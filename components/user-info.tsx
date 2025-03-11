@@ -7,20 +7,20 @@ export function UserInfo() {
         <div className="flex gap-2 w-full justify-between">
           <div className="flex gap-2">
             <CircleUserRoundIcon className="stroke-[#79747e] w-7 h-7" />
-            <div className="flex flex-col gap-0">
+            <div className="flex flex-col gap-0.5">
               <span className="text-sm">Guest</span>
-              <button className="cursor-pointer px-1 py-0 ">
+              <button className="cursor-pointer px-1 py-0 hover:bg-[#d5828e] hover:text-white transition-colors duration-200 ease-in-out rounded">
                 <span className="text-xs">Login Required</span>
               </button>
             </div>
           </div>
 
-          <div className="flex items-center flex-col">
+          <div className="flex items-center flex-col gap-0.5">
             <div className="flex items-center gap-1">
               <UserIcon className="stroke-[#79747e] w-5 h-5" />
               <span className="text-xs">Lvl 1</span>
             </div>
-            <button className="cursor-pointer px-1 py-0 hover:bg-[] ">
+            <button className="cursor-pointer px-1 py-0 hover:bg-[#d5828e] hover:text-white transition-colors duration-200 ease-in-out rounded">
               <span className="text-xs">Log Out</span>
             </button>
           </div>

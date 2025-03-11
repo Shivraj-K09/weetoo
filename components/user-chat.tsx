@@ -3,7 +3,7 @@ import { Input } from "./ui/input";
 
 export function UserChat() {
   return (
-    <div className="h-[22rem] bg-[#EBE0E1] rounded-md">
+    <div className="h-[35rem] bg-[#EBE0E1] rounded-md">
       <div className="flex flex-col h-full">
         <div className="h-9 bg-[#D5828E] rounded-sm px-4 flex items-center justify-between w-full">
           <span className="text-xs text-white">Users Online: 3,280</span>

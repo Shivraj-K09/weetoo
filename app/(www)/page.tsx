@@ -505,7 +505,10 @@ export default function Home() {
                 setSelectedSymbol(symbolMap[value] || "CAPITALCOM:US30");
               }}
             >
-              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+              <SelectTrigger
+                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                aria-label="암호화폐"
+              >
                 <SelectValue placeholder="암호화폐" className="text-white" />
               </SelectTrigger>
               <SelectContent>
@@ -535,7 +538,10 @@ export default function Home() {
                 setSelectedSymbol(symbolMap[value] || selectedSymbol);
               }}
             >
-              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+              <SelectTrigger
+                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                aria-label="통화"
+              >
                 <SelectValue placeholder="통화" className="text-white" />
               </SelectTrigger>
               <SelectContent>
@@ -563,7 +569,10 @@ export default function Home() {
                 setSelectedSymbol(symbolMap[value] || selectedSymbol);
               }}
             >
-              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+              <SelectTrigger
+                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                aria-label="지수"
+              >
                 <SelectValue placeholder="지수" className="text-white" />
               </SelectTrigger>
               <SelectContent>
@@ -595,7 +604,10 @@ export default function Home() {
                 setSelectedSymbol(symbolMap[value] || selectedSymbol);
               }}
             >
-              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+              <SelectTrigger
+                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                aria-label="원자재"
+              >
                 <SelectValue placeholder="원자재" className="text-white" />
               </SelectTrigger>
               <SelectContent>
