@@ -1,8 +1,9 @@
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { CalendarIcon, MenuIcon, UserIcon } from "lucide-react";
+import { MenuIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "./ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import {
   Sheet,
   SheetContent,
@@ -11,8 +12,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export function Navigation() {
   return (
