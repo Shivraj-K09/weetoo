@@ -12,10 +12,17 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { TickerTape } from "react-ts-tradingview-widgets";
 
+interface TradingViewWindow extends Window {
+  TradingView?: {
+    widget: new (config: any) => any;
+  };
+}
+
 export function DesktopContent() {
   const container = useRef<HTMLDivElement>(null);
   const [selectedSymbol, setSelectedSymbol] =
     useState<string>("CAPITALCOM:US30");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Clear previous chart if it exists
@@ -41,7 +48,23 @@ export function DesktopContent() {
           "calendar": false,
           "support_host": "https://www.tradingview.com"
         }`;
-    container?.current?.appendChild(script);
+
+    script.onload = () => setIsLoading(false);
+    script.onerror = () => {
+      console.error("TradingView widget failed to load");
+      setIsLoading(false);
+    };
+
+    if (container.current) {
+      container.current.appendChild(script);
+    }
+
+    return () => {
+      if (container.current) {
+        container.current.innerHTML = "";
+      }
+      setIsLoading(true);
+    };
   }, [selectedSymbol]);
 
   return (
@@ -630,10 +653,19 @@ export function DesktopContent() {
             </Select>
           </div>
           <div className="h-[25rem] w-full pb-4">
+            {isLoading && (
+              <div className="h-full w-full bg-gray-200 animate-pulse rounded-sm flex items-center justify-center">
+                Loading chart...
+              </div>
+            )}
             <div
               className="tradingview-widget-container"
               ref={container}
-              style={{ height: "100%", width: "100%" }}
+              style={{
+                height: "100%",
+                width: "100%",
+                display: isLoading ? "none" : "block",
+              }}
             >
               <div
                 className="tradingview-widget-container__widget"

@@ -10,6 +10,10 @@ export function MobileContent() {
       </div>
 
       <MobileCarousel />
+
+      <h2 className="flex items-center justify-center py-20 text-3xl">
+        Under construction
+      </h2>
     </div>
   );
 }
