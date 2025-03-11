@@ -534,10 +534,12 @@ export function DesktopContent() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
+                className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+                  cryptoValue ? "text-red-500 font-semibold" : "text-white"
+                }`}
                 aria-label="암호화폐"
               >
-                <SelectValue placeholder="암호화폐" className="text-white" />
+                <SelectValue placeholder="암호화폐" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="BTCUSDT" className="text-sm py-0.5">
@@ -574,10 +576,12 @@ export function DesktopContent() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
+                className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+                  currencyValue ? "text-red-500 font-semibold" : "text-white"
+                }`}
                 aria-label="통화"
               >
-                <SelectValue placeholder="통화" className="text-white" />
+                <SelectValue placeholder="통화" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="EURUSD" className="text-sm py-0.5">
@@ -612,10 +616,12 @@ export function DesktopContent() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
+                className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+                  indexValue ? "text-red-500 font-semibold" : "text-white"
+                }`}
                 aria-label="지수"
               >
-                <SelectValue placeholder="지수" className="text-white" />
+                <SelectValue placeholder="지수" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NAS 100" className="text-sm py-0.5">
@@ -654,10 +660,12 @@ export function DesktopContent() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
+                className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+                  commodityValue ? "text-red-500 font-semibold" : "text-white"
+                }`}
                 aria-label="원자재"
               >
-                <SelectValue placeholder="원자재" className="text-white" />
+                <SelectValue placeholder="원자재" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="XAUUSD" className="text-sm py-0.5">
