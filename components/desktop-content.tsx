@@ -12,12 +12,6 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { TickerTape } from "react-ts-tradingview-widgets";
 
-interface TradingViewWindow extends Window {
-  TradingView?: {
-    widget: new (config: any) => any;
-  };
-}
-
 export function DesktopContent() {
   const container = useRef<HTMLDivElement>(null);
   const [selectedSymbol, setSelectedSymbol] =
