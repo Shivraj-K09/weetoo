@@ -9,7 +9,7 @@ export function UserInfo() {
             <CircleUserRoundIcon className="stroke-[#79747e] w-7 h-7" />
             <div className="flex flex-col gap-0">
               <span className="text-sm">Guest</span>
-              <button className="cursor-pointer px-1 py-0 border border-red-500">
+              <button className="cursor-pointer px-1 py-0 ">
                 <span className="text-xs">Login Required</span>
               </button>
             </div>
@@ -20,7 +20,7 @@ export function UserInfo() {
               <UserIcon className="stroke-[#79747e] w-5 h-5" />
               <span className="text-xs">Lvl 1</span>
             </div>
-            <button className="cursor-pointer px-1 py-0 hover:bg-[] border border-red-500">
+            <button className="cursor-pointer px-1 py-0 hover:bg-[] ">
               <span className="text-xs">Log Out</span>
             </button>
           </div>
