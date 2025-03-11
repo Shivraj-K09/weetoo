@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export function TopBar() {
   return (
-    <div className="h-11 flex items-center" suppressHydrationWarning>
+    <div className="flex py-2 items-center">
       <div className="container mx-auto flex gap-10 justify-end">
         <Link
           href="/purchase"

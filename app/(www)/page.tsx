@@ -31,7 +31,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="font-[family-name:var(--font-geist-sans)] w-full h-full overflow-y-auto">
+    <div className="font-[family-name:var(--font-geist-sans)] w-full h-full">
       <div className="h-full">
         <Image
           src="/banner.png"

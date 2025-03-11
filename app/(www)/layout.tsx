@@ -10,12 +10,12 @@ export default function MainLayout({
 }) {
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="w-full h-full flex flex-col overflow-y-auto">
+      <div className="w-full h-full flex flex-col">
         <TopBar />
         <Navigation />
-        <div className="container mx-auto px-5 py-2 gap-4 flex h-full overflow-y-auto">
+        <div className="container mx-auto px-5 py-2 gap-4 flex h-full">
           <UserSidebar />
-          <div className="flex flex-1 h-full overflow-y-auto">{children}</div>
+          <div className="flex flex-1 h-full">{children}</div>
           <RightSidebar />
         </div>
       </div>
