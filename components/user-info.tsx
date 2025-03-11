@@ -2,24 +2,27 @@ import { CircleUserRoundIcon, SettingsIcon, UserIcon } from "lucide-react";
 
 export function UserInfo() {
   return (
-    <div className="p-4 bg-[#EBE0E1] rounded-md">
+    <div className="p-4 py-6  bg-[#EBE0E1] rounded-md">
       <div className="flex flex-col gap-4">
         <div className="flex gap-2 w-full justify-between">
           <div className="flex gap-2">
-            <CircleUserRoundIcon className="stroke-[#79747e]" />
-            <div className="flex flex-col">
+            <CircleUserRoundIcon className="stroke-[#79747e] w-7 h-7" />
+            <div className="flex flex-col gap-0">
               <span className="text-sm">Guest</span>
-              <span className="text-xs">Login Required</span>
+              <button className="cursor-pointer px-1 py-0 border border-red-500">
+                <span className="text-xs">Login Required</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center flex-col gap-1">
+          <div className="flex items-center flex-col">
             <div className="flex items-center gap-1">
               <UserIcon className="stroke-[#79747e] w-5 h-5" />
               <span className="text-xs">Lvl 1</span>
             </div>
-
-            <span className="text-xs">Log Out</span>
+            <button className="cursor-pointer px-1 py-0 hover:bg-[] border border-red-500">
+              <span className="text-xs">Log Out</span>
+            </button>
           </div>
         </div>
 

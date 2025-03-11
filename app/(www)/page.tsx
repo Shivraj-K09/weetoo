@@ -1,34 +1,48 @@
 "use client";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UsersIcon } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TickerTape } from "react-ts-tradingview-widgets";
 
 export default function Home() {
   const container = useRef<HTMLDivElement>(null);
+  const [selectedSymbol, setSelectedSymbol] =
+    useState<string>("CAPITALCOM:US30");
 
   useEffect(() => {
+    // Clear previous chart if it exists
+    if (container.current) {
+      container.current.innerHTML = "";
+    }
+
     const script = document.createElement("script");
     script.src =
       "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = `
-        {
-          "autosize": true,
-          "symbol": "NASDAQ:AAPL",
-          "interval": "D",
-          "timezone": "Etc/UTC",
-          "theme": "light",
-          "style": "1",
-          "locale": "en",
-          "allow_symbol_change": true,
-          "calendar": false,
-          "support_host": "https://www.tradingview.com"
-        }`;
+      {
+        "autosize": true,
+        "symbol": "${selectedSymbol}",
+        "timezone": "Etc/UTC",
+        "theme": "light",
+        "style": "1",
+        "locale": "en",
+        "range": "YTD",
+        "allow_symbol_change": true,
+        "calendar": false,
+        "support_host": "https://www.tradingview.com"
+      }`;
     container?.current?.appendChild(script);
-  }, []);
+  }, [selectedSymbol]);
 
   return (
     <div className="font-[family-name:var(--font-geist-sans)] w-full h-full">
@@ -477,16 +491,143 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="h-[18rem] py-4">
-          <div
-            className="tradingview-widget-container"
-            ref={container}
-            style={{ height: "100%", width: "100%" }}
-          >
+        <div>
+          <div className="flex gap-3 py-3 items-center justify-center w-full">
+            <Select
+              onValueChange={(value) => {
+                // Map the dropdown values to TradingView symbols
+                const symbolMap: Record<string, string> = {
+                  BTCUSDT: "BINANCE:BTCUSDT",
+                  ETHUSDT: "BINANCE:ETHUSDT",
+                  XRPUSDT: "BINANCE:XRPUSDT",
+                  SOLUSDT: "BINANCE:SOLUSDT",
+                };
+                setSelectedSymbol(symbolMap[value] || "CAPITALCOM:US30");
+              }}
+            >
+              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+                <SelectValue placeholder="암호화폐" className="text-white" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BTCUSDT" className="text-sm py-0.5">
+                  BTCUSDT
+                </SelectItem>
+                <SelectItem value="ETHUSDT" className="text-sm py-0.5">
+                  ETHUSDT
+                </SelectItem>
+                <SelectItem value="XRPUSDT" className="text-sm py-0.5">
+                  XRPUSDT
+                </SelectItem>
+                <SelectItem value="SOLUSDT" className="text-sm py-0.5">
+                  SOLUSDT
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              onValueChange={(value) => {
+                // Map the dropdown values to TradingView symbols
+                const symbolMap: Record<string, string> = {
+                  EURUSD: "FX:EURUSD",
+                  GBPUSD: "FX:GBPUSD",
+                  USDJPY: "FX:USDJPY",
+                };
+                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+              }}
+            >
+              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+                <SelectValue placeholder="통화" className="text-white" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EURUSD" className="text-sm py-0.5">
+                  EURUSD
+                </SelectItem>
+                <SelectItem value="GBPUSD" className="text-sm py-0.5">
+                  GBPUSD
+                </SelectItem>
+                <SelectItem value="USDJPY" className="text-sm py-0.5">
+                  USDJPY
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              onValueChange={(value) => {
+                // Map the dropdown values to TradingView symbols
+                const symbolMap: Record<string, string> = {
+                  "NAS 100": "NASDAQ:NDX",
+                  "SP 500": "FOREXCOM:SPXUSD",
+                  HSI: "HSI:HSI",
+                  DXY: "CAPITALCOM:DXY",
+                };
+                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+              }}
+            >
+              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+                <SelectValue placeholder="지수" className="text-white" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NAS 100" className="text-sm py-0.5">
+                  NAS 100
+                </SelectItem>
+                <SelectItem value="SP 500" className="text-sm py-0.5">
+                  SP 500
+                </SelectItem>
+                <SelectItem value="HSI" className="text-sm py-0.5">
+                  HSI
+                </SelectItem>
+                <SelectItem value="DXY" className="text-sm py-0.5">
+                  DXY
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              onValueChange={(value) => {
+                // Map the dropdown values to TradingView symbols
+                const symbolMap: Record<string, string> = {
+                  XAUUSD: "OANDA:XAUUSD",
+                  XAGUSD: "OANDA:XAGUSD",
+                  "CL1!": "NYMEX:CL1!",
+                  "NG1!": "NYMEX:NG1!",
+                  UKOIL: "OANDA:BCOUSD",
+                };
+                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+              }}
+            >
+              <SelectTrigger className="h-8 w-32 shadow-none bg-[#D9D9D9]">
+                <SelectValue placeholder="원자재" className="text-white" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="XAUUSD" className="text-sm py-0.5">
+                  XAUUSD
+                </SelectItem>
+                <SelectItem value="XAGUSD" className="text-sm py-0.5">
+                  XAGUSD
+                </SelectItem>
+                <SelectItem value="CL1!" className="text-sm py-0.5">
+                  CL1!
+                </SelectItem>
+                <SelectItem value="NG1!" className="text-sm py-0.5">
+                  NG1!
+                </SelectItem>
+                <SelectItem value="UKOIL" className="text-sm py-0.5">
+                  UKOIL
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="h-[25rem] w-full pb-4">
             <div
-              className="tradingview-widget-container__widget"
-              style={{ height: "calc(100% - 32px)", width: "100%" }}
-            ></div>
+              className="tradingview-widget-container"
+              ref={container}
+              style={{ height: "100%", width: "100%" }}
+            >
+              <div
+                className="tradingview-widget-container__widget"
+                style={{ height: "calc(100% - 32px)", width: "100%" }}
+              ></div>
+            </div>
           </div>
         </div>
       </div>

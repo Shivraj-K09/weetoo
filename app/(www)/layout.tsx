@@ -13,7 +13,7 @@ export default function MainLayout({
       <div className="w-full h-full flex flex-col">
         <TopBar />
         <Navigation />
-        <div className="container mx-auto px-5 py-2 gap-4 flex h-full">
+        <div className="max-w-[80rem] w-full mx-auto px-5 py-2 gap-4 flex h-full">
           <UserSidebar />
           <div className="flex flex-1 h-full">{children}</div>
           <RightSidebar />
