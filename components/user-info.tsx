@@ -37,7 +37,7 @@ export function UserInfo() {
           </div>
           <div className="flex text-xs items-center flex-col gap-1">
             <span>my page</span>
-            <SettingsIcon className="w-4 h-4" />
+            <SettingsIcon className="w-4 h-4 cursor-pointer" />
           </div>
         </div>
       </div>

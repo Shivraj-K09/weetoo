@@ -16,7 +16,7 @@ export function UserChat() {
               placeholder="Please Login First"
               className="h-9 shadow-none placeholder:text-white bg-[#A1999A] rounded-sm text-[0.6875rem] pr-17.5"
             />
-            <Button className="h-8 absolute right-0 rounded-sm text-xs bg-[#7B7A7F] transition-colors duration-200 ease-in-out">
+            <Button className="h-8 absolute right-0 rounded-sm text-xs bg-[#7B7A7F] transition-colors duration-200 ease-in-out cursor-pointer">
               Send
             </Button>
           </div>

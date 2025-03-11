@@ -16,6 +16,10 @@ export function DesktopContent() {
   const container = useRef<HTMLDivElement>(null);
   const [selectedSymbol, setSelectedSymbol] =
     useState<string>("CAPITALCOM:US30");
+  const [cryptoValue, setCryptoValue] = useState<string>("");
+  const [currencyValue, setCurrencyValue] = useState<string>("");
+  const [indexValue, setIndexValue] = useState<string>("");
+  const [commodityValue, setCommodityValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -511,7 +515,14 @@ export function DesktopContent() {
         <div>
           <div className="flex gap-3 py-3 items-center justify-center w-full">
             <Select
+              value={cryptoValue}
               onValueChange={(value) => {
+                // Only update necessary states
+                setCryptoValue(value);
+                setCurrencyValue("");
+                setIndexValue("");
+                setCommodityValue("");
+
                 // Map the dropdown values to TradingView symbols
                 const symbolMap: Record<string, string> = {
                   BTCUSDT: "BINANCE:BTCUSDT",
@@ -523,7 +534,7 @@ export function DesktopContent() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
                 aria-label="암호화폐"
               >
                 <SelectValue placeholder="암호화폐" className="text-white" />
@@ -545,18 +556,25 @@ export function DesktopContent() {
             </Select>
 
             <Select
+              value={currencyValue}
               onValueChange={(value) => {
+                // Only update necessary states
+                setCurrencyValue(value);
+                setCryptoValue("");
+                setIndexValue("");
+                setCommodityValue("");
+
                 // Map the dropdown values to TradingView symbols
                 const symbolMap: Record<string, string> = {
                   EURUSD: "FX:EURUSD",
                   GBPUSD: "FX:GBPUSD",
                   USDJPY: "FX:USDJPY",
                 };
-                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+                setSelectedSymbol(symbolMap[value] || "CAPITALCOM:US30");
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
                 aria-label="통화"
               >
                 <SelectValue placeholder="통화" className="text-white" />
@@ -575,7 +593,14 @@ export function DesktopContent() {
             </Select>
 
             <Select
+              value={indexValue}
               onValueChange={(value) => {
+                // Only update necessary states
+                setIndexValue(value);
+                setCryptoValue("");
+                setCurrencyValue("");
+                setCommodityValue("");
+
                 // Map the dropdown values to TradingView symbols
                 const symbolMap: Record<string, string> = {
                   "NAS 100": "NASDAQ:NDX",
@@ -583,11 +608,11 @@ export function DesktopContent() {
                   HSI: "HSI:HSI",
                   DXY: "CAPITALCOM:DXY",
                 };
-                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+                setSelectedSymbol(symbolMap[value] || "CAPITALCOM:US30");
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
                 aria-label="지수"
               >
                 <SelectValue placeholder="지수" className="text-white" />
@@ -609,7 +634,14 @@ export function DesktopContent() {
             </Select>
 
             <Select
+              value={commodityValue}
               onValueChange={(value) => {
+                // Only update necessary states
+                setCommodityValue(value);
+                setCryptoValue("");
+                setCurrencyValue("");
+                setIndexValue("");
+
                 // Map the dropdown values to TradingView symbols
                 const symbolMap: Record<string, string> = {
                   XAUUSD: "OANDA:XAUUSD",
@@ -618,11 +650,11 @@ export function DesktopContent() {
                   "NG1!": "NYMEX:NG1!",
                   UKOIL: "OANDA:BCOUSD",
                 };
-                setSelectedSymbol(symbolMap[value] || selectedSymbol);
+                setSelectedSymbol(symbolMap[value] || "CAPITALCOM:US30");
               }}
             >
               <SelectTrigger
-                className="h-8 w-32 shadow-none bg-[#D9D9D9]"
+                className="h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer"
                 aria-label="원자재"
               >
                 <SelectValue placeholder="원자재" className="text-white" />

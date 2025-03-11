@@ -20,7 +20,7 @@ export function ExchangeList() {
               <span className="font-semibold text-sm">40%</span>
             </div>
 
-            <Button className="rounded-full bg-[#65558f] text-white h-8">
+            <Button className="rounded-full bg-[#65558f] text-white h-8 cursor-pointer">
               신청하기
             </Button>
           </div>
@@ -41,7 +41,7 @@ export function ExchangeList() {
               <span className="font-semibold text-sm">40%</span>
             </div>
 
-            <Button className="rounded-full bg-[#65558f] text-white h-8">
+            <Button className="rounded-full bg-[#65558f] text-white h-8 cursor-pointer">
               신청하기
             </Button>
           </div>
@@ -62,7 +62,7 @@ export function ExchangeList() {
               <span className="font-semibold text-sm">40%</span>
             </div>
 
-            <Button className="rounded-full bg-[#65558f] text-white h-8">
+            <Button className="rounded-full bg-[#65558f] text-white h-8 cursor-pointer">
               신청하기
             </Button>
           </div>
@@ -83,7 +83,7 @@ export function ExchangeList() {
               <span className="font-semibold text-sm">40%</span>
             </div>
 
-            <Button className="rounded-full bg-[#65558f] text-white h-8">
+            <Button className="rounded-full bg-[#65558f] text-white h-8 cursor-pointer">
               신청하기
             </Button>
           </div>
@@ -104,7 +104,7 @@ export function ExchangeList() {
               <span className="font-semibold text-sm">40%</span>
             </div>
 
-            <Button className="rounded-full bg-[#65558f] text-white h-8">
+            <Button className="rounded-full bg-[#65558f] text-white h-8 cursor-pointer">
               신청하기
             </Button>
           </div>

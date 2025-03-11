@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { XIcon } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
@@ -21,7 +21,9 @@ export function TopBar() {
   return (
     <div className="hidden lg:flex py-2 items-center">
       <div className="max-w-[80rem] mx-auto flex w-full justify-between">
-        <Image src="/logo1.png" width={100} height={25} alt="logo" />
+        <Link href="/">
+          <Image src="/logo1.png" width={100} height={25} alt="logo" />
+        </Link>
         <div className="flex gap-10">
           <Link
             href="/purchase"
@@ -29,7 +31,7 @@ export function TopBar() {
           ></Link>
 
           <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
+            <PopoverTrigger asChild className="cursor-pointer">
               <Button variant="ghost">
                 <Image
                   src="/coins.png"
@@ -51,10 +53,10 @@ export function TopBar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-white hover:bg-[#5a5f6b]"
+                    className="h-6 cursor-pointer w-6 text-white hover:bg-[#5a5f6b]"
                     onClick={() => setOpen(false)}
                   >
-                    <X className="h-4 w-4" />
+                    <XIcon className="h-4 w-4" />
                   </Button>
                 </div>
 

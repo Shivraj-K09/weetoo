@@ -10,7 +10,7 @@ export function RefundFee() {
       </div>
       <div className="flex flex-col gap-1 items-center justify-center w-full mt-1">
         <Image src="/refund.png" alt="refund-fee" width={300} height={500} />
-        <Button className="w-full bg-[#3f5ae7] hover:bg-transparent hover:border hover:border-[#3f5ae7] hover:text-[#3f5ae7] text-white text-xs transition-colors duration-200 ease-in-out rounded-full h-10">
+        <Button className="w-full bg-[#3f5ae7] hover:bg-transparent hover:border hover:border-[#3f5ae7] hover:text-[#3f5ae7] text-white text-xs transition-colors duration-200 ease-in-out rounded-full h-10 cursor-pointer">
           나도 예상 환급액 조회하기
         </Button>
       </div>
