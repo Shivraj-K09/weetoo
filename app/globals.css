@@ -143,3 +143,7 @@ body,
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
+
+.carousel-container {
+  overflow: visible !important;
+}
