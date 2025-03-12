@@ -32,16 +32,25 @@ export function Navigation() {
               </HoverCardTrigger>
               <HoverCardContent className="w-50 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <Link href="/trader">트레이딩</Link>
-                  </div>
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <Link href="/trader-rank">트레이더 순위</Link>
-                  </div>
+                  <Link
+                    href="/trader"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    트레이딩
+                  </Link>
+                  <Link
+                    href="/trader-rank"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    트레이더 순위
+                  </Link>
 
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <Link href="/kor-coin-rank">kor_coin 순위</Link>
-                  </div>
+                  <Link
+                    href="/kor-coin-rank"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    kor_coin 순위
+                  </Link>
                 </div>
               </HoverCardContent>
             </HoverCard>
