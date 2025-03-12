@@ -56,13 +56,19 @@ export default function KorCoinRank() {
   return (
     <div className="w-full h-full py-5">
       <div className="flex flex-col w-full">
-        <div className="flex gap-5 items-center w-full justify-center">
+        <Image
+          src="/trader-banner.png"
+          alt="trader-banner"
+          width={1000}
+          height={250}
+          className="w-full rounded"
+        />
+        <div className="flex gap-5 mt-5 items-center w-full justify-center">
           <Image
             src="/title-coin.png"
             alt="kor-coin"
             width={100}
             height={100}
-            // lazy loading
             loading="lazy"
           />
           <h1 className="text-6xl font-semibold uppercase">Kor_coin Ranking</h1>

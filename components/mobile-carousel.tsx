@@ -54,7 +54,7 @@ function TradingViewWidget() {
   }, []);
 
   return (
-    <div className="h-full mt-2 rounded-sm">
+    <div className="h-full mt-2 rounded-sm w-full">
       {isLoading && (
         <div className="h-full w-full bg-gray-200 animate-pulse rounded-sm flex items-center justify-center">
           Loading chart...
@@ -139,6 +139,9 @@ export function MobileCarousel() {
         className="w-full max-w-[350px] relative"
         onMouseEnter={plugin.current.stop}
         onMouseLeave={plugin.current.reset}
+        opts={{
+          loop: true,
+        }}
       >
         <div className="absolute top-1/2 left-8 -translate-y-1/2 z-20 pointer-events-auto">
           <CarouselPrevious className="h-8 w-8 bg-white text-black" />
