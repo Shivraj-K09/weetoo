@@ -33,7 +33,7 @@ export function Navigation() {
               <HoverCardContent className="w-50 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>트레이딩</span>
+                    <Link href="/trader">트레이딩</Link>
                   </div>
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
                     <span>트레이더 순위</span>
