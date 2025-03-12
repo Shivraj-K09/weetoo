@@ -6,7 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { leftTableUsers, rightTableUsers, users } from "@/data/data";
+import { leftTableUsers, rightTableUsers } from "@/data/data";
 import { UserCircleIcon } from "lucide-react";
 import Image from "next/image";
 import { JSX } from "react";
