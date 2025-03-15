@@ -20,9 +20,11 @@ export function Trading() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Clear previous chart if it exists
-    if (container.current) {
-      container.current.innerHTML = "";
+    // Capture the current DOM node once
+    const containerEl = container.current;
+
+    if (containerEl) {
+      containerEl.innerHTML = "";
     }
 
     const script = document.createElement("script");
@@ -30,21 +32,21 @@ export function Trading() {
       "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
-    script.innerHTML = `
-            {
-              "autosize": true,
-              "symbol": "${selectedSymbol}",
-              "interval": "D",
-              "timezone": "Asia/Seoul",
-              "theme": "light",
-              "style": "1",
-              "locale": "kr",
-              "hide_top_toolbar": true,
-              "allow_symbol_change": true,
-              "save_image": false,
-              "calendar": false,
-              "support_host": "https://www.tradingview.com"
-            }`;
+
+    script.innerHTML = `{
+      "autosize": true,
+      "symbol": "${selectedSymbol}",
+      "interval": "D",
+      "timezone": "Asia/Seoul",
+      "theme": "light",
+      "style": "1",
+      "locale": "kr",
+      "hide_top_toolbar": true,
+      "allow_symbol_change": true,
+      "save_image": false,
+      "calendar": false,
+      "support_host": "https://www.tradingview.com"
+    }`;
 
     script.onload = () => setIsLoading(false);
     script.onerror = () => {
@@ -52,13 +54,13 @@ export function Trading() {
       setIsLoading(false);
     };
 
-    if (container.current) {
-      container.current.appendChild(script);
+    if (containerEl) {
+      containerEl.appendChild(script);
     }
 
     return () => {
-      if (container.current) {
-        container.current.innerHTML = "";
+      if (containerEl) {
+        containerEl.innerHTML = "";
       }
       setIsLoading(true);
     };

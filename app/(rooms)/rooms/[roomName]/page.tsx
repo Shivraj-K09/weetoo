@@ -61,8 +61,9 @@ export default function RoomPage() {
   const container = useRef<HTMLDivElement>(null);
 
   // Extract room ID and name from the URL
-  const [roomId, ...roomNameParts] = roomNameParam.split("-");
-  const roomName = roomNameParts.join("-");
+  // const [roomId, ...roomNameParts] = roomNameParam.split("-");
+  const [roomId] = roomNameParam.split("-");
+  // const roomName = roomNameParts.join("-");
 
   // State for the room details
   const [roomDetails, setRoomDetails] = useState<Room>({
@@ -86,10 +87,12 @@ export default function RoomPage() {
   //   : "Untitled Room";
 
   useEffect(() => {
-    if (!container.current) return;
+    // Capture the container element once
+    const containerEl = container.current;
+    if (!containerEl) return;
 
     // Clear any existing content
-    container.current.innerHTML = "";
+    containerEl.innerHTML = "";
 
     const script = document.createElement("script");
     script.src =
@@ -97,30 +100,28 @@ export default function RoomPage() {
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = `
-            {
-              "autosize": true,
-              "symbol": "${roomDetails.symbol}",
-              "interval": "D",
-              "timezone": "Asia/Seoul",
-              "theme": "dark",
-              "style": "1",
-              "locale": "kr",
-              "withdateranges": true,
-              "hide_side_toolbar": false,
-              "backgroundColor": "rgba(33, 38, 49, 1)",
-              "gridColor": "rgba(33, 38, 49, 1)",
-              "allow_symbol_change": true,
-              "calendar": false,
-              "support_host": "https://www.tradingview.com"
-            }`;
+              {
+                "autosize": true,
+                "symbol": "${roomDetails.symbol}",
+                "interval": "D",
+                "timezone": "Asia/Seoul",
+                "theme": "dark",
+                "style": "1",
+                "locale": "kr",
+                "withdateranges": true,
+                "hide_side_toolbar": false,
+                "backgroundColor": "rgba(33, 38, 49, 1)",
+                "gridColor": "rgba(33, 38, 49, 1)",
+                "allow_symbol_change": true,
+                "calendar": false,
+                "support_host": "https://www.tradingview.com"
+              }`;
 
-    container.current.appendChild(script);
+    containerEl.appendChild(script);
 
     // Cleanup function
     return () => {
-      if (container.current) {
-        container.current.innerHTML = "";
-      }
+      containerEl.innerHTML = "";
     };
   }, [roomDetails.symbol]); // Only re-run when symbol changes
 

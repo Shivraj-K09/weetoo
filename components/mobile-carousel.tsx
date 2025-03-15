@@ -17,24 +17,26 @@ function TradingViewWidget() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Capture the container element once
+    const containerEl = container.current;
+
     const script = document.createElement("script");
     script.src =
       "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
-    script.innerHTML = `
-      {
-        "autosize": true,
-        "symbol": "NASDAQ:AAPL",
-        "interval": "D",
-        "timezone": "Etc/UTC",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "allow_symbol_change": true,
-        "calendar": false,
-        "support_host": "https://www.tradingview.com"
-      }`;
+    script.innerHTML = `{
+      "autosize": true,
+      "symbol": "NASDAQ:AAPL",
+      "interval": "D",
+      "timezone": "Etc/UTC",
+      "theme": "dark",
+      "style": "1",
+      "locale": "en",
+      "allow_symbol_change": true,
+      "calendar": false,
+      "support_host": "https://www.tradingview.com"
+    }`;
 
     script.onload = () => setIsLoading(false);
     script.onerror = () => {
@@ -42,13 +44,13 @@ function TradingViewWidget() {
       setIsLoading(false);
     };
 
-    if (container.current) {
-      container.current.appendChild(script);
+    if (containerEl) {
+      containerEl.appendChild(script);
     }
 
     return () => {
-      if (container.current) {
-        container.current.innerHTML = "";
+      if (containerEl) {
+        containerEl.innerHTML = "";
       }
     };
   }, []);
