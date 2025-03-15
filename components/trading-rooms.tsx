@@ -40,7 +40,7 @@ const getRoomsFromStorage = (): Room[] => {
     const storedRooms = localStorage.getItem("tradingRooms");
     if (storedRooms) {
       try {
-        return JSON.parse(storedRooms).map((room: any) => ({
+        return JSON.parse(storedRooms).map((room: Room) => ({
           ...room,
           createdAt: new Date(room.createdAt),
         }));

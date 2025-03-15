@@ -78,12 +78,12 @@ export default function RoomPage() {
   }, [roomId]);
 
   // Check if it is a private room
-  const isPrivate = roomDetails.privacy === "private";
+  // const isPrivate = roomDetails.privacy === "private";
 
   // Format room title from the room name
-  const title = roomName
-    ? roomName.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
-    : "Untitled Room";
+  // const title = roomName
+  //   ? roomName.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  //   : "Untitled Room";
 
   useEffect(() => {
     if (!container.current) return;

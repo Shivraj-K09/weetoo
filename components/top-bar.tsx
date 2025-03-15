@@ -13,7 +13,6 @@ import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Skeleton } from "./ui/skeleton";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
@@ -34,9 +33,9 @@ export function TopBar() {
     setChecked(newChecked);
   };
 
-  const handleOpen = (newOpen: boolean) => {
-    setOpen(newOpen);
-  };
+  // const handleOpen = (newOpen: boolean) => {
+  //   setOpen(newOpen);
+  // };
 
   return (
     <div className="hidden lg:flex py-2 items-center">
