@@ -35,7 +35,7 @@ export function Trading() {
               "autosize": true,
               "symbol": "${selectedSymbol}",
               "interval": "D",
-              "timezone": "Etc/UTC",
+              "timezone": "Asia/Seoul",
               "theme": "light",
               "style": "1",
               "locale": "kr",
@@ -87,7 +87,7 @@ export function Trading() {
           }}
         >
           <SelectTrigger
-            className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+            className={`h-8 w-32 shadow-none border cursor-pointer ${
               cryptoValue ? "text-red-500 font-semibold" : "text-white"
             }`}
             aria-label="암호화폐"

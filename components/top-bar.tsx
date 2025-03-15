@@ -9,14 +9,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { XIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { Skeleton } from "./ui/skeleton";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
+  const [openMarket, setOpenMarket] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("10000");
+  const [quantities, setQuantities] = useState([1, 1, 1]);
+  const [checked, setChecked] = useState([false, false, false]);
+
+  const updateQuantity = (index: number, value: number) => {
+    const newQuantities = [...quantities];
+    newQuantities[index] = Math.max(1, value);
+    setQuantities(newQuantities);
+  };
+
+  const toggleChecked = (index: number) => {
+    const newChecked = [...checked];
+    newChecked[index] = !newChecked[index];
+    setChecked(newChecked);
+  };
+
+  const handleOpen = (newOpen: boolean) => {
+    setOpen(newOpen);
+  };
 
   return (
     <div className="hidden lg:flex py-2 items-center">
@@ -24,11 +44,217 @@ export function TopBar() {
         <Link href="/">
           <Image src="/logo1.png" width={100} height={25} alt="logo" />
         </Link>
-        <div className="flex gap-10">
-          <Link
-            href="/purchase"
-            className="flex items-center font-semibold text-sm gap-2"
-          ></Link>
+        <div className="flex items-center gap-10">
+          <Popover open={openMarket} onOpenChange={setOpenMarket}>
+            <PopoverTrigger asChild className="cursor-pointer">
+              <Button variant="ghost">
+                <Image src="/basket.png" width={25} height={25} alt="basket" />
+                위투 마켓
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[700px] p-0" align="start">
+              <div className="flex flex-col bg-gray-100">
+                {/* Header */}
+                <div className="bg-[#2d3142] text-white p-3 flex justify-between items-center">
+                  <h1 className="text-lg font-bold">위투 마켓</h1>
+                  <button
+                    className="text-white cursor-pointer"
+                    onClick={() => setOpenMarket(false)}
+                  >
+                    <XIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Card 1 */}
+                    <div className="bg-white rounded-lg overflow-hidden border border-red-200">
+                      <div className="p-4 flex flex-col items-center">
+                        <div className="w-full h-20 bg-amber-100 rounded-md mb-3 flex items-center justify-center">
+                          <div className="bg-amber-200 w-10 h-10 rounded-full"></div>
+                        </div>
+
+                        <h3 className="font-medium text-center mb-2 text-xs">
+                          회원 전적 초기화(통합)
+                        </h3>
+
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <div className="flex items-center">
+                            <Checkbox
+                              id="check1"
+                              className="mr-1 h-3 w-3 rounded-full bg-red-500 border-red-500"
+                              checked={checked[0]}
+                              onCheckedChange={() => toggleChecked(0)}
+                            />
+                            <span className="text-gray-700 text-xs">
+                              10,000 캐시
+                            </span>
+                          </div>
+
+                          <div className="flex items-center border rounded">
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(0, quantities[0] - 1)
+                              }
+                            >
+                              <MinusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                            <input
+                              type="text"
+                              value={quantities[0]}
+                              onChange={(e) =>
+                                updateQuantity(
+                                  0,
+                                  Number.parseInt(e.target.value) || 1
+                                )
+                              }
+                              className="w-8 text-center text-xs"
+                            />
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(0, quantities[0] + 1)
+                              }
+                            >
+                              <PlusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button className="cursor-pointer w-full bg-red-500 text-white py-2 text-xs font-medium">
+                        구매하기 (선물가능)
+                      </button>
+                    </div>
+
+                    {/* Card 2 */}
+                    <div className="bg-white rounded-lg overflow-hidden border border-blue-200">
+                      <div className="p-4 flex flex-col items-center">
+                        <div className="w-full h-20 bg-blue-100 rounded-md mb-3 flex items-center justify-center">
+                          <div className="bg-blue-200 w-10 h-10 rounded-full"></div>
+                        </div>
+
+                        <h3 className="font-medium text-center mb-2 text-xs">
+                          채팅방 전적 초기화
+                        </h3>
+
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <div className="flex items-center">
+                            <Checkbox
+                              id="check2"
+                              className="mr-1 h-3 w-3 rounded-full bg-red-500 border-red-500"
+                              checked={checked[1]}
+                              onCheckedChange={() => toggleChecked(1)}
+                            />
+                            <span className="text-gray-700 text-xs">
+                              300 캐시
+                            </span>
+                          </div>
+
+                          <div className="flex items-center border rounded">
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(1, quantities[1] - 1)
+                              }
+                            >
+                              <MinusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                            <input
+                              type="text"
+                              value={quantities[1]}
+                              onChange={(e) =>
+                                updateQuantity(
+                                  1,
+                                  Number.parseInt(e.target.value) || 1
+                                )
+                              }
+                              className="w-8 text-center text-xs"
+                            />
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(1, quantities[1] + 1)
+                              }
+                            >
+                              <PlusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button className="w-full bg-red-500 text-white py-2 text-xs font-medium cursor-pointer">
+                        구매하기 (선물가능)
+                      </button>
+                    </div>
+
+                    {/* Card 3 */}
+                    <div className="bg-white rounded-lg overflow-hidden border border-teal-200">
+                      <div className="p-4 flex flex-col items-center">
+                        <div className="w-full h-20 bg-teal-100 rounded-md mb-3 flex items-center justify-center">
+                          <div className="bg-teal-200 w-10 h-10 rounded-full"></div>
+                        </div>
+
+                        <h3 className="font-medium text-center mb-2 text-xs">
+                          메시지 아용권
+                        </h3>
+
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <div className="flex items-center">
+                            <Checkbox
+                              id="check3"
+                              className="mr-1 h-3 w-3 rounded-full bg-red-500 border-red-500"
+                              checked={checked[2]}
+                              onCheckedChange={() => toggleChecked(2)}
+                            />
+                            <span className="text-gray-700 text-xs">
+                              300 캐시
+                            </span>
+                          </div>
+
+                          <div className="flex items-center border rounded">
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(2, quantities[2] - 1)
+                              }
+                            >
+                              <MinusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                            <input
+                              type="text"
+                              value={quantities[2]}
+                              onChange={(e) =>
+                                updateQuantity(
+                                  2,
+                                  Number.parseInt(e.target.value) || 1
+                                )
+                              }
+                              className="w-8 text-center text-xs"
+                            />
+                            <button
+                              className="px-1 py-0.5"
+                              onClick={() =>
+                                updateQuantity(2, quantities[2] + 1)
+                              }
+                            >
+                              <PlusIcon className="w-3 h-3 text-gray-500 cursor-pointer" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button className="w-full bg-red-500 text-white py-2 text-xs font-medium cursor-pointer">
+                        구매하기 (선물가능)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild className="cursor-pointer">
