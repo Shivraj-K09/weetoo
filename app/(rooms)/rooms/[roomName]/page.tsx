@@ -100,22 +100,22 @@ export default function RoomPage() {
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = `
-              {
-                "autosize": true,
-                "symbol": "${roomDetails.symbol}",
-                "interval": "D",
-                "timezone": "Asia/Seoul",
-                "theme": "dark",
-                "style": "1",
-                "locale": "kr",
-                "withdateranges": true,
-                "hide_side_toolbar": false,
-                "backgroundColor": "rgba(33, 38, 49, 1)",
-                "gridColor": "rgba(33, 38, 49, 1)",
-                "allow_symbol_change": true,
-                "calendar": false,
-                "support_host": "https://www.tradingview.com"
-              }`;
+            {
+              "autosize": true,
+              "symbol": "${roomDetails.symbol}",
+              "interval": "D",
+              "timezone": "Asia/Seoul",
+              "theme": "dark",
+              "style": "1",
+              "locale": "kr",
+              "withdateranges": true,
+              "hide_side_toolbar": false,
+              "backgroundColor": "rgba(33, 38, 49, 1)",
+              "gridColor": "rgba(33, 38, 49, 1)",
+              "allow_symbol_change": true,
+              "calendar": false,
+              "support_host": "https://www.tradingview.com"
+            }`;
 
     containerEl.appendChild(script);
 

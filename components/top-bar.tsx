@@ -13,10 +13,12 @@ import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { Icons } from "./icons";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
   const [openMarket, setOpenMarket] = useState(false);
+  const [openCustomerSupport, setOpenCustomerSupport] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState("10000");
   const [quantities, setQuantities] = useState([1, 1, 1]);
   const [checked, setChecked] = useState([false, false, false]);
@@ -377,13 +379,85 @@ export function TopBar() {
             </PopoverContent>
           </Popover>
 
-          <Link
-            href="/customer-support"
-            className="flex items-center text-sm font-semibold gap-2"
+          <Popover
+            open={openCustomerSupport}
+            onOpenChange={setOpenCustomerSupport}
           >
-            <Image src="/computer.png" width={25} height={25} alt="computer" />
-            고객센터
-          </Link>
+            <PopoverTrigger asChild className="cursor-pointer">
+              <Button variant="ghost">
+                <Image
+                  src="/computer.png"
+                  width={25}
+                  height={25}
+                  alt="computer"
+                />
+                고객센터
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-[380px] rounded-none" align="end">
+              <div className="overflow-hidden rounded-none">
+                <div className="bg-[#434753] py-3 px-4 flex justify-between items-center">
+                  <h3 className="text-white font-medium text-xs">
+                    소셜 문의 안내
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 cursor-pointer w-6 text-white hover:bg-[#5a5f6b]"
+                    onClick={() => setOpenCustomerSupport(false)}
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {/* KakaoTalk Button */}
+                  <button className="w-full bg-[#e5d862] rounded-xl p-4 flex items-center space-x-4">
+                    <div className="w-12 h-12 relative flex-shrink-0 bg-[#FEE500] rounded-lg flex items-center justify-center">
+                      <Icons.kakaoIcon className="w-8 h-8" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xl font-bold text-center">
+                        카카오톡 1:1 상담
+                      </div>
+                      <div className="text-xs text-center">
+                        클릭하시면 이동됩니다
+                      </div>
+                    </div>
+                    <div className="text-xs text-right">
+                      입금출금
+                      <br />
+                      불편사항
+                      <br />
+                      관련문의
+                    </div>
+                  </button>
+
+                  {/* Telegram Button */}
+                  <button className="w-full bg-[#E3F2FD] rounded-xl p-4 flex items-center space-x-4">
+                    <div className="w-12 h-12 relative flex-shrink-0 bg-[#229ED9] rounded-lg flex items-center justify-center">
+                      <Icons.telegramIcon className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xl font-bold text-center">
+                        텔레그램 1:1 상담
+                      </div>
+                      <div className="text-xs text-center">
+                        클릭하시면 이동됩니다
+                      </div>
+                    </div>
+                    <div className="text-xs text-right">
+                      입금출금
+                      <br />
+                      불편사항
+                      <br />
+                      관련문의
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>
