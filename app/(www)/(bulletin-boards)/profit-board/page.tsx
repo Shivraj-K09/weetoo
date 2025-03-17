@@ -13,7 +13,7 @@ import Image from "next/image";
 
 export default function ProfitBoard() {
   return (
-    <div className="w-full h-full py-5">
+    <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
           src="/banner.png"
