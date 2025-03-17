@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -8,16 +9,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Image from "next/image";
 
 export default function EducationBoard() {
   return (
     <div className="w-full h-full">
-      <Button className="bg-[#FF4C4C] text-white rounded-md shadow-none cursor-pointer hover:bg-[#FF4C4C]/[0.9]">
-        수익게시판
+      <div className="flex flex-col w-full">
+        <Image
+          src="/banner.png"
+          alt="trader-banner"
+          width={1000}
+          height={250}
+          className="w-full rounded"
+        />
+      </div>
+
+      <Button className="bg-[#FF4C4C] text-white mt-3 rounded-md shadow-none cursor-pointer hover:bg-[#FF4C4C]/[0.9]">
+        교육게시판
       </Button>
 
-      <div className="pt-5">
-        <div className="[&>div]:max-h-[70rem] border rounded overflow-hidden">
+      <Separator orientation="horizontal" className="w-full my-5" />
+      <div className="">
+        <div className="[&>div]:max-h-[53rem] border rounded overflow-hidden">
           <Table className="[&_td]:border-border [&_th]:border-border border-separate border-spacing-0 [&_th]:border-b [&_tr]:border-none [&_tr:not(:last-child)_td]:border-b">
             <TableHeader className="bg-background/90 sticky top-0 z-10 backdrop-blur-xs">
               <TableRow className="hover:bg-transparent">
