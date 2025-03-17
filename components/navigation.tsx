@@ -63,16 +63,26 @@ export function Navigation() {
               </HoverCardTrigger>
               <HoverCardContent className="w-50 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>자유 게시판</span>
-                  </div>
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>수익 게시판</span>
-                  </div>
+                  <Link
+                    href="/free-board"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    자유 게시판
+                  </Link>
 
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>교육 게시판</span>
-                  </div>
+                  <Link
+                    href="/profit-board"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    수익 게시판
+                  </Link>
+
+                  <Link
+                    href="/education-board"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    교육 게시판
+                  </Link>
                 </div>
               </HoverCardContent>
             </HoverCard>
