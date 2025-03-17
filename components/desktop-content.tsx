@@ -4,8 +4,36 @@ import { UsersIcon } from "lucide-react";
 import Image from "next/image";
 import { TickerTape } from "react-ts-tradingview-widgets";
 import { Trading } from "./trading";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "./ui/context-menu";
+import { MessageDialog } from "./message-dialog";
+import { useState } from "react";
 
 export function DesktopContent() {
+  const [messageDialog, setMessageDialog] = useState({
+    isOpen: false,
+    recipient: "",
+  });
+
+  const handleOpenMessageDialog = (username: string) => {
+    setMessageDialog({
+      isOpen: true,
+      recipient: username,
+    });
+  };
+
+  const handleCloseMessageDialog = () => {
+    setMessageDialog({
+      ...messageDialog,
+      isOpen: false,
+    });
+  };
+
   return (
     <div className="font-[family-name:var(--font-geist-sans)] w-full h-full lg:block hidden">
       <div className="h-full">
@@ -216,240 +244,80 @@ export function DesktopContent() {
             </div>
           </div>
 
-          <div className="flex border rounded-md p-3 pt-5">
-            <div className="flex justify-between w-full">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Image src="/crown.png" alt="crown" width={25} height={25} />
-                  <span className="text-xs">일간 수익률 순위 TOP5</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
+          <div>
+            <div className="flex border rounded-md p-3 pt-5">
+              <div className="flex justify-between w-full">
+                {[1, 2, 3, 4].map((columnIndex) => (
+                  <div key={columnIndex} className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
+                      <Image
+                        src="/crown.png"
+                        alt="crown"
+                        width={25}
+                        height={25}
+                      />
+                      <span className="text-xs">일간 수익률 순위 TOP5</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {[1, 2, 3, 4, 5].map((rowIndex) => {
+                        const id = `profile-${columnIndex}-${rowIndex}`;
+                        const username = `whgn${rowIndex}${columnIndex}**`;
+                        return (
+                          <ContextMenu key={id}>
+                            <ContextMenuTrigger>
+                              <div className="flex items-center gap-2 cursor-pointer">
+                                <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs">나스닥 킬러</span>
+                                  <span className="text-[0.65rem] text-muted-foreground">
+                                    NAS100
+                                  </span>
+                                </div>
+                              </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent className="w-[180px] p-0 overflow-hidden">
+                              <div className="bg-[#2d4055] text-white p-2 font-medium">
+                                나스닥 킬러
+                              </div>
+                              <ContextMenuItem className="py-2 cursor-pointer">
+                                Profile
+                              </ContextMenuItem>
+                              <ContextMenuSeparator className="m-0" />
+                              <ContextMenuItem
+                                className="py-2 cursor-pointer"
+                                onClick={() =>
+                                  handleOpenMessageDialog(username)
+                                }
+                              >
+                                Message
+                              </ContextMenuItem>
+                              <ContextMenuSeparator className="m-0" />
+                              <ContextMenuItem className="py-2 cursor-pointer">
+                                Subscribe
+                              </ContextMenuItem>
+                              <ContextMenuSeparator className="m-0" />
+                              <ContextMenuItem className="py-2 cursor-pointer">
+                                Block
+                              </ContextMenuItem>
+                              <ContextMenuSeparator className="m-0" />
+                              <ContextMenuItem className="py-2 cursor-pointer">
+                                Report
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Image src="/crown.png" alt="crown" width={25} height={25} />
-                  <span className="text-xs">일간 수익률 순위 TOP5</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Image src="/crown.png" alt="crown" width={25} height={25} />
-                  <span className="text-xs">일간 수익률 순위 TOP5</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Image src="/crown.png" alt="crown" width={25} height={25} />
-                  <span className="text-xs">일간 수익률 순위 TOP5</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-[1.56rem] h-[1.56rem] bg-gray-500 rounded-full" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">나스닥 킬러</span>
-                      <span className="text-[0.65rem] text-muted-foreground">
-                        NAS100
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
+
+            <MessageDialog
+              isOpen={messageDialog.isOpen}
+              onClose={handleCloseMessageDialog}
+              recipient={messageDialog.recipient}
+            />
           </div>
         </div>
 

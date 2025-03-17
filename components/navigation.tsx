@@ -90,8 +90,11 @@ export function Navigation() {
             <Button
               variant="ghost"
               className="text-white font-semibold cursor-pointer"
+              asChild
             >
-              투자대회
+              <Link href="/trading-competition" className="cursor-pointer">
+                투자대회
+              </Link>
             </Button>
 
             <HoverCard openDelay={0}>
