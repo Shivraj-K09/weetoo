@@ -24,6 +24,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import Image from "next/image";
 
 // Event data
 const events = [
@@ -344,6 +345,15 @@ export default function TradingCompetition() {
 
   return (
     <div className="px-4 py-4 w-full max-w-7xl mx-auto bg-white">
+      <div className="flex flex-col w-full">
+        <Image
+          src="/banner.png"
+          alt="trader-banner"
+          width={1000}
+          height={250}
+          className="w-full rounded"
+        />
+      </div>
       {/* Tabs - Modern design with underline indicator */}
       <div className="mb-8 border-b border-gray-200">
         <div className="flex">
