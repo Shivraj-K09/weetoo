@@ -2,19 +2,12 @@
 
 import type React from "react";
 
-import { ChevronLeft, ChevronRight, Search, Filter } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
 import { useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
   PaginationContent,
@@ -24,7 +17,28 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Image from "next/image";
+
+// Create interfaces for the items
+interface EventItem {
+  title: string;
+  subtitle?: string;
+  description?: string; // Made optional
+  period?: string; // Made optional
+  color?: string;
+  imageColor?: string;
+  id?: number;
+  image?: string;
+  category?: string;
+  date?: string;
+}
 
 // Event data
 const events = [
@@ -280,7 +294,7 @@ export default function TradingCompetition() {
   const [winnersItemsPerPage, setWinnersItemsPerPage] = useState(10);
   const [pastItemsPerPage, setPastItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
-  const [pastCurrentPage, setPastCurrentPage] = useState(1);
+  const [, setPastCurrentPage] = useState(1);
 
   const nextSlide = () => {
     setActiveSlide((prev) => (prev === banners.length - 1 ? 0 : prev + 1));
@@ -301,7 +315,7 @@ export default function TradingCompetition() {
   });
 
   // Filter based on search term
-  const searchFiltered = (items: any[]) => {
+  const searchFiltered = (items: EventItem[]) => {
     if (!searchTerm) return items;
     return items.filter((item) =>
       item.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -309,7 +323,7 @@ export default function TradingCompetition() {
   };
 
   // Get paginated data
-  const getPaginatedData = (items: any[]) => {
+  const getPaginatedData = (items: EventItem[]) => {
     const filtered = searchFiltered(items);
     // Use the appropriate itemsPerPage based on the active tab
     const itemsPerPage =

@@ -75,7 +75,7 @@ export default function News() {
   // Update displayed news when current page changes
   useEffect(() => {
     setDisplayedNews(getCurrentPageItems());
-  }, [currentPage]);
+  }, [currentPage, getCurrentPageItems]);
 
   return (
     <div className="h-full rounded-xls bg-gradient-to-br from-indigo-100 via-white to-teal-100 text-gray-800 p-4 md:p-6 relative">
