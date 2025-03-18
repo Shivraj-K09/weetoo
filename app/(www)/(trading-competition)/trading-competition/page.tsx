@@ -2,11 +2,7 @@
 
 import type React from "react";
 
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useState } from "react";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import Image from "next/image";
 import {
   Pagination,
   PaginationContent,
@@ -25,79 +23,211 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
 
-// Event data
-const events = [
-  {
-    title: "절세상품 이벤트 MOVE UP!",
-    subtitle: "<영업점 이벤트>",
-    description: "한투에서 개인연금, ISA 가입 시 최대 116만원 혜택!",
-    period: "2025.01.02 ~ 2025.03.31",
-  },
-  {
-    title: "주식재권 이벤트 MOVE UP!",
-    subtitle: "<영업점 이벤트>",
-    description: "주식, 재권 한투로 이전 시 최대 160만원 혜택!",
-    period: "2025.01.02 ~ 2025.03.31",
-  },
-  {
-    title: "세금 줄이고 ETF도 받자!!",
-    subtitle: "<뱅키스 이벤트>",
-    description: "ISA중개형 계좌로 바꾸고 - 세금 줄이고 ETF도 받자~!!",
-    period: "2025.01.01 ~ 2025.03.31",
-  },
-  {
-    title: "신규 계좌 개설 이벤트",
-    subtitle: "<영업점 이벤트>",
-    description: "신규 계좌 개설 시 다양한 혜택을 받아보세요!",
-    period: "2025.02.01 ~ 2025.04.30",
-  },
-  {
-    title: "해외 주식 거래 수수료 이벤트",
-    subtitle: "<뱅키스 이벤트>",
-    description: "해외 주식 거래 시 수수료 할인 혜택!",
-    period: "2025.01.15 ~ 2025.05.15",
-  },
-  {
-    title: "연금저축 추가 적립 이벤트",
-    subtitle: "<영업점 이벤트>",
-    description: "연금저축 추가 적립 시 특별 혜택을 드립니다!",
-    period: "2025.03.01 ~ 2025.06.30",
-  },
-  {
-    title: "ETF 투자 이벤트",
-    subtitle: "<뱅키스 이벤트>",
-    description: "ETF 투자 시 다양한 혜택을 받아보세요!",
-    period: "2025.02.15 ~ 2025.05.31",
-  },
-  {
-    title: "주식 이체 이벤트",
-    subtitle: "<영업점 이벤트>",
-    description: "타사 주식 이체 시 수수료 지원 혜택!",
-    period: "2025.01.10 ~ 2025.04.10",
-  },
-];
-
-// Banner data
+// Banner data for the carousel
 const banners = [
   {
+    color: "bg-gradient-to-r from-blue-500 to-blue-400",
+    title: "신규 계좌 개설 프로모션",
+    period: "2025. 01. 15 ~ 2025. 04. 15",
+    discount: "10%",
+  },
+  {
+    color: "bg-gradient-to-r from-blue-600 to-blue-500",
     title: "국내 선물옵션 수수료 할인 이벤트",
     period: "2025. 01. 02 ~ 2025. 06. 30",
     discount: "9.1%",
   },
   {
+    color: "bg-gradient-to-r from-blue-500 to-sky-500",
     title: "해외 주식 거래 수수료 이벤트",
     period: "2025. 02. 01 ~ 2025. 05. 31",
     discount: "8.5%",
   },
+];
+
+// Current events data
+const events = [
   {
-    title: "신규 계좌 개설 프로모션",
-    period: "2025. 01. 15 ~ 2025. 04. 15",
-    discount: "10%",
+    id: 1,
+    category: "영업점 이벤트",
+    title: "절세상품 이벤트 MOVE UP!",
+    description: "한투에서 개인연금, ISA 가입 시 최대 116만원 혜택!",
+    period: "2025.01.02 ~ 2025.03.31",
+  },
+  {
+    id: 2,
+    category: "영업점 이벤트",
+    title: "주식재권 이벤트 MOVE UP!",
+    description: "주식, 재권 한투로 이전 시 최대 160만원 혜택!",
+    period: "2025.01.02 ~ 2025.03.31",
+  },
+  {
+    id: 3,
+    category: "뱅키스 이벤트",
+    title: "세금 줄이고 ETF도 받자!!",
+    description: "ISA중개형 계좌로 바꾸고 - 세금 줄이고 ETF도 받자~!!",
+    period: "2025.01.01 ~ 2025.03.31",
+  },
+  {
+    id: 4,
+    category: "영업점 이벤트",
+    title: "신규 계좌 개설 이벤트",
+    description: "신규 계좌 개설 시 다양한 혜택을 받아보세요!",
+    period: "2025.02.01 ~ 2025.04.30",
+  },
+  {
+    id: 5,
+    category: "뱅키스 이벤트",
+    title: "해외 주식 거래 수수료 이벤트",
+    description: "해외 주식 거래 시 수수료 할인 혜택!",
+    period: "2025.01.15 ~ 2025.05.15",
+  },
+  {
+    id: 6,
+    category: "영업점 이벤트",
+    title: "연금저축 추가 적립 이벤트",
+    description: "연금저축 추가 적립 시 특별 혜택을 드립니다!",
+    period: "2025.03.01 ~ 2025.06.30",
+  },
+  {
+    id: 7,
+    category: "뱅키스 이벤트",
+    title: "ETF 투자 이벤트",
+    description: "ETF 투자 시 다양한 혜택을 받아보세요!",
+    period: "2025.02.15 ~ 2025.05.31",
+  },
+  {
+    id: 8,
+    category: "영업점 이벤트",
+    title: "주식 이체 이벤트",
+    description: "타사 주식 이체 시 수수료 지원 혜택!",
+    period: "2025.01.10 ~ 2025.04.10",
+  },
+  {
+    id: 9,
+    category: "뱅키스 이벤트",
+    title: "국내주식 활성화 이벤트",
+    description: "국내주식 거래 시 수수료 할인 혜택!",
+    period: "2025.01.05 ~ 2025.04.05",
+  },
+  {
+    id: 10,
+    category: "영업점 이벤트",
+    title: "해외주식 연결 이벤트",
+    description: "해외주식 계좌 연결 시 특별 혜택!",
+    period: "2025.01.20 ~ 2025.04.20",
+  },
+  {
+    id: 11,
+    category: "뱅키스 이벤트",
+    title: "가상자산 ETF 이벤트",
+    description: "가상자산 ETF 거래 시 혜택을 받아보세요!",
+    period: "2025.02.10 ~ 2025.05.10",
+  },
+  {
+    id: 12,
+    category: "영업점 이벤트",
+    title: "새해맞이 투자 이벤트",
+    description: "새해맞이 투자 상품 가입 시 혜택!",
+    period: "2025.01.01 ~ 2025.03.31",
+  },
+  {
+    id: 13,
+    category: "뱅키스 이벤트",
+    title: "해외수수료 프로모션",
+    description: "해외주식 거래 수수료 할인 프로모션!",
+    period: "2025.01.15 ~ 2025.04.15",
+  },
+  {
+    id: 14,
+    category: "영업점 이벤트",
+    title: "연말정산 투자 이벤트",
+    description: "연말정산 대비 투자상품 가입 시 혜택!",
+    period: "2025.01.05 ~ 2025.03.05",
+  },
+  {
+    id: 15,
+    category: "뱅키스 이벤트",
+    title: "국내선물옵션 수수료 할인",
+    description: "국내선물옵션 거래 시 수수료 할인 혜택!",
+    period: "2025.01.10 ~ 2025.06.10",
+  },
+  {
+    id: 16,
+    category: "영업점 이벤트",
+    title: "중국주식 신규거래 이벤트",
+    description: "중국주식 거래 시 특별 혜택!",
+    period: "2025.02.01 ~ 2025.05.01",
+  },
+  {
+    id: 17,
+    category: "뱅키스 이벤트",
+    title: "ETF 적립식 거래 이벤트",
+    description: "ETF 적립식 가입 시 혜택을 받아보세요!",
+    period: "2025.01.20 ~ 2025.04.20",
+  },
+  {
+    id: 18,
+    category: "영업점 이벤트",
+    title: "미국증시 상향여행 이벤트",
+    description: "미국 주식 거래 시 특별 혜택!",
+    period: "2025.02.15 ~ 2025.05.15",
+  },
+  {
+    id: 19,
+    category: "뱅키스 이벤트",
+    title: "거래수수료 할인 프로모션",
+    description: "국내주식 거래 수수료 할인 혜택!",
+    period: "2025.01.05 ~ 2025.04.05",
+  },
+  {
+    id: 20,
+    category: "영업점 이벤트",
+    title: "해외주식 연말정산 이벤트",
+    description: "해외주식 투자 시 연말정산 혜택!",
+    period: "2025.01.01 ~ 2025.03.31",
+  },
+  {
+    id: 21,
+    category: "뱅키스 이벤트",
+    title: "ETF 종합 패키지 이벤트",
+    description: "다양한 ETF 투자 시 혜택을 받아보세요!",
+    period: "2025.01.15 ~ 2025.04.15",
+  },
+  {
+    id: 22,
+    category: "영업점 이벤트",
+    title: "ESG 멀티팩터 ETF 이벤트",
+    description: "ESG ETF 투자 시 특별 혜택!",
+    period: "2025.02.01 ~ 2025.05.01",
+  },
+  {
+    id: 23,
+    category: "뱅키스 이벤트",
+    title: "국내주식 활력투자 이벤트",
+    description: "국내주식 거래 시 다양한 혜택!",
+    period: "2025.01.10 ~ 2025.04.10",
+  },
+  {
+    id: 24,
+    category: "영업점 이벤트",
+    title: "국내주식 이전 이벤트",
+    description: "타사 주식 이전 시 수수료 지원!",
+    period: "2025.01.05 ~ 2025.04.05",
+  },
+  {
+    id: 25,
+    category: "뱅키스 이벤트",
+    title: "해외주식 IBKR 연결 이벤트",
+    description: "해외주식 계좌 연결 시 특별 혜택!",
+    period: "2025.02.10 ~ 2025.05.10",
   },
 ];
 
-// Winner announcements data
+// Winner announcements data - expanded with more entries
 const winnerAnnouncements = [
   {
     id: 1312,
@@ -252,13 +382,183 @@ const winnerAnnouncements = [
   },
 ];
 
+// Past events data - expanded with more entries
+const pastEvents = [
+  {
+    id: 1,
+    title: "KIWOOM 미국대표지수 2종 ETF 거래이벤트",
+    description: "ETF 거래하고 문화상품권 3만원 혜택 받으세요~!",
+    period: "2025.02.03 - 2025.02.28",
+    logo: "K",
+    category: "ETF 이벤트",
+  },
+  {
+    id: 2,
+    title: "TIGER조선 TOP ETF 거래이벤트 시즌2",
+    description: "ETF 거래하고 문화상품권 5만원 혜택 받으세요~!",
+    period: "2025.02.03 - 2025.02.28",
+    logo: "T",
+    category: "ETF 이벤트",
+  },
+  {
+    id: 3,
+    title: "<공업점 이벤트> 운용사 ETF 거래이벤트",
+    description: "운용사 ETF 이벤트 참여시 최대 15만원 혜택!",
+    period: "2024.12.20 - 2025.02.28",
+    logo: "E",
+    category: "영업점 이벤트",
+  },
+  {
+    id: 4,
+    title: "OpenAPI 신규 고객 이벤트 시즌1(이벤트 조기종료_1/15)",
+    description:
+      "Open API 거래하고 최대 한달 100만원 + 신세계백화점상품권 혜택 받아가세요~!",
+    period: "2025.01.02 - 2025.02.28",
+    logo: "O",
+    category: "API 이벤트",
+  },
+  {
+    id: 5,
+    title: "해외주식 거래 이벤트",
+    description: "해외주식 거래하고 수수료 할인 혜택 받으세요!",
+    period: "2024.12.15 - 2025.01.31",
+    logo: "G",
+    category: "해외주식 이벤트",
+  },
+  {
+    id: 6,
+    title: "국내주식 신규 거래 이벤트",
+    description: "국내주식 거래하고 다양한 혜택을 받아보세요!",
+    period: "2024.11.01 - 2025.01.15",
+    logo: "N",
+    category: "국내주식 이벤트",
+  },
+  {
+    id: 7,
+    title: "연말 투자 이벤트",
+    description: "연말 투자 상품 가입하고 특별 혜택 받으세요!",
+    period: "2024.12.01 - 2024.12.31",
+    logo: "Y",
+    category: "투자 이벤트",
+  },
+  {
+    id: 8,
+    title: "뱅키스 ETF 거래 이벤트",
+    description: "뱅키스에서 ETF 거래하고 경품 받아가세요!",
+    period: "2024.11.15 - 2024.12.31",
+    logo: "B",
+    category: "뱅키스 이벤트",
+  },
+  {
+    id: 9,
+    title: "연말정산 투자 이벤트",
+    description: "연말정산 대비 투자상품 가입하고 혜택 받으세요!",
+    period: "2024.11.01 - 2024.12.15",
+    logo: "T",
+    category: "투자 이벤트",
+  },
+  {
+    id: 10,
+    title: "주식 이체 이벤트",
+    description: "타사 주식 이체하고 수수료 혜택 받으세요!",
+    period: "2024.10.15 - 2024.11.30",
+    logo: "S",
+    category: "주식 이벤트",
+  },
+  {
+    id: 11,
+    title: "뱅키스 해외주식 거래 이벤트",
+    description: "뱅키스에서 해외주식 거래하고 수수료 할인 받으세요!",
+    period: "2024.10.01 - 2024.11.15",
+    logo: "B",
+    category: "뱅키스 이벤트",
+  },
+  {
+    id: 12,
+    title: "신규 고객 이벤트",
+    description: "신규 고객 대상 특별 혜택 이벤트!",
+    period: "2024.09.15 - 2024.10.31",
+    logo: "N",
+    category: "신규 고객 이벤트",
+  },
+  {
+    id: 13,
+    title: "추석 맞이 이벤트",
+    description: "추석 맞이 특별 이벤트 진행!",
+    period: "2024.09.01 - 2024.09.30",
+    logo: "C",
+    category: "시즌 이벤트",
+  },
+  {
+    id: 14,
+    title: "ETF 적립식 이벤트",
+    description: "ETF 적립식 가입하고 혜택 받으세요!",
+    period: "2024.08.15 - 2024.09.30",
+    logo: "E",
+    category: "ETF 이벤트",
+  },
+  {
+    id: 15,
+    title: "여름 휴가 이벤트",
+    description: "여름 휴가 시즌 특별 이벤트!",
+    period: "2024.07.15 - 2024.08.31",
+    logo: "S",
+    category: "시즌 이벤트",
+  },
+  {
+    id: 16,
+    title: "해외주식 수수료 할인 이벤트",
+    description: "해외주식 거래 수수료 할인 이벤트!",
+    period: "2024.07.01 - 2024.08.15",
+    logo: "G",
+    category: "해외주식 이벤트",
+  },
+  {
+    id: 17,
+    title: "국내주식 거래 이벤트",
+    description: "국내주식 거래하고 혜택 받으세요!",
+    period: "2024.06.15 - 2024.07.31",
+    logo: "K",
+    category: "국내주식 이벤트",
+  },
+  {
+    id: 18,
+    title: "뱅키스 신규 가입 이벤트",
+    description: "뱅키스 신규 가입하고 혜택 받으세요!",
+    period: "2024.06.01 - 2024.07.15",
+    logo: "B",
+    category: "뱅키스 이벤트",
+  },
+  {
+    id: 19,
+    title: "ISA 가입 이벤트",
+    description: "ISA 가입하고 다양한 혜택 받으세요!",
+    period: "2024.05.15 - 2024.06.30",
+    logo: "I",
+    category: "ISA 이벤트",
+  },
+  {
+    id: 20,
+    title: "연금저축 이벤트",
+    description: "연금저축 가입하고 혜택 받으세요!",
+    period: "2024.05.01 - 2024.06.15",
+    logo: "P",
+    category: "연금 이벤트",
+  },
+];
+
 export default function TradingCompetition() {
   const [activeTab, setActiveTab] = useState("current");
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeSlide, setActiveSlide] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  // Replace the single itemsPerPage state with separate states for each tab
+  const [currentItemsPerPage, setCurrentItemsPerPage] = useState(4);
+  const [winnersItemsPerPage, setWinnersItemsPerPage] = useState(10);
+  const [pastItemsPerPage, setPastItemsPerPage] = useState(5);
+  const [searchTerm, setSearchTerm] = useState("");
 
+  // Carousel navigation
   const nextSlide = () => {
     setActiveSlide((prev) => (prev === banners.length - 1 ? 0 : prev + 1));
   };
@@ -270,26 +570,59 @@ export default function TradingCompetition() {
   // Filter events based on the active filter
   const filteredEvents = events.filter((event) => {
     if (activeFilter === "all") return true;
-    if (activeFilter === "branch" && event.subtitle.includes("영업점"))
+    if (activeFilter === "branch" && event.category.includes("영업점"))
       return true;
-    if (activeFilter === "bankis" && event.subtitle.includes("뱅키스"))
+    if (activeFilter === "bankis" && event.category.includes("뱅키스"))
       return true;
     return false;
   });
 
-  // Calculate total pages
-  const totalPages = Math.ceil(winnerAnnouncements.length / itemsPerPage);
-
-  // Get paginated data
-  const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return winnerAnnouncements.slice(startIndex, endIndex);
+  // Filter events based on search term
+  const searchFiltered = (items: any[]) => {
+    if (!searchTerm) return items;
+    return items.filter((item) =>
+      item.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   };
 
+  // Get paginated data
+  const getPaginatedData = (items: any[]) => {
+    const filtered = searchFiltered(items);
+    // Use the appropriate itemsPerPage based on the active tab
+    const itemsPerPage =
+      activeTab === "current"
+        ? currentItemsPerPage
+        : activeTab === "winners"
+        ? winnersItemsPerPage
+        : pastItemsPerPage;
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return {
+      data: filtered.slice(startIndex, endIndex),
+      totalPages: Math.ceil(filtered.length / itemsPerPage),
+    };
+  };
+
+  // Get data for current tab
+  const currentTabData = () => {
+    switch (activeTab) {
+      case "current":
+        return getPaginatedData(filteredEvents);
+      case "winners":
+        return getPaginatedData(winnerAnnouncements);
+      case "past":
+        return getPaginatedData(pastEvents);
+      default:
+        return { data: [], totalPages: 0 };
+    }
+  };
+
+  const { data, totalPages } = currentTabData();
+
   return (
-    <div className="w-full">
-      <div className="flex flex-col mb-5 w-full">
+    <div className="w-full max-w-6xl mx-auto bg-white">
+      <div className="flex flex-col w-full">
         <Image
           src="/banner.png"
           alt="trader-banner"
@@ -299,414 +632,594 @@ export default function TradingCompetition() {
         />
       </div>
       {/* Tabs */}
-      <div className="border-b border-blue-500 mb-6">
-        <div className="grid grid-cols-3 w-full">
+      <div className="my-8">
+        <div className="flex border-b">
           <TabButton
             isActive={activeTab === "current"}
-            onClick={() => setActiveTab("current")}
+            onClick={() => {
+              setActiveTab("current");
+              setCurrentPage(1);
+            }}
           >
             진행중인 이벤트
           </TabButton>
           <TabButton
             isActive={activeTab === "winners"}
-            onClick={() => setActiveTab("winners")}
+            onClick={() => {
+              setActiveTab("winners");
+              setCurrentPage(1);
+            }}
           >
             당첨자 발표
           </TabButton>
           <TabButton
             isActive={activeTab === "past"}
-            onClick={() => setActiveTab("past")}
+            onClick={() => {
+              setActiveTab("past");
+              setCurrentPage(1);
+            }}
           >
             지난 이벤트
           </TabButton>
         </div>
       </div>
 
-      {/* Content for current tab */}
-      {activeTab === "current" && (
-        <div className="space-y-6">
-          {/* Carousel Banner */}
-          <div className="relative">
-            {/* Left Arrow */}
-            <button
-              onClick={prevSlide}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-white shadow-md hover:bg-gray-100 rounded-full p-2 z-10 cursor-pointer"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="h-5 w-5 text-blue-500" />
-            </button>
-
-            {/* Banner */}
-            <div className="bg-blue-500 rounded-md text-white p-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">
-                  {banners[activeSlide].title}
-                </h2>
-                <p>{banners[activeSlide].period}</p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-28 h-24 bg-blue-400 rounded flex items-center justify-center">
-                  <div className="text-2xl font-bold text-white">
-                    {banners[activeSlide].discount}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Arrow */}
-            <button
-              onClick={nextSlide}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 bg-white shadow-md hover:bg-gray-100 rounded-full p-2 z-10 cursor-pointer"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="h-5 w-5 text-blue-500" />
-            </button>
-          </div>
-
-          {/* Carousel Dots */}
-          <div className="flex justify-center gap-2 mt-2">
-            {banners.map((_, index) => (
+      {/* Main content area with min-height to prevent layout shifts */}
+      <div className="min-h-[600px] flex flex-col">
+        {/* Current Events Tab */}
+        {activeTab === "current" && (
+          <div className="space-y-8 flex-1">
+            {/* Carousel Banner */}
+            <div className="relative mb-6">
+              {/* Navigation Arrows - Outside the banner */}
               <button
-                key={index}
-                onClick={() => setActiveSlide(index)}
-                className={`h-2 transition-all rounded-full cursor-pointer ${
-                  activeSlide === index ? "w-8 bg-blue-500" : "w-2 bg-gray-300"
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
+                onClick={prevSlide}
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-white hover:bg-gray-100 rounded-full p-2 z-10 cursor-pointer"
+                aria-label="Previous slide"
+              >
+                <ChevronLeft className="h-5 w-5 text-blue-500" />
+              </button>
 
-          {/* Filter buttons */}
-          <div className="flex gap-2 mt-4">
-            <FilterButton
-              isActive={activeFilter === "all"}
-              onClick={() => setActiveFilter("all")}
-            >
-              전체
-            </FilterButton>
-            <FilterButton
-              isActive={activeFilter === "branch"}
-              onClick={() => setActiveFilter("branch")}
-            >
-              영업점계좌
-            </FilterButton>
-            <FilterButton
-              isActive={activeFilter === "bankis"}
-              onClick={() => setActiveFilter("bankis")}
-            >
-              뱅키스계좌
-            </FilterButton>
-          </div>
+              <button
+                onClick={nextSlide}
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 bg-white hover:bg-gray-100 rounded-full p-2 z-10 cursor-pointer"
+                aria-label="Next slide"
+              >
+                <ChevronRight className="h-5 w-5 text-blue-500" />
+              </button>
 
-          {/* Search and filter */}
-          <div className="flex justify-between items-center mt-6 gap-4">
-            <Select defaultValue="10">
-              <SelectTrigger className="w-36 border rounded shadow-none cursor-pointer">
-                <SelectValue placeholder="10개씩 보기" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10" className="cursor-pointer">
-                  10개씩 보기
-                </SelectItem>
-                <SelectItem value="20" className="cursor-pointer">
-                  20개씩 보기
-                </SelectItem>
-                <SelectItem value="30" className="cursor-pointer">
-                  30개씩 보기
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex gap-2">
-              <Select defaultValue="all">
-                <SelectTrigger className="w-28 border rounded shadow-none cursor-pointer">
-                  <SelectValue placeholder="전체" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="cursor-pointer">
-                    전체
-                  </SelectItem>
-                  <SelectItem value="title" className="cursor-pointer">
-                    제목
-                  </SelectItem>
-                  <SelectItem value="content" className="cursor-pointer">
-                    내용
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative">
-                <Input
-                  placeholder="검색어를 입력하세요."
-                  className="w-64 pr-10 border rounded shadow-none"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-0 top-0  h-8.5"
-                >
-                  <Search className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Event list */}
-          <div className="mt-6 border-t pt-6 h-[35rem] overflow-y-auto pr-2">
-            <div className="space-y-6">
-              {filteredEvents.map((event, index) => (
-                <div key={index} className="flex border-b pb-6">
-                  <div className="w-40 h-32 bg-gray-200 flex-shrink-0 flex items-center justify-center text-gray-400">
-                    <div className="text-sm">{event.title.substring(0, 1)}</div>
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <div className="flex justify-between">
-                      <div>
-                        <div className="text-sm text-gray-600 mb-1">
-                          {event.subtitle}
-                        </div>
-                        <h3 className="font-bold">{event.title}</h3>
-                      </div>
-                      <div>
-                        <Badge className="bg-blue-500 hover:bg-blue-500">
-                          진행중
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm mt-2">{event.description}</p>
-                    <p className="text-xs text-gray-500 mt-4">
-                      기간 : {event.period}
+              {/* Banner */}
+              <div
+                className={`${banners[activeSlide].color} p-8 text-white rounded-xl`}
+              >
+                <div className="flex justify-between items-center">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-medium">
+                      {banners[activeSlide].title}
+                    </h2>
+                    <p className="text-white/80">
+                      {banners[activeSlide].period}
                     </p>
                   </div>
+                  <div className="flex-shrink-0">
+                    <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                      <div className="text-2xl font-bold text-white">
+                        {banners[activeSlide].discount}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Carousel Indicators - Below the banner */}
+              <div className="flex justify-center gap-2 mt-4">
+                {banners.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setActiveSlide(index)}
+                    className={`h-2 rounded-full transition-all cursor-pointer ${
+                      activeSlide === index
+                        ? "w-6 bg-blue-500"
+                        : "w-2 bg-gray-300"
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Placeholder content for other tabs */}
-      {activeTab === "winners" && (
-        <div className="space-y-6">
-          {/* Search and filter */}
-          <div className="flex justify-between items-center gap-4">
-            <Select
-              value={itemsPerPage.toString()}
-              onValueChange={(value) => {
-                setItemsPerPage(Number.parseInt(value));
-                setCurrentPage(1); // Reset to first page when changing items per page
-              }}
-            >
-              <SelectTrigger className="w-36 border rounded shadow-none cursor-pointer">
-                <SelectValue placeholder={`${itemsPerPage}개씩 보기`} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15" className="cursor-pointer">
-                  15개씩 보기
-                </SelectItem>
-                <SelectItem value="30" className="cursor-pointer">
-                  30개씩 보기
-                </SelectItem>
-                <SelectItem value="50" className="cursor-pointer">
-                  50개씩 보기
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
+            {/* Filter buttons */}
             <div className="flex gap-2">
-              <Select defaultValue="all">
-                <SelectTrigger className="w-28 border rounded shadow-none cursor-pointer">
-                  <SelectValue placeholder="전체" />
+              <FilterButton
+                isActive={activeFilter === "all"}
+                onClick={() => setActiveFilter("all")}
+              >
+                전체
+              </FilterButton>
+              <FilterButton
+                isActive={activeFilter === "branch"}
+                onClick={() => setActiveFilter("branch")}
+              >
+                영업점계좌
+              </FilterButton>
+              <FilterButton
+                isActive={activeFilter === "bankis"}
+                onClick={() => setActiveFilter("bankis")}
+              >
+                뱅키스계좌
+              </FilterButton>
+            </div>
+
+            {/* Search and filter controls */}
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <Select
+                value={currentItemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setCurrentItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-40 cursor-pointer">
+                  <SelectValue
+                    placeholder={`${currentItemsPerPage}개씩 보기`}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="cursor-pointer">
-                    전체
+                  <SelectItem value="4" className="cursor-pointer">
+                    4개씩 보기
                   </SelectItem>
-                  <SelectItem value="title" className="cursor-pointer">
-                    제목
+                  <SelectItem value="10" className="cursor-pointer">
+                    10개씩 보기
+                  </SelectItem>
+                  <SelectItem value="20" className="cursor-pointer">
+                    20개씩 보기
+                  </SelectItem>
+                  <SelectItem value="30" className="cursor-pointer">
+                    30개씩 보기
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <div className="relative">
-                <Input
-                  placeholder="검색어를 입력하세요."
-                  className="w-64 pr-10 border rounded shadow-none"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-0 top-0 h-full"
-                >
-                  <Search className="h-5 w-5" />
-                </Button>
+
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-28 cursor-pointer">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      전체
+                    </SelectItem>
+                    <SelectItem value="title" className="cursor-pointer">
+                      제목
+                    </SelectItem>
+                    <SelectItem value="content" className="cursor-pointer">
+                      내용
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="검색어를 입력하세요"
+                    className="pr-10"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-0 top-0 h-full cursor-pointer"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Winners announcement table */}
-          <div className="mt-6 border-t border-b">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="py-3 px-4 text-left w-20 font-medium text-gray-600">
-                    NO
-                  </th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">
-                    제목
-                  </th>
-                  <th className="py-3 px-4 text-left w-28 font-medium text-gray-600">
-                    작성일
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {getPaginatedData().map((announcement) => (
-                  <tr
-                    key={announcement.id}
-                    className="border-b hover:bg-gray-50 cursor-pointer"
+            {/* Event list */}
+            <div className="space-y-4 flex-1">
+              {data.length > 0 ? (
+                data.map((event: any, index: number) => (
+                  <div
+                    key={index}
+                    className="p-6 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer"
                   >
-                    <td className="py-4 px-4 text-gray-700">
-                      {announcement.id}
-                    </td>
-                    <td className="py-4 px-4 text-gray-700">
-                      {announcement.title}
-                    </td>
-                    <td className="py-4 px-4 text-gray-700">
-                      {announcement.date}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <Pagination className="mt-6">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage((prev) => Math.max(prev - 1, 1));
-                  }}
-                  className={
-                    currentPage === 1
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Calculate which page numbers to show
-                let pageNum;
-                if (totalPages <= 5) {
-                  // If 5 or fewer pages, show all pages
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  // If on pages 1-3, show pages 1-5
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  // If on last 3 pages, show last 5 pages
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  // Otherwise show current page and 2 pages on either side
-                  pageNum = currentPage - 2 + i;
-                }
-
-                return (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setCurrentPage(pageNum);
-                      }}
-                      isActive={currentPage === pageNum}
-                      className="cursor-pointer"
-                    >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-
-              {totalPages > 5 && currentPage < totalPages - 2 && (
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 flex-shrink-0 mx-auto sm:mx-0">
+                        <span className="text-xl font-medium">
+                          {event.title.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="text-sm text-gray-500 mb-1">
+                              {event.category}
+                            </div>
+                            <h3 className="font-medium text-gray-900">
+                              {event.title}
+                            </h3>
+                          </div>
+                          <Badge className="bg-blue-500 hover:bg-blue-600 self-start">
+                            진행중
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {event.description}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          기간: {event.period}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  검색 결과가 없습니다
+                </div>
               )}
+            </div>
+          </div>
+        )}
 
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-                  }}
-                  className={
-                    currentPage === totalPages
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
+        {/* Winners Tab */}
+        {activeTab === "winners" && (
+          <div className="space-y-8 flex-1">
+            {/* Search and filter controls */}
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <Select
+                value={winnersItemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setWinnersItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-40 cursor-pointer">
+                  <SelectValue
+                    placeholder={`${winnersItemsPerPage}개씩 보기`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10" className="cursor-pointer">
+                    10개씩 보기
+                  </SelectItem>
+                  <SelectItem value="20" className="cursor-pointer">
+                    20개씩 보기
+                  </SelectItem>
+                  <SelectItem value="30" className="cursor-pointer">
+                    30개씩 보기
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-28 cursor-pointer">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      전체
+                    </SelectItem>
+                    <SelectItem value="title" className="cursor-pointer">
+                      제목
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="검색어를 입력하세요"
+                    className="pr-10"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-0 top-0 h-full cursor-pointer"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Winners announcement table */}
+            <div className="overflow-hidden rounded-lg border border-gray-100 flex-1">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      NO
+                    </th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      제목
+                    </th>
+                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      작성일
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.length > 0 ? (
+                    data.map((announcement: any) => (
+                      <tr
+                        key={announcement.id}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <td className="py-4 px-4 text-sm text-gray-500">
+                          {announcement.id}
+                        </td>
+                        <td className="py-4 px-4 text-sm font-medium text-gray-900">
+                          {announcement.title}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-500">
+                          {announcement.date}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="py-8 text-center text-gray-500"
+                      >
+                        검색 결과가 없습니다
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Past Events Tab */}
+        {activeTab === "past" && (
+          <div className="space-y-8 flex-1">
+            {/* Search and filter controls */}
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <Select
+                value={pastItemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setPastItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-40 cursor-pointer">
+                  <SelectValue placeholder={`${pastItemsPerPage}개씩 보기`} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5" className="cursor-pointer">
+                    5개씩 보기
+                  </SelectItem>
+                  <SelectItem value="10" className="cursor-pointer">
+                    10개씩 보기
+                  </SelectItem>
+                  <SelectItem value="20" className="cursor-pointer">
+                    20개씩 보기
+                  </SelectItem>
+                  <SelectItem value="30" className="cursor-pointer">
+                    30개씩 보기
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-28 cursor-pointer">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      전체
+                    </SelectItem>
+                    <SelectItem value="title" className="cursor-pointer">
+                      제목
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="검색어를 입력하세요"
+                    className="pr-10"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-0 top-0 h-full cursor-pointer"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Past events list */}
+            <div className="space-y-4 flex-1">
+              {data.length > 0 ? (
+                data.map((event: any) => (
+                  <div
+                    key={event.id}
+                    className="p-6 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer"
+                  >
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0 mx-auto sm:mx-0">
+                        <span className="text-xl font-medium">
+                          {event.logo}
+                        </span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="text-sm text-gray-500 mb-1">
+                              {event.category}
+                            </div>
+                            <h3 className="font-medium text-gray-900">
+                              {event.title}
+                            </h3>
+                          </div>
+                          <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-700 self-start">
+                            종료
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {event.description}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          기간: {event.period}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  검색 결과가 없습니다
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Pagination - consistent position at bottom */}
+        {totalPages > 1 && (
+          <div className="mt-8">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage((prev) => Math.max(prev - 1, 1));
+                    }}
+                    className={
+                      currentPage === 1
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Calculate which page numbers to show
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    // If 5 or fewer pages, show all pages
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    // If on pages 1-3, show pages 1-5
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    // If on last 3 pages, show last 5 pages
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    // Otherwise show current page and 2 pages on either side
+                    pageNum = currentPage - 2 + i;
                   }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
 
-      {activeTab === "past" && (
-        <div className="h-40 flex items-center justify-center text-gray-500">
-          지난 이벤트 내용이 여기에 표시됩니다.
-        </div>
-      )}
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(pageNum);
+                        }}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                    }}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// Tab button with rounded corners and subtle hover effects
+// Tab button component
 function TabButton({
-  children,
   isActive,
   onClick,
+  children,
 }: {
-  children: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full py-3 text-center transition-colors cursor-pointer ${
+      className={`px-6 py-4 text-center transition-all relative cursor-pointer ${
         isActive
-          ? "bg-blue-500 text-white rounded-t-md"
-          : "text-gray-700 hover:bg-blue-100 hover:text-blue-600 hover:rounded-t-md"
+          ? "text-blue-600 font-medium"
+          : "text-gray-500 hover:text-gray-800"
       }`}
     >
       {children}
+      {isActive && (
+        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600" />
+      )}
     </button>
   );
 }
 
-// Simple filter button that matches the original design
+// Filter button component
 function FilterButton({
-  children,
   isActive,
   onClick,
+  children,
 }: {
-  children: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 text-sm rounded-full cursor-pointer ${
+      className={`px-4 py-2 text-sm rounded-full transition-colors cursor-pointer ${
         isActive
           ? "bg-blue-500 text-white"
-          : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+          : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
       }`}
     >
       {children}

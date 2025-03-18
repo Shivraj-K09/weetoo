@@ -1,4 +1,5 @@
 import { CircleUserRoundIcon, SettingsIcon, UserIcon } from "lucide-react";
+import Link from "next/link";
 
 export function UserInfo() {
   return (
@@ -36,8 +37,13 @@ export function UserInfo() {
             <span>3</span>
           </div>
           <div className="flex text-xs items-center flex-col gap-1">
-            <span>my page</span>
-            <SettingsIcon className="w-4 h-4 cursor-pointer" />
+            <Link
+              href="/my-profile"
+              className="flex items-center flex-col gap-1"
+            >
+              my page
+              <SettingsIcon className="w-4 h-4 cursor-pointer" />
+            </Link>
           </div>
         </div>
       </div>
