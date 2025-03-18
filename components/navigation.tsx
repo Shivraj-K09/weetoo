@@ -100,16 +100,21 @@ export function Navigation() {
             <HoverCard openDelay={0}>
               <HoverCardTrigger asChild className="cursor-pointer">
                 <Button variant="ghost" className="text-white font-semibold">
-                  뉴스
+                  정보
                 </Button>
               </HoverCardTrigger>
               <HoverCardContent className="w-50 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>국내</span>
+                    <span>종합 데이터</span>
                   </div>
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>해외</span>
+                    <Link
+                      href="/news"
+                      className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                    >
+                      뉴스
+                    </Link>
                   </div>
                 </div>
               </HoverCardContent>{" "}
