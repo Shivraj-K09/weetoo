@@ -166,6 +166,7 @@ export default function RegisterPage() {
       });
 
       if (error) throw error;
+      console.log(error);
     } catch (error) {
       console.error(`${provider} login error:`, error);
       toast.error(`Failed to sign in with ${provider}. Please try again.`);
