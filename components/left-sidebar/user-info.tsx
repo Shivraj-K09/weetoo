@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import Image from "next/image";
 
 type UserData = {
   id: string;
@@ -196,7 +197,9 @@ export function UserInfo() {
 
         {/* Footer */}
         <footer className="border-t border-gray-100 p-4 text-center">
-          <span className="text-sm text-gray-500">Don't have an account? </span>
+          <span className="text-sm text-gray-500">
+            Don&apos;t have an account?{" "}
+          </span>
           <Link
             href="/register"
             className="text-sm font-medium text-[#c74135] hover:underline"
@@ -225,7 +228,7 @@ export function UserInfo() {
             <div className="relative">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f8e9e8] ring-1 ring-[#e9c3c0] transition-all duration-300 hover:ring-2 hover:ring-[#e9c3c0]">
                 {userData?.avatar_url ? (
-                  <img
+                  <Image
                     src={userData.avatar_url || "/placeholder.svg"}
                     alt={`${userData.first_name}'s avatar`}
                     className="h-12 w-12 rounded-full object-cover"

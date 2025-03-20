@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { supabase, SupportedProvider } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
+import Image from "next/image";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -128,7 +129,7 @@ export default function RegisterPage() {
 
     try {
       // Register with Supabase
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -157,7 +158,7 @@ export default function RegisterPage() {
   const handleSocialLogin = async (provider: SupportedProvider) => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -614,11 +615,15 @@ export default function RegisterPage() {
                 }`}
                 aria-hidden={currentSlide !== index}
               >
-                <img
-                  src={slide.image || "/placeholder.svg"}
-                  alt=""
-                  className="h-full w-full object-cover"
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  fill
+                  className="object-cover"
                   aria-hidden="true"
+                  unoptimized={slide.image?.startsWith(
+                    "https://images.unsplash.com"
+                  )}
                 />
                 {/* Gradient overlay - left to right */}
                 <div

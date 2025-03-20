@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 type IconProps = React.SVGProps<SVGSVGElement>;
 
 export const Icons = {

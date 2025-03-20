@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase, type SupportedProvider } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -107,11 +108,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { data, error: signUpError } =
-        await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
+      const { error: signUpError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
       if (signUpError) throw signUpError;
       toast.success("Signed in successfully.");
@@ -132,7 +132,7 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: SupportedProvider) => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -452,7 +452,7 @@ export default function LoginPage() {
               className="mt-8 text-center text-sm"
             >
               <p className="text-muted-foreground">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/register"
                   className="font-medium text-[#e74c3c] hover:underline"
@@ -485,11 +485,15 @@ export default function LoginPage() {
                 }`}
                 aria-hidden={currentSlide !== index}
               >
-                <img
-                  src={slide.image || "/placeholder.svg"}
-                  alt=""
-                  className="h-full w-full object-cover"
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  fill
+                  className="object-cover"
                   aria-hidden="true"
+                  unoptimized={slide.image?.startsWith(
+                    "https://images.unsplash.com"
+                  )}
                 />
                 {/* Gradient overlay - left to right */}
                 <div

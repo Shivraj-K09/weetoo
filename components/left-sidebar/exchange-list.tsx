@@ -17,7 +17,7 @@ type Exchange = {
 };
 
 export function ExchangeList() {
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [, setHoveredItem] = useState<string | null>(null);
 
   // Sample exchange data with more entries to demonstrate scrolling
   const exchanges: Exchange[] = [
