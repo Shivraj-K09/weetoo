@@ -232,6 +232,7 @@ export function UserInfo() {
                     src={userData.avatar_url || "/placeholder.svg"}
                     alt={`${userData.first_name}'s avatar`}
                     className="h-12 w-12 rounded-full object-cover"
+                    fill
                   />
                 ) : (
                   <CircleUserRoundIcon className="h-7 w-7 text-[#c74135]" />
