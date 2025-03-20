@@ -341,7 +341,7 @@ export function UserInfo() {
       {/* Settings link */}
       <footer className="border-t border-gray-100">
         <Link
-          href="/settings"
+          href="/my-profile"
           className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
         >
           <div className="flex items-center gap-2">
