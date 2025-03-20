@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, TrendingUp, Eye, EyeOff } from "lucide-react";
@@ -14,10 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase, type SupportedProvider } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Icons } from "@/components/icons";
 import Image from "next/image";
+import { Icons } from "@/components/icons";
 
-export default function LoginPage() {
+// Create a client component that uses useSearchParams
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegistered = searchParams.get("registered") === "true";
@@ -150,7 +151,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Brand in top left */}
+      {/* Left side header with brand and back to website link */}
       <div className="absolute left-6 top-6 z-10 flex w-[calc(100%-3rem)] items-center justify-between md:left-10 md:top-10 md:w-[calc(50%-5rem)]">
         <div className="flex items-center space-x-2">
           <TrendingUp className="h-6 w-6 text-[#e74c3c]" aria-hidden="true" />
@@ -159,10 +160,8 @@ export default function LoginPage() {
             <span className="text-[#e74c3c]">T</span>OO
           </span>
         </div>
-
-        {/* Back to website link in top right */}
         <Link
-          href="/"
+          href="#"
           className="text-sm font-medium text-muted-foreground hover:text-[#e74c3c] hover:underline"
           aria-label="Return to main website"
         >
@@ -291,7 +290,7 @@ export default function LoginPage() {
                     aria-label="Sign in with Naver"
                     onClick={() => {
                       toast.info(
-                        "Naver is not availabe right now. Please use other providers."
+                        "Naver login is not currently supported by Supabase. Please use another method."
                       );
                     }}
                   >
@@ -486,8 +485,8 @@ export default function LoginPage() {
                 aria-hidden={currentSlide !== index}
               >
                 <Image
-                  src={slide.image}
-                  alt={slide.title}
+                  src={slide.image || "/placeholder.svg"}
+                  alt=""
                   fill
                   className="object-cover"
                   aria-hidden="true"
@@ -557,5 +556,20 @@ export default function LoginPage() {
         )}
       </aside>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function Login() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
