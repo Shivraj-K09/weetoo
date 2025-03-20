@@ -1,7 +1,7 @@
 "use client";
 
-import { TradingMarketPlace } from "@/components/trading-market-place";
-import { TradingTabs } from "@/components/trading-tabs";
+import { TradingMarketPlace } from "@/components/room/trading-market-place";
+import { TradingTabs } from "@/components/room/trading-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

@@ -1,5 +1,5 @@
 import { DesktopContent } from "@/components/desktop-content";
-import { MobileContent } from "@/components/mobile-content";
+import { MobileContent } from "@/components/mobile/mobile-content";
 
 export default function Home() {
   return (

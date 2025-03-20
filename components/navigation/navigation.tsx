@@ -2,8 +2,12 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { MenuIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "./ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
+import { Button } from "@/components/ui/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import {
   Sheet,
   SheetContent,
@@ -11,7 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "./ui/sheet";
+} from "@/components/ui/sheet";
 
 export function Navigation() {
   return (
@@ -19,11 +23,6 @@ export function Navigation() {
       <div className="bg-[#E74C3C] w-full lg:inline-flex py-3.5 text-white items-center hidden">
         <div className="mx-auto container">
           <div className="flex items-center justify-center gap-20 xl:gap-36">
-            {/* <Link href="/trader">트레이더</Link>
-            <Link href="/community">커뮤니티</Link>
-            <Link href="/investment">투자대회</Link>
-            <Link href="/news">뉴스</Link>
-            <Link href="/exchange">거래소</Link> */}
             <HoverCard openDelay={0}>
               <HoverCardTrigger asChild className="cursor-pointer">
                 <Button variant="ghost" className="text-white font-semibold">
@@ -117,7 +116,7 @@ export function Navigation() {
                     </Link>
                   </div>
                 </div>
-              </HoverCardContent>{" "}
+              </HoverCardContent>
             </HoverCard>
 
             <HoverCard openDelay={0}>
@@ -128,12 +127,19 @@ export function Navigation() {
               </HoverCardTrigger>
               <HoverCardContent className="w-54 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>해외선물 거래소 비교</span>
-                  </div>
-                  <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>코인선물 거래소 비교</span>
-                  </div>
+                  <Link
+                    href="/crypto-compare"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    코인선물 거래소 비교
+                  </Link>
+
+                  <Link
+                    href="/overseas-compare"
+                    className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                  >
+                    해외선물 거래소 비교
+                  </Link>
                 </div>
               </HoverCardContent>{" "}
             </HoverCard>

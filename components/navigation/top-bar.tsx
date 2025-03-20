@@ -13,7 +13,7 @@ import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Icons } from "./icons";
+import { Icons } from "../icons";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
