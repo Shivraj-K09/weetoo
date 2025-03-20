@@ -257,7 +257,7 @@ export function UserInfo() {
           </div>
 
           <button
-            className="group flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 transition-all hover:bg-[#f8e9e8] hover:text-[#c74135]"
+            className="group flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 transition-all hover:bg-[#f8e9e8] hover:text-[#c74135] cursor-pointer"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onClick={handleSignOut}
