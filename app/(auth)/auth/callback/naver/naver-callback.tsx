@@ -99,7 +99,7 @@ export function NaverCallback() {
 
               // Add a small delay to ensure everything is updated
               setTimeout(() => {
-                router.push("/dashboard");
+                router.push("/");
               }, 1000);
             } else {
               // No email/password provided
