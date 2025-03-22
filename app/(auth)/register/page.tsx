@@ -12,10 +12,11 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase, SupportedProvider } from "@/lib/supabase/client";
+import { supabase, type SupportedProvider } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
 import Image from "next/image";
+import { getNaverOAuthURL } from "@/lib/auth/naver";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -158,15 +159,21 @@ export default function RegisterPage() {
   const handleSocialLogin = async (provider: SupportedProvider) => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        },
-      });
 
-      if (error) throw error;
-      console.log(error);
+      // For Google and Kakao, use Supabase OAuth
+      if (provider === "google" || provider === "kakao") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: provider as any, // Type assertion to bypass TypeScript error
+          options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          },
+        });
+
+        if (error) throw error;
+      } else if (provider === "naver") {
+        // For Naver, use our custom implementation
+        window.location.href = getNaverOAuthURL();
+      }
     } catch (error) {
       console.error(`${provider} login error:`, error);
       toast.error(`Failed to sign in with ${provider}. Please try again.`);
@@ -331,11 +338,7 @@ export default function RegisterPage() {
                     type="button"
                     className="h-12 w-full rounded-xl border-[#e74c3c]/20 bg-[#03C75A] px-0 text-white hover:bg-[#03C75A]/90 hover:text-white cursor-pointer"
                     aria-label="Sign up with Naver"
-                    onClick={() => {
-                      toast.info(
-                        "Naver is not availabe right now. Please use other providers."
-                      );
-                    }}
+                    onClick={() => handleSocialLogin("naver")}
                   >
                     <Icons.naver2Icon className="w-5 h-5" />
                     <span className="sr-only">Sign up with Naver</span>
@@ -352,7 +355,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-2 text-muted-foreground">
+                <span className="bg-background px-2 text-muted-foreground select-none">
                   or continue with email
                 </span>
               </div>
@@ -617,7 +620,7 @@ export default function RegisterPage() {
                 aria-hidden={currentSlide !== index}
               >
                 <Image
-                  src={slide.image}
+                  src={slide.image || "/placeholder.svg"}
                   alt={slide.title}
                   fill
                   className="object-cover"

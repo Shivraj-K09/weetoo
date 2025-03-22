@@ -14,6 +14,7 @@ export const supabase = createClient();
 export type SupportedProvider =
   | "google"
   | "kakao"
+  | "naver" // This is the custom provider we're using
   | "github"
   | "facebook"
   | "twitter"

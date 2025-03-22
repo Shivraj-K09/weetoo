@@ -37,6 +37,7 @@ export function UserInfo() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -48,6 +49,8 @@ export function UserInfo() {
 
         if (session) {
           setIsLoggedIn(true);
+          console.log("User is logged in with ID:", session.user.id);
+          console.log("User metadata:", session.user.user_metadata);
 
           // Fetch user data from public.users table
           const { data: userProfile, error } = await supabase
@@ -58,6 +61,44 @@ export function UserInfo() {
 
           if (error) {
             console.error("Error fetching user profile:", error);
+            setDebugInfo(
+              JSON.stringify(
+                {
+                  error: error,
+                  userId: session.user.id,
+                  userMetadata: session.user.user_metadata,
+                },
+                null,
+                2
+              )
+            );
+
+            // Try to create a minimal user profile from session data
+            const userMetadata = session.user.user_metadata;
+            let firstName = userMetadata?.name || userMetadata?.full_name || "";
+            let lastName = "";
+
+            if (firstName && firstName.includes(" ")) {
+              const nameParts = firstName.split(" ");
+              firstName = nameParts[0];
+              lastName = nameParts.slice(1).join(" ");
+            }
+
+            // Set minimal user data from session
+            setUserData({
+              id: session.user.id,
+              first_name: firstName,
+              last_name: lastName,
+              email: session.user.email || "",
+              provider_type: userMetadata?.provider || "email",
+              kor_coins: 0,
+              level: 1,
+              levelProgress: 50,
+              notifications: 0,
+              accountType: userMetadata?.provider ? "Social" : "Standard",
+              avatar_url: userMetadata?.avatar_url || "",
+            });
+
             return;
           }
 
@@ -75,6 +116,7 @@ export function UserInfo() {
         }
       } catch (error) {
         console.error("Error checking session:", error);
+        setDebugInfo(JSON.stringify(error, null, 2));
       } finally {
         setIsLoading(false);
       }
@@ -87,6 +129,7 @@ export function UserInfo() {
       async (event, session) => {
         if (event === "SIGNED_IN" && session) {
           setIsLoggedIn(true);
+          console.log("Auth state changed: SIGNED_IN");
 
           // Fetch user data
           const { data: userProfile, error } = await supabase
@@ -97,6 +140,33 @@ export function UserInfo() {
 
           if (error) {
             console.error("Error fetching user profile:", error);
+
+            // Try to create a minimal user profile from session data
+            const userMetadata = session.user.user_metadata;
+            let firstName = userMetadata?.name || userMetadata?.full_name || "";
+            let lastName = "";
+
+            if (firstName && firstName.includes(" ")) {
+              const nameParts = firstName.split(" ");
+              firstName = nameParts[0];
+              lastName = nameParts.slice(1).join(" ");
+            }
+
+            // Set minimal user data from session
+            setUserData({
+              id: session.user.id,
+              first_name: firstName,
+              last_name: lastName,
+              email: session.user.email || "",
+              provider_type: userMetadata?.provider || "email",
+              kor_coins: 0,
+              level: 1,
+              levelProgress: 50,
+              notifications: 0,
+              accountType: userMetadata?.provider ? "Social" : "Standard",
+              avatar_url: userMetadata?.avatar_url || "",
+            });
+
             return;
           }
 
@@ -140,6 +210,7 @@ export function UserInfo() {
 
   // Function to partially hide email
   const hideEmail = (email: string) => {
+    if (!email) return "";
     const [username, domain] = email.split("@");
     const hiddenUsername =
       username.charAt(0) + "***" + username.charAt(username.length - 1);
@@ -232,7 +303,8 @@ export function UserInfo() {
                     src={userData.avatar_url || "/placeholder.svg"}
                     alt={`${userData.first_name}'s avatar`}
                     className="h-12 w-12 rounded-full object-cover"
-                    fill
+                    width={48}
+                    height={48}
                   />
                 ) : (
                   <CircleUserRoundIcon className="h-7 w-7 text-[#c74135]" />
@@ -350,11 +422,21 @@ export function UserInfo() {
               Account Settings
             </span>
           </div>
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e9c3c0] text-xs font-medium text-[#c74135]">
+          {/* <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e9c3c0] text-xs font-medium text-[#c74135]">
             1
-          </div>
+          </div> */}
         </Link>
       </footer>
+
+      {/* Debug info (only in development) */}
+      {process.env.NODE_ENV === "development" && debugInfo && (
+        <details className="border-t border-gray-100 p-4 text-xs">
+          <summary className="cursor-pointer text-gray-500">Debug Info</summary>
+          <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-2 rounded text-gray-700 overflow-auto max-h-60">
+            {debugInfo}
+          </pre>
+        </details>
+      )}
     </section>
   );
 }

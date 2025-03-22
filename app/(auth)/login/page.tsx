@@ -16,6 +16,7 @@ import { supabase, type SupportedProvider } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import Image from "next/image";
 import { Icons } from "@/components/icons";
+import { getNaverOAuthURL } from "@/lib/auth/naver";
 
 // Create a client component that uses useSearchParams
 function LoginContent() {
@@ -109,6 +110,9 @@ function LoginContent() {
     setIsLoading(true);
 
     try {
+      // Store the remember me preference in localStorage
+      localStorage.setItem("rememberMe", rememberMe ? "true" : "false");
+
       const { error: signUpError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -133,14 +137,24 @@ function LoginContent() {
   const handleSocialLogin = async (provider: SupportedProvider) => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        },
-      });
 
-      if (error) throw error;
+      // Store the remember me preference in localStorage
+      localStorage.setItem("rememberMe", rememberMe ? "true" : "false");
+
+      // For Google and Kakao, use Supabase OAuth
+      if (provider === "google" || provider === "kakao") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: provider as any, // Type assertion to bypass TypeScript error
+          options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          },
+        });
+
+        if (error) throw error;
+      } else if (provider === "naver") {
+        // For Naver, use our custom implementation
+        window.location.href = getNaverOAuthURL();
+      }
     } catch (error) {
       console.error(`${provider} login error:`, error);
       toast.error(`Failed to sign in with ${provider}. Please try again.`);
@@ -148,6 +162,23 @@ function LoginContent() {
       setIsLoading(false);
     }
   };
+
+  // Function to handle Naver login with remember me
+  const handleNaverLogin = () => {
+    // Store the remember me preference in localStorage
+    localStorage.setItem("rememberMe", rememberMe ? "true" : "false");
+
+    // Redirect to Naver OAuth URL
+    window.location.href = getNaverOAuthURL();
+  };
+
+  // Load remember me preference from localStorage
+  useEffect(() => {
+    const savedRememberMe = localStorage.getItem("rememberMe");
+    if (savedRememberMe) {
+      setRememberMe(savedRememberMe === "true");
+    }
+  }, []);
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -161,7 +192,7 @@ function LoginContent() {
           </span>
         </div>
         <Link
-          href="#"
+          href="/"
           className="text-sm font-medium text-muted-foreground hover:text-[#e74c3c] hover:underline"
           aria-label="Return to main website"
         >
@@ -288,11 +319,7 @@ function LoginContent() {
                     type="button"
                     className="h-12 w-full rounded-xl border-primary/20 bg-[#03C75A] px-0 text-white hover:bg-[#03C75A]/90 hover:text-white cursor-pointer"
                     aria-label="Sign in with Naver"
-                    onClick={() => {
-                      toast.info(
-                        "Naver login is not currently supported by Supabase. Please use another method."
-                      );
-                    }}
+                    onClick={handleNaverLogin}
                   >
                     <Icons.naver2Icon className="w-5 h-5" />
                     <span className="sr-only">Sign in with Naver</span>
@@ -309,7 +336,7 @@ function LoginContent() {
                 />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-2 text-muted-foreground">
+                <span className="bg-background px-2 text-muted-foreground select-none">
                   or continue with email
                 </span>
               </div>
