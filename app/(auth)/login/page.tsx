@@ -144,7 +144,7 @@ function LoginContent() {
       // For Google and Kakao, use Supabase OAuth
       if (provider === "google" || provider === "kakao") {
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: provider as any, // Type assertion to bypass TypeScript error
+          provider: provider as "google" | "kakao",
           options: {
             redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
           },

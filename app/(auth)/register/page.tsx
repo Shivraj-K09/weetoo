@@ -2,21 +2,21 @@
 
 import type React from "react";
 
+import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getNaverOAuthURL } from "@/lib/auth/naver";
+import { supabase, type SupportedProvider } from "@/lib/supabase/client";
 import { ArrowRight, Eye, EyeOff, TrendingUp } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase, type SupportedProvider } from "@/lib/supabase/client";
-import { toast } from "sonner";
-import { Icons } from "@/components/icons";
 import Image from "next/image";
-import { getNaverOAuthURL } from "@/lib/auth/naver";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -163,7 +163,7 @@ export default function RegisterPage() {
       // For Google and Kakao, use Supabase OAuth
       if (provider === "google" || provider === "kakao") {
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: provider as any, // Type assertion to bypass TypeScript error
+          provider: provider as "google" | "kakao",
           options: {
             redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
           },

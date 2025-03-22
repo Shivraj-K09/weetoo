@@ -17,6 +17,30 @@ import {
 } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
 
+// Add these type definitions at the top of the file, after the imports
+interface SessionInfo {
+  session: {
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+    user: {
+      id: string;
+      email?: string;
+      user_metadata: Record<string, unknown>;
+    };
+  } | null;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+  error?: unknown;
+  details?: string;
+  email?: string;
+  password?: string;
+  userId?: string;
+}
+
 export default function NaverCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,8 +48,8 @@ export default function NaverCallbackPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
-  const [apiResponse, setApiResponse] = useState<any>(null);
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [authState, setAuthState] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -75,7 +99,7 @@ export default function NaverCallbackPage() {
 
               // Add a small delay to ensure everything is updated
               setTimeout(() => {
-                router.push("/");
+                router.push("/dashboard");
               }, 1000);
             } else {
               // No email/password provided
@@ -101,7 +125,9 @@ export default function NaverCallbackPage() {
           rawResult = err;
           throw err;
         } finally {
-          setRawResponse(JSON.stringify(rawResult, null, 2));
+          setRawResponse(
+            JSON.stringify(rawResult as Record<string, unknown>, null, 2)
+          );
         }
       } catch (err) {
         console.error("Error during Naver callback:", err);
@@ -126,7 +152,7 @@ export default function NaverCallbackPage() {
           <p className="mt-4 text-muted-foreground">
             Authentication successful! Redirecting...
           </p>
-          {/* {sessionInfo && (
+          {sessionInfo && (
             <details className="text-xs mt-4 max-w-md mx-auto">
               <summary className="cursor-pointer text-muted-foreground">
                 Session Information
@@ -135,7 +161,7 @@ export default function NaverCallbackPage() {
                 {JSON.stringify(sessionInfo, null, 2)}
               </pre>
             </details>
-          )} */}
+          )}
         </div>
       </div>
     );
