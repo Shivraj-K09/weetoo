@@ -53,10 +53,45 @@ export function NaverCallback() {
   const [authState, setAuthState] = useState<"loading" | "success" | "error">(
     "loading"
   );
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+
+  // Check if user is already logged in
+  useEffect(() => {
+    async function checkExistingSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        console.log(
+          "User already has an active session, redirecting to dashboard"
+        );
+        setSessionInfo(data);
+        setAuthState("success");
+
+        // Add a small delay to ensure everything is updated
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1000);
+        return true;
+      }
+      return false;
+    }
+
+    checkExistingSession();
+  }, [router]);
 
   useEffect(() => {
     async function processCallback() {
       try {
+        // If we're already at max retries, don't try again
+        if (retryCount >= MAX_RETRIES) {
+          setError(
+            `Failed after ${MAX_RETRIES} attempts. Please try logging in again.`
+          );
+          setAuthState("error");
+          setIsLoading(false);
+          return;
+        }
+
         const code = searchParams.get("code");
 
         if (!code) {
@@ -99,7 +134,7 @@ export function NaverCallback() {
 
               // Add a small delay to ensure everything is updated
               setTimeout(() => {
-                router.push("/");
+                router.push("/dashboard");
               }, 1000);
             } else {
               // No email/password provided
@@ -123,11 +158,34 @@ export function NaverCallback() {
           }
         } catch (err) {
           rawResult = err;
+
+          // Network error - retry after a delay
+          if (
+            err instanceof Error &&
+            (err.message.includes("fetch failed") ||
+              err.message.includes("ECONNRESET") ||
+              err.message.includes("network"))
+          ) {
+            console.log(
+              `Network error, retrying (${retryCount + 1}/${MAX_RETRIES})...`
+            );
+            setRetryCount((prev) => prev + 1);
+
+            // Wait 2 seconds before retrying
+            setTimeout(() => {
+              processCallback();
+            }, 2000);
+
+            return;
+          }
+
           throw err;
         } finally {
-          setRawResponse(
-            JSON.stringify(rawResult as Record<string, unknown>, null, 2)
-          );
+          if (rawResult) {
+            setRawResponse(
+              JSON.stringify(rawResult as Record<string, unknown>, null, 2)
+            );
+          }
         }
       } catch (err) {
         console.error("Error during Naver callback:", err);
@@ -140,8 +198,18 @@ export function NaverCallback() {
       }
     }
 
-    processCallback();
-  }, [searchParams, router]);
+    if (authState === "loading") {
+      processCallback();
+    }
+  }, [searchParams, router, retryCount, authState]);
+
+  // Add a manual retry button handler
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setAuthState("loading");
+    setRetryCount(0);
+  };
 
   // If we're in the success state, show the success UI
   if (authState === "success") {
@@ -174,7 +242,9 @@ export function NaverCallback() {
         <div className="text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
           <p className="mt-4 text-muted-foreground">
-            Completing authentication...
+            {retryCount > 0
+              ? `Completing authentication (Attempt ${retryCount}/${MAX_RETRIES})...`
+              : "Completing authentication..."}
           </p>
         </div>
       </div>
@@ -247,7 +317,13 @@ export function NaverCallback() {
               </ul>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-center pt-6">
+          <CardFooter className="flex justify-between pt-6">
+            <Button
+              onClick={handleRetry}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Try Again
+            </Button>
             <Button
               onClick={() => router.push("/login")}
               className="bg-red-600 hover:bg-red-700"
