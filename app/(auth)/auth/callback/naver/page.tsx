@@ -67,7 +67,7 @@ export default function NaverCallbackPage() {
         }
 
         // Capture the raw response for debugging
-        let rawResult: any;
+        let rawResult: unknown;
         try {
           const result: NaverCallbackResult = await handleNaverCallback(code);
           rawResult = result;

@@ -17,7 +17,7 @@ export type NaverCallbackResult = {
   redirectTo?: string;
   directLogin?: boolean;
   message?: string;
-  error?: any;
+  error?: unknown;
   details?: string;
   email?: string;
   password?: string;
