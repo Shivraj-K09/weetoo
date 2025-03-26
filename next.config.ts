@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       "lh3.googleusercontent.com",
       "img1.kakaocdn.net",
       "phinf.pstatic.net",
+      "f1.tokenpost.kr",
     ],
   },
 };
