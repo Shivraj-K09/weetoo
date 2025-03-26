@@ -220,7 +220,7 @@ export function NaverCallback() {
           <p className="mt-4 text-muted-foreground">
             Authentication successful! Redirecting...
           </p>
-          {sessionInfo && (
+          {/* {sessionInfo && (
             <details className="text-xs mt-4 max-w-md mx-auto">
               <summary className="cursor-pointer text-muted-foreground">
                 Session Information
@@ -229,7 +229,7 @@ export function NaverCallback() {
                 {JSON.stringify(sessionInfo, null, 2)}
               </pre>
             </details>
-          )}
+          )} */}
         </div>
       </div>
     );
@@ -268,7 +268,7 @@ export function NaverCallback() {
               </div>
             )}
 
-            {sessionInfo && (
+            {/* {sessionInfo && (
               <details className="text-xs mb-4">
                 <summary className="cursor-pointer text-muted-foreground">
                   Session Information
@@ -277,7 +277,7 @@ export function NaverCallback() {
                   {JSON.stringify(sessionInfo, null, 2)}
                 </pre>
               </details>
-            )}
+            )} */}
 
             {debugInfo && (
               <details className="text-xs mb-4">

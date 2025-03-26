@@ -140,15 +140,15 @@ export function ExchangeList() {
   return (
     <section
       aria-label="Exchange List"
-      className="bg-[#f1ebf8] rounded-xl border border-purple-100 shadow-sm overflow-hidden"
+      className="bg-[#f8ebeb] rounded-xl border border-purple-100 shadow-sm overflow-hidden"
     >
       {/* Header */}
       <header className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-[#65558f] flex items-center justify-center">
+          <div className="h-6 w-6 rounded-full bg-[#8f5555] flex items-center justify-center">
             <span className="text-xs font-medium text-white">E</span>
           </div>
-          <h3 className="text-sm font-medium text-[#65558f]">Exchange Rates</h3>
+          <h3 className="text-sm font-medium text-[#8f5555]">Exchange Rates</h3>
         </div>
         <span className="text-xs text-gray-500">Last updated: Just now</span>
       </header>
@@ -194,7 +194,7 @@ export function ExchangeList() {
                   </span>
                 </div>
 
-                <Button className="rounded-full h-7 px-3 bg-[#65558f] text-white text-xs hover:bg-[#574a7b] cursor-pointer">
+                <Button className="rounded-full h-7 px-3 bg-[#b84d4d] text-white text-xs hover:bg-[#b16565] cursor-pointer">
                   신청하기
                 </Button>
               </div>

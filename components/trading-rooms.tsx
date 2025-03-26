@@ -165,7 +165,13 @@ export function TradingRooms() {
     setShowPassword(false);
 
     // Navigate to the room with clean URL
-    router.push(`/rooms/${roomId}-${roomName}`);
+    // router.push(`/rooms/${roomId}-${roomName}`);
+    // Navigate the room to the new window
+    window.open(
+      `/rooms/${roomId}-${roomName}`,
+      "_blank",
+      "width=1600,height=900"
+    );
   };
 
   const handleRoomClick = (room: Room) => {
@@ -180,7 +186,9 @@ export function TradingRooms() {
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^\w-]+/g, "")}`;
-    router.push(`/rooms/${roomSlug}`);
+    // router.push(`/rooms/${roomSlug}`);
+    // Navigate the room to the new window
+    window.open(`/rooms/${roomSlug}`, "_blank", "width=1600,height=900");
   };
 
   // Format time difference

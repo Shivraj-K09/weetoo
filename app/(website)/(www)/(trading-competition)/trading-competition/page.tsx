@@ -472,7 +472,7 @@ export default function TradingCompetition() {
           </div>
 
           {/* Filter buttons - Modern pill design */}
-          <div className="flex flex-wrap gap-2 mt-4">
+          {/* <div className="flex flex-wrap gap-2 mt-4">
             <FilterButton
               isActive={activeFilter === "all"}
               onClick={() => setActiveFilter("all")}
@@ -491,7 +491,7 @@ export default function TradingCompetition() {
             >
               뱅키스계좌
             </FilterButton>
-          </div>
+          </div> */}
 
           {/* Search and filter - Modern clean design */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">

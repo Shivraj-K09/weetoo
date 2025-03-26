@@ -7,9 +7,12 @@ import {
   type NaverTokenResponse,
   type NaverUserResponse,
 } from "@/lib/auth/naver";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET!;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Define the return type for our function
 export type NaverCallbackResult = {
@@ -232,6 +235,63 @@ export async function handleNaverCallback(
       success: false,
       error,
       message: error instanceof Error ? error.message : "Authentication failed",
+    };
+  }
+}
+
+export async function resetPassword(
+  email: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Create a Supabase admin client with the service role key
+    const supabaseAdmin = createAdminClient(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // First, check if the user exists
+    const { data: users, error: getUserError } =
+      await supabaseAdmin.auth.admin.listUsers();
+
+    if (getUserError) {
+      console.error("Error listing users:", getUserError);
+      return { success: false, error: "Failed to check if user exists" };
+    }
+
+    const user = users.users.find((u) => u.email === email);
+
+    if (!user) {
+      return {
+        success: false,
+        error: "No account found with this email address",
+      };
+    }
+
+    // Update the user's password
+    const { error: updateError } =
+      await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        password: newPassword,
+      });
+
+    if (updateError) {
+      console.error("Error updating password:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Password reset error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
     };
   }
 }
