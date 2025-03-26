@@ -287,7 +287,7 @@ const pastEvents = [
 
 export default function TradingCompetition() {
   const [activeTab, setActiveTab] = useState("current");
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter] = useState("all");
   const [activeSlide, setActiveSlide] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [currentItemsPerPage, setCurrentItemsPerPage] = useState(4);
@@ -930,25 +930,25 @@ function TabButton({
 }
 
 // Filter button - Modern pill design
-function FilterButton({
-  children,
-  isActive,
-  onClick,
-}: {
-  children: React.ReactNode;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-        isActive
-          ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
-          : "bg-white text-gray-700 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+// function FilterButton({
+//   children,
+//   isActive,
+//   onClick,
+// }: {
+//   children: React.ReactNode;
+//   isActive: boolean;
+//   onClick: () => void;
+// }) {
+//   return (
+//     <button
+//       onClick={onClick}
+//       className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+//         isActive
+//           ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
+//           : "bg-white text-gray-700 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+//       }`}
+//     >
+//       {children}
+//     </button>
+//   );
+// }

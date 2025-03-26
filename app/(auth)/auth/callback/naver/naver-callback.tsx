@@ -49,7 +49,7 @@ export function NaverCallback() {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
-  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const [, setSessionInfo] = useState<SessionInfo | null>(null);
   const [authState, setAuthState] = useState<"loading" | "success" | "error">(
     "loading"
   );

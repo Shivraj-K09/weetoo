@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EyeIcon, EyeOffIcon, GlobeIcon, LockIcon, XIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Avatar } from "./ui/avatar";
 
@@ -67,7 +67,7 @@ const saveRoomDetails = (
 };
 
 export function TradingRooms() {
-  const router = useRouter();
+  // const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showPassword, setShowPassword] = useState(false);
