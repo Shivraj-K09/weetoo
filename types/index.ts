@@ -10,3 +10,14 @@ export interface TraderRanking {
   return: number;
   numberOfTrades: number;
 }
+
+export interface Article {
+  title: string;
+  description: string;
+  url: string;
+  urlToImage: string;
+  publishedAt: Date;
+  source: string;
+  category: string;
+  relevanceScore: number;
+}

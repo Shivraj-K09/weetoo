@@ -137,6 +137,7 @@ export default function RegisterPage() {
           data: {
             first_name: formData.first_name,
             last_name: formData.last_name,
+            role: "user",
           },
         },
       });

@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
               provider: "naver",
               provider_id: naver_id,
               full_name: name,
+              role: "user",
             },
             password, // Update password so we can sign in with it
           });
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
               provider: "naver",
               provider_id: naver_id,
               full_name: name,
+              role: "user",
             },
           });
 
@@ -116,6 +118,7 @@ export async function POST(request: NextRequest) {
             avatar_url: profile_image,
             provider_type: "naver",
             kor_coins: 0, // Default value
+            role: "user",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },

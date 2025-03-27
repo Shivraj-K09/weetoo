@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
       "img1.kakaocdn.net",
       "phinf.pstatic.net",
       "f1.tokenpost.kr",
+      "placehold.co",
     ],
   },
 };
