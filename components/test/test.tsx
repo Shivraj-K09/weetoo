@@ -46,7 +46,7 @@ export default function News() {
   const [totalPages] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [newsData, setNewsData] = useState<NewsItem[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -404,7 +404,6 @@ interface NewsCardProps {
 function NewsCard({
   title,
   content,
-  category,
   time,
   imageUrl,
   link,

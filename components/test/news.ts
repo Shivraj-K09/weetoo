@@ -265,7 +265,7 @@ export async function GET(request: Request) {
     );
 
     // 6) Format: Coinness => KST, TokenPost => local
-    const formattedArticles = mergedArticles.map((article, index) => {
+    const formattedArticles = mergedArticles.map((article) => {
       const displayDate =
         article.source === "Coinness"
           ? formatDateKST(article.date)
@@ -275,8 +275,11 @@ export async function GET(request: Request) {
 
     console.log("Merged & sorted articles =>", formattedArticles);
     return NextResponse.json({ articles: formattedArticles });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching merged news:", error);
-    return NextResponse.json({ error: error.toString() }, { status: 500 });
+    return NextResponse.json(
+      { error: (error as Error).toString() },
+      { status: 500 }
+    );
   }
 }
