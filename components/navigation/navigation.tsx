@@ -105,8 +105,14 @@ export function Navigation() {
               <HoverCardContent className="w-50 bg-[#3498DB] p-0 text-white border-none">
                 <div className="flex flex-col gap-2 p-4">
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
-                    <span>종합 데이터</span>
+                    <Link
+                      href="/comprehensive-data"
+                      className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer"
+                    >
+                      종합 데이터
+                    </Link>
                   </div>
+
                   <div className="hover:bg-[#90c2e4] rounded px-4 py-1.5 cursor-pointer">
                     <Link
                       href="/news"

@@ -21,3 +21,28 @@ export interface Article {
   category: string;
   relevanceScore: number;
 }
+
+export interface CurrencyData {
+  symbol: string;
+  price: string;
+  change: string;
+  pips: string;
+  high: string;
+  low: string;
+  chartData: number[];
+  backgroundColor?: string;
+}
+
+export interface CandlestickData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface PerformanceItem {
+  label: string;
+  value: string;
+  color: string;
+}
