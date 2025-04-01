@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       "phinf.pstatic.net",
       "f1.tokenpost.kr",
       "placehold.co",
+      "coin-images.coingecko.com",
     ],
   },
 };

@@ -21,7 +21,6 @@ export interface Article {
   category: string;
   relevanceScore: number;
 }
-
 export interface CurrencyData {
   symbol: string;
   price: string;
@@ -31,6 +30,7 @@ export interface CurrencyData {
   low: string;
   chartData: number[];
   backgroundColor?: string;
+  isLive?: boolean;
 }
 
 export interface CandlestickData {

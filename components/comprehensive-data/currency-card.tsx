@@ -20,13 +20,9 @@ export function CurrencyCard({
   const isPositive = Number.parseFloat(data.change) >= 0;
   const backgroundColor =
     data.backgroundColor ||
-    (data.symbol.includes("JPY") || data.symbol.includes("NZD")
-      ? "bg-[#3d2e3b]"
-      : data.symbol.includes("BTC") ||
-        data.symbol.includes("GOLD") ||
-        data.symbol.includes("OIL")
-      ? "bg-[#2e3d33]"
-      : "bg-[#2c3038]");
+    (isPositive
+      ? "bg-[#2e3d33]" // Green background for positive changes
+      : "bg-[#3d2e3b]"); // Red background for negative changes
 
   // Add very subtle border color based on trend
   const borderColor = isPositive
@@ -34,14 +30,9 @@ export function CurrencyCard({
     : "border-red-900/30"; // Very dark, semi-transparent red
 
   // Add gradient overlay based on card type
-  const gradientOverlay =
-    data.symbol.includes("JPY") || data.symbol.includes("NZD")
-      ? "bg-gradient-to-br from-[#3d2e3b]/50 to-[#3d2e3b]"
-      : data.symbol.includes("BTC") ||
-        data.symbol.includes("GOLD") ||
-        data.symbol.includes("OIL")
-      ? "bg-gradient-to-br from-[#2e3d33]/50 to-[#2e3d33]"
-      : "bg-gradient-to-br from-[#2c3038]/50 to-[#2c3038]";
+  const gradientOverlay = isPositive
+    ? "bg-gradient-to-br from-[#2e3d33]/50 to-[#2e3d33]" // Green gradient for positive changes
+    : "bg-gradient-to-br from-[#3d2e3b]/50 to-[#3d2e3b]"; // Red gradient for negative changes
 
   return (
     <div
@@ -103,10 +94,16 @@ export function CurrencyCard({
 
         {/* Chart */}
         <div className="h-16 relative">
-          <LineChart
-            data={data.chartData}
-            color={isPositive ? "#22c55e" : "#ef4444"}
-          />
+          {data.chartData && data.chartData.length > 0 ? (
+            <LineChart
+              data={data.chartData}
+              color={isPositive ? "#22c55e" : "#ef4444"}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-400 text-xs">
+              No chart data available
+            </div>
+          )}
 
           {/* Subtle highlight on hover */}
           <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-5 transition-opacity duration-300"></div>

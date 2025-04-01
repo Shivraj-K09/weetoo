@@ -1,124 +1,146 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { getCandlestickData } from "@/lib/data";
+import { useState, useEffect } from "react";
+import { fetchCryptoData, fetchCommodityData, fetchForexData } from "@/lib/api";
+import dynamic from "next/dynamic";
+import type { CurrencyData } from "@/types";
+
+// Dynamically import TradingViewWidget with no SSR to avoid hydration issues
+const TradingViewWidget = dynamic(() => import("./trading-view-widget"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-[#1e2329]">
+      <div className="text-gray-400 text-sm">Loading chart...</div>
+    </div>
+  ),
+});
 
 interface DetailedChartProps {
   symbol: string;
+  currencyData?: CurrencyData[]; // Add currencyData prop
 }
 
-export function DetailedChart({ symbol }: DetailedChartProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const data = getCandlestickData(symbol);
-  const lastCandle = data[data.length - 1];
-  const currentPrice = lastCandle.close.toFixed(4);
-  const priceChange =
-    lastCandle.close >= lastCandle.open ? "+0.0003 (0.03%)" : "-0.0003 (0.03%)";
-  const isPriceUp = lastCandle.close >= lastCandle.open;
+export function DetailedChart({
+  symbol,
+  currencyData = [],
+}: DetailedChartProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [cryptoData, setCryptoData] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [commodityData, setCommodityData] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [forexData, setForexData] = useState<any>(null);
 
+  // Find the matching currency data from the main cards
+  const matchingCurrency = currencyData.find(
+    (currency) => currency.symbol === symbol
+  );
+
+  // Determine which data to use based on symbol
+  const isCrypto = symbol === "BTC/USD";
+  const isCommodity = symbol === "Gold" || symbol === "Crude Oil WTI";
+  const isForex = [
+    "EUR/USD",
+    "GBP/USD",
+    "USD/JPY",
+    "USD/CAD",
+    "USD/CHF",
+    "AUD/USD",
+    "NZD/USD",
+    "EUR/GBP",
+    "GBP/JPY",
+  ].includes(symbol);
+
+  // Fetch live data for BTC/USD, commodities, and forex
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const fetchData = async () => {
+      if (isCrypto) {
+        try {
+          const data = await fetchCryptoData();
+          setCryptoData(data);
+        } catch (error) {
+          console.error(
+            "Error fetching crypto data for detailed chart:",
+            error
+          );
+        }
+      } else if (isCommodity) {
+        try {
+          const data = await fetchCommodityData();
+          setCommodityData(data);
+        } catch (error) {
+          console.error(
+            "Error fetching commodity data for detailed chart:",
+            error
+          );
+        }
+      } else if (isForex) {
+        try {
+          const data = await fetchForexData();
+          setForexData(data);
+        } catch (error) {
+          console.error("Error fetching forex data for detailed chart:", error);
+        }
+      }
+    };
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Set canvas dimensions
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, rect.width, rect.height);
-
-    // Draw background
-    ctx.fillStyle = "#1e2329";
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    // Draw grid lines
-    ctx.strokeStyle = "#2c3038";
-    ctx.lineWidth = 1;
-
-    // Horizontal grid lines
-    for (let i = 0; i <= 4; i++) {
-      const y = (i / 4) * rect.height;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(rect.width, y);
-      ctx.stroke();
+    // Only fetch if we don't have matching currency data
+    if (!matchingCurrency) {
+      fetchData();
     }
+  }, [symbol, isCrypto, isCommodity, isForex, matchingCurrency]);
 
-    // Vertical grid lines
-    for (let i = 0; i <= 6; i++) {
-      const x = (i / 6) * rect.width;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
-      ctx.stroke();
-    }
+  // Get current price based on data source - prioritize matching currency data
+  const currentPrice = matchingCurrency
+    ? matchingCurrency.price
+    : isCrypto && cryptoData
+    ? Number.parseFloat(cryptoData.lastPrice).toFixed(2)
+    : isCommodity &&
+      commodityData &&
+      commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"]
+    ? commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"].Last
+    : isForex && forexData && forexData[symbol]
+    ? forexData[symbol].Bid
+    : "Loading...";
 
-    // Draw candlesticks
-    const candleWidth = (rect.width / data.length) * 0.8;
-    const spacing = (rect.width / data.length) * 0.2;
+  // Get price change based on data source - prioritize matching currency data
+  const priceChange = matchingCurrency
+    ? `${matchingCurrency.change}% (${matchingCurrency.pips})`
+    : isCrypto && cryptoData
+    ? `${cryptoData.priceChange > 0 ? "+" : ""}${Number.parseFloat(
+        cryptoData.priceChangePercent
+      ).toFixed(2)}% (${Math.abs(
+        Number.parseFloat(cryptoData.priceChange)
+      ).toFixed(2)})`
+    : isCommodity &&
+      commodityData &&
+      commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"]
+    ? `${
+        commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"]["Chg%"]
+      } (${commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"].Chg})`
+    : isForex && forexData && forexData[symbol]
+    ? `${forexData[symbol]["Chg. %"]} (${forexData[symbol]["Chg."]})`
+    : "0.00% (0.00)";
 
-    const minPrice = Math.min(...data.flatMap((d) => [d.low, d.open, d.close]));
-    const maxPrice = Math.max(
-      ...data.flatMap((d) => [d.high, d.open, d.close])
-    );
-    const priceRange = maxPrice - minPrice;
-
-    data.forEach((candle, i) => {
-      const x = i * (candleWidth + spacing) + spacing / 2;
-
-      // Draw wick
-      ctx.beginPath();
-      ctx.moveTo(
-        x + candleWidth / 2,
-        rect.height -
-          ((candle.high - minPrice) / priceRange) * rect.height * 0.8 -
-          rect.height * 0.1
-      );
-      ctx.lineTo(
-        x + candleWidth / 2,
-        rect.height -
-          ((candle.low - minPrice) / priceRange) * rect.height * 0.8 -
-          rect.height * 0.1
-      );
-      ctx.strokeStyle = candle.close >= candle.open ? "#22c55e" : "#ef4444";
-      ctx.stroke();
-
-      // Draw candle body
-      const openY =
-        rect.height -
-        ((candle.open - minPrice) / priceRange) * rect.height * 0.8 -
-        rect.height * 0.1;
-      const closeY =
-        rect.height -
-        ((candle.close - minPrice) / priceRange) * rect.height * 0.8 -
-        rect.height * 0.1;
-      const candleHeight = Math.abs(closeY - openY);
-
-      ctx.fillStyle = candle.close >= candle.open ? "#22c55e" : "#ef4444";
-      ctx.fillRect(
-        x,
-        Math.min(openY, closeY),
-        candleWidth,
-        Math.max(candleHeight, 1)
-      );
-    });
-
-    // Draw time label
-    ctx.fillStyle = "#9ca3af";
-    ctx.font = "12px Arial";
-    ctx.fillText("12:00 AM", 10, 20);
-  }, [symbol, data]);
+  // Determine if price is up based on data source - prioritize matching currency data
+  const isPriceUp = matchingCurrency
+    ? Number.parseFloat(matchingCurrency.change) >= 0
+    : isCrypto && cryptoData
+    ? Number.parseFloat(cryptoData.priceChangePercent) >= 0
+    : isCommodity &&
+      commodityData &&
+      commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"]
+    ? commodityData[symbol === "Gold" ? "Gold" : "Crude Oil WTI"].Chg.includes(
+        "+"
+      )
+    : isForex && forexData && forexData[symbol]
+    ? !forexData[symbol]["Chg."].includes("-")
+    : false;
 
   return (
     <div className="bg-[#1e2329] border-2 border-[#3c4048] rounded-md shadow-2xl overflow-hidden w-full h-full relative">
       {/* Header bar with currency symbol and current price */}
-      <div className="absolute top-0 left-0 right-0 h-8 bg-[#252a31] border-b border-[#3c4048] flex items-center justify-between px-3">
+      <div className="absolute top-0 left-0 right-0 h-8 bg-[#252a31] border-b border-[#3c4048] flex items-center justify-between px-3 z-10">
         <span className="text-white text-sm font-medium">{symbol}</span>
         <div className="flex items-center">
           <span className="text-white text-sm font-medium mr-2">
@@ -134,14 +156,9 @@ export function DetailedChart({ symbol }: DetailedChartProps) {
         </div>
       </div>
 
-      {/* Canvas with padding for header */}
+      {/* TradingView Widget */}
       <div className="pt-8 h-full">
-        <canvas
-          ref={canvasRef}
-          width="350"
-          height="220"
-          className="w-full h-full"
-        />
+        <TradingViewWidget symbol={symbol} />
       </div>
     </div>
   );

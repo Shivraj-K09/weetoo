@@ -17,6 +17,17 @@ export function LineChart({ data, color }: LineChartProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Validate data to ensure it contains valid numbers
+    const validData = data.filter(
+      (value) => typeof value === "number" && !isNaN(value) && isFinite(value)
+    );
+
+    // If no valid data, don't render
+    if (validData.length === 0) {
+      console.warn("No valid data to render chart");
+      return;
+    }
+
     // Set canvas dimensions
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -27,15 +38,19 @@ export function LineChart({ data, color }: LineChartProps) {
     // Clear canvas
     ctx.clearRect(0, 0, rect.width, rect.height);
 
+    // Find min and max values safely
+    const minValue = Math.min(...validData);
+    const maxValue = Math.max(...validData);
+
+    // If min and max are the same, add a small range
+    const range = maxValue - minValue || maxValue * 0.1;
+
     // Draw line
-    const points = data.map((value, index) => ({
-      x: (index / (data.length - 1)) * rect.width,
+    const points = validData.map((value, index) => ({
+      x: (index / (validData.length - 1)) * rect.width,
       y:
         rect.height -
-        ((value - Math.min(...data)) /
-          (Math.max(...data) - Math.min(...data))) *
-          rect.height *
-          0.8 -
+        ((value - minValue) / range) * rect.height * 0.8 -
         rect.height * 0.1,
     }));
 

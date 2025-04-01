@@ -2,7 +2,7 @@ import { FinancialDashboard } from "@/components/comprehensive-data/financial-da
 
 export default function ComprehensiveData() {
   return (
-    <main className="min-h-screen bg-[#1e2329] text-white">
+    <main className="h-fit bg-[#1e2329] text-white">
       <FinancialDashboard />
     </main>
   );
