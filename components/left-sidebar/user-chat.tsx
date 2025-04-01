@@ -742,7 +742,8 @@ export function UserChat() {
             <div className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
               <p className="text-xs text-white/80">
-                Users Online: {isConnecting ? "" : onlineUsers.toLocaleString()}{" "}
+                Users Online:{" "}
+                {isConnecting ? "Connecting..." : onlineUsers.toLocaleString()}{" "}
               </p>
             </div>
           </div>
