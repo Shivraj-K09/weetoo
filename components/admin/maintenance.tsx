@@ -41,8 +41,8 @@ export function AdminUnderConstruction() {
           </div>
 
           <p className="text-slate-300 max-w-sm mx-auto mb-8">
-            We're building a powerful admin experience. Check back soon to see
-            our progress.
+            We&apos;re building a powerful admin experience. Check back soon to
+            see our progress.
           </p>
         </div>
 
