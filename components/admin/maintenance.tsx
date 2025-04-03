@@ -83,10 +83,6 @@ export function AdminUnderConstruction() {
             </div>
           </div>
         </div>
-
-        <div className="mt-8 text-center text-slate-500 text-sm">
-          <p>© {new Date().getFullYear()} Your Company</p>
-        </div>
       </div>
     </div>
   );
