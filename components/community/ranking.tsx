@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { User, MessageSquare, Bell, Ban, Flag, X, Send } from "lucide-react";
 import {
@@ -7,6 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function Ranking() {
   const [messageDialog, setMessageDialog] = useState({
@@ -14,8 +17,9 @@ export function Ranking() {
     username: "",
   });
   const [messageText, setMessageText] = useState("");
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [activeTab, setActiveTab] = useState("ranking1");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Open message dialog
   const openMessageDialog = (username: string) => {
@@ -80,92 +84,141 @@ export function Ranking() {
     };
   }, [messageDialog.visible]);
 
+  // Render a single ranking column - remove the unused parameter
+  const renderRankingColumn = () => (
+    <div className="overflow-hidden">
+      {/* Ranking Header */}
+      <div className="flex items-center px-3 py-2 border-b border-gray-200 bg-gradient-to-r from-[#f39c12]/20 to-white">
+        <span className="text-[#f39c12] mr-1.5">👑</span>
+        <h3 className="text-xs font-medium text-gray-700">
+          일간 수익률 순위 TOP5
+        </h3>
+      </div>
+
+      {/* Ranking List with shadcn Context Menu */}
+      <div className="overflow-y-auto">
+        {[1, 2, 3, 4, 5].map((rank) => (
+          <ContextMenu key={rank}>
+            <ContextMenuTrigger>
+              <div className="flex items-center px-3 py-2 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center mr-2.5">
+                  <span className="text-white text-[10px] font-medium">
+                    {rank}
+                  </span>
+                </div>
+                <div className="flex-1 flex items-center">
+                  <span className="text-gray-700 font-medium text-[0.6rem]">
+                    나스닥 탑천
+                  </span>
+                  <span className="text-gray-400 text-[10px] ml-1.5">
+                    NASDAQ
+                  </span>
+                </div>
+              </div>
+            </ContextMenuTrigger>
+
+            <ContextMenuContent className="w-44 p-0 overflow-hidden shadow-lg rounded-md border border-gray-200">
+              {/* Custom styled header */}
+              <div className="bg-gradient-to-r from-[#e74c3c]/90 to-[#e74c3c]/80 text-white px-3 py-2.5">
+                <div className="text-sm font-medium truncate">나스닥 탑천</div>
+              </div>
+
+              <div className="py-1">
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50">
+                  <User className="h-3.5 w-3.5 mr-2 text-[#e74c3c]" />
+                  <span>프로필 보기</span>
+                </ContextMenuItem>
+
+                <ContextMenuItem
+                  className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50"
+                  onClick={() => openMessageDialog("나스닥 탑천")}
+                >
+                  <MessageSquare className="h-3.5 w-3.5 mr-2 text-[#e74c3c]" />
+                  <span>메시지 보내기</span>
+                </ContextMenuItem>
+
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50">
+                  <Bell className="h-3.5 w-3.5 mr-2 text-[#e74c3c]" />
+                  <span>구독하기</span>
+                </ContextMenuItem>
+              </div>
+
+              <ContextMenuSeparator />
+
+              <div className="bg-gray-50 py-1">
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-100">
+                  <Ban className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                  <span>차단하기</span>
+                </ContextMenuItem>
+
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-100">
+                  <Flag className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                  <span>신고하기</span>
+                </ContextMenuItem>
+              </div>
+            </ContextMenuContent>
+          </ContextMenu>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white mt-4">
-      <div className="grid grid-cols-4 divide-x divide-gray-200">
+    <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
+      {/* Desktop View - Four column layout */}
+      <div className="hidden lg:grid lg:grid-cols-4 divide-x divide-gray-200">
         {[1, 2, 3, 4].map((section) => (
-          <div key={section} className="overflow-hidden">
-            {/* Ranking Header */}
-            <div className="flex items-center px-3 py-1.5 border-b border-gray-200 bg-gradient-to-r from-[#f39c12]/20 to-white">
-              <span className="text-[#f39c12] mr-1">👑</span>
-              <h3 className="text-xs font-medium text-gray-700">
-                일간 수익률 순위 TOP5
-              </h3>
-            </div>
-
-            {/* Ranking List with shadcn Context Menu */}
-            <div className="overflow-y-auto">
-              {[1, 2, 3, 4, 5].map((rank) => (
-                <ContextMenu key={rank}>
-                  <ContextMenuTrigger>
-                    <div className="flex items-center px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center mr-2">
-                        <span className="text-white text-[10px]">{rank}</span>
-                      </div>
-                      <div className="flex-1 flex items-center">
-                        <span className="text-gray-700">나스닥 탑천</span>
-                        <span className="text-gray-400 text-[10px] ml-1">
-                          NASDAQ
-                        </span>
-                      </div>
-                    </div>
-                  </ContextMenuTrigger>
-
-                  <ContextMenuContent className="w-44 p-0 overflow-hidden">
-                    {/* Custom styled header */}
-                    <div className="bg-gradient-to-r from-[#e74c3c]/90 to-[#e74c3c]/80 text-white px-3 py-2">
-                      <div className="text-sm font-medium truncate">
-                        나스닥 탑천
-                      </div>
-                    </div>
-
-                    <div className="py-1">
-                      <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer">
-                        <User className="h-3 w-3 mr-2 text-[#e74c3c]" />
-                        <span>프로필 보기</span>
-                      </ContextMenuItem>
-
-                      <ContextMenuItem
-                        className="flex items-center px-3 py-2 text-xs cursor-pointer"
-                        onClick={() => openMessageDialog("나스닥 탑천")}
-                      >
-                        <MessageSquare className="h-3 w-3 mr-2 text-[#e74c3c]" />
-                        <span>메시지 보내기</span>
-                      </ContextMenuItem>
-
-                      <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer">
-                        <Bell className="h-3 w-3 mr-2 text-[#e74c3c]" />
-                        <span>구독하기</span>
-                      </ContextMenuItem>
-                    </div>
-
-                    <ContextMenuSeparator />
-
-                    <div className="bg-gray-50 py-1">
-                      <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer">
-                        <Ban className="h-3 w-3 mr-2 text-gray-500" />
-                        <span>차단하기</span>
-                      </ContextMenuItem>
-
-                      <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer">
-                        <Flag className="h-3 w-3 mr-2 text-gray-500" />
-                        <span>신고하기</span>
-                      </ContextMenuItem>
-                    </div>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ))}
-            </div>
-          </div>
+          <div key={section}>{renderRankingColumn()}</div>
         ))}
       </div>
 
-      {/* Message Dialog - Now more rectangular */}
+      {/* Mobile View - Tab-based layout */}
+      <div className="md:hidden">
+        <Tabs
+          defaultValue="ranking1"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="bg-gray-50"
+        >
+          <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-gray-200">
+            {[1, 2, 3, 4].map((index) => (
+              <TabsTrigger
+                key={index}
+                value={`ranking${index}`}
+                className="text-xs py-2 px-1 data-[state=active]:bg-white data-[state=active]:text-[#f39c12] data-[state=active]:border-b-2 data-[state=active]:border-[#f39c12] data-[state=active]:shadow-none rounded-none"
+              >
+                <div className="flex items-center justify-center">
+                  <span className="text-[#f39c12] mr-1 text-xs">👑</span>
+                  <span className="font-medium">순위 {index}</span>
+                </div>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="ranking1" className="m-0 bg-white border-t-0">
+            {renderRankingColumn()}
+          </TabsContent>
+
+          <TabsContent value="ranking2" className="m-0 bg-white border-t-0">
+            {renderRankingColumn()}
+          </TabsContent>
+
+          <TabsContent value="ranking3" className="m-0 bg-white border-t-0">
+            {renderRankingColumn()}
+          </TabsContent>
+
+          <TabsContent value="ranking4" className="m-0 bg-white border-t-0">
+            {renderRankingColumn()}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Message Dialog - Responsive */}
       {messageDialog.visible && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
           <div
             ref={dialogRef}
-            className="bg-white rounded-lg shadow-xl w-[480px] overflow-hidden"
+            className="bg-white rounded-lg shadow-xl w-full max-w-[480px] overflow-hidden"
           >
             {/* Dialog Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#e74c3c] to-[#e74c3c]/90 text-white">
@@ -182,7 +235,7 @@ export function Ranking() {
             </div>
 
             {/* Dialog Content */}
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
               <div className="mb-4">
                 <label className="block text-xs text-gray-500 mb-1">
                   받는 사람
@@ -203,7 +256,7 @@ export function Ranking() {
                   onChange={(e) => setMessageText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="메시지를 입력하세요..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded resize-none h-32 text-sm focus:outline-none focus:ring-1 focus:ring-[#e74c3c] focus:border-[#e74c3c]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded resize-none h-24 sm:h-32 text-sm focus:outline-none focus:ring-1 focus:ring-[#e74c3c] focus:border-[#e74c3c]"
                 ></textarea>
                 <p className="text-xs text-gray-400 mt-1">
                   Enter 키를 눌러 전송하거나 Shift+Enter로 줄바꿈
@@ -213,14 +266,14 @@ export function Ranking() {
               <div className="flex justify-end">
                 <button
                   onClick={closeMessageDialog}
-                  className="px-4 py-2 text-xs border border-gray-200 rounded mr-2 hover:bg-gray-50 transition-colors"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs border border-gray-200 rounded mr-2 hover:bg-gray-50 transition-colors"
                 >
                   취소
                 </button>
                 <button
                   onClick={sendMessage}
                   disabled={!messageText.trim()}
-                  className={`px-4 py-2 text-xs rounded text-white flex items-center ${
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 text-xs rounded text-white flex items-center ${
                     messageText.trim()
                       ? "bg-[#e74c3c] hover:bg-[#e74c3c]/90"
                       : "bg-gray-300 cursor-not-allowed"

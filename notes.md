@@ -9,3 +9,7 @@
 [] competition page same admin depends on the admin.
 
 [] Captcha for signup
+
+[] Delete the chats after 24-48 hours (still not planned to do this or not sure)
+
+[] Need to fix the comprehensive-data page data.

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PriceInfoBar } from "@/components/room/price-info-bar";
+import { WarningDialog } from "@/components/room/warning-dialog";
 
 // Define privacy type as a union type for better type safety
 type Privacy = "private" | "public";
@@ -90,6 +91,8 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
   const [ownerName, setOwnerName] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
   const [priceDataLoaded, setPriceDataLoaded] = useState(false);
+
+  const [showWarning, setShowWarning] = useState(false);
 
   // Add this near the other state declarations
   // Update the initial state to include volume
@@ -950,6 +953,39 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
     }
   };
 
+  // Check if warning should be shown
+  useEffect(() => {
+    const checkWarningDismissed = () => {
+      const dismissedTime = localStorage.getItem("trading-warning-dismissed");
+
+      if (!dismissedTime) {
+        setShowWarning(true);
+        return;
+      }
+
+      // Check if 24 hours have passed since last dismissal
+      const lastDismissed = Number.parseInt(dismissedTime, 10);
+      const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+
+      if (Date.now() - lastDismissed > twentyFourHoursMs) {
+        setShowWarning(true);
+        localStorage.removeItem("trading-warning-dismissed");
+      }
+    };
+
+    // Small delay to ensure the component is mounted
+    const timer = setTimeout(() => {
+      checkWarningDismissed();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle warning confirmation
+  const handleWarningConfirm = () => {
+    setShowWarning(false);
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -973,6 +1009,8 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
+      <WarningDialog isOpen={showWarning} onConfirm={handleWarningConfirm} />
+
       <div className="p-4 w-full flex gap-1.5 bg-[#181a20]">
         <div className="h-full text-white rounded-md shadow-sm flex-1 w-full">
           <div className="flex flex-col gap-1.5">

@@ -270,7 +270,7 @@ export function TopBar() {
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="p-0 w-[380px] rounded-none"
+              className="p-0 w-[420px] rounded-none"
               align="start"
             >
               <div className="overflow-hidden rounded-none">
@@ -317,7 +317,7 @@ export function TopBar() {
                           htmlFor={`amount-${amount}`}
                           className="text-[0.825rem]"
                         >
-                          {amount.toLocaleString()} 캐시
+                          {amount.toLocaleString()} 코코인
                         </Label>
                       </div>
                     ))}
@@ -331,19 +331,19 @@ export function TopBar() {
                         입금금액은 부가세
                         <span className="text-red-500">10%</span> 포함{" "}
                         <span className="text-red-500 font-bold">11,000</span>{" "}
-                        원이며,
+                        코코인,
                       </p>
                       <p className="text-gray-600">
                         충전될 캐시는{" "}
                         <span className="text-red-500 font-bold">10,000</span>{" "}
-                        입니다.
+                        코코인.
                       </p>
                     </div>
 
                     {/* Bank account info */}
                     <div className="text-center text-sm">
                       <p className="text-gray-600">
-                        하나은행 880-910101-42505 주식회사 코넷
+                        하나은행 830501-04-245285 주식회사 코넷
                       </p>
                     </div>
 

@@ -1,6 +1,10 @@
 import { UsersIcon } from "lucide-react";
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 export function Community() {
+  const [activeTab, setActiveTab] = useState("free");
+
   return (
     // <div className="flex flex-col gap-3 border rounded-md p-3">
     //   <div className="flex items-center gap-2">
@@ -178,21 +182,21 @@ export function Community() {
     //     </div>
     //   </div>
     // </div>
-    <div className="border border-gray-200 rounded-md overflow-hidden bg-white">
+    <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
       {/* Header with subtle gradient */}
       <div className="flex items-center px-4 py-2 border-b border-gray-200 bg-gradient-to-r from-[#e74c3c] via-[#e74c3c]/90 to-[#e74c3c]/80 text-white">
         <UsersIcon className="h-4 w-4 mr-2" />
         <h2 className="text-sm font-medium">WEETOO Community</h2>
       </div>
 
-      {/* Content - Three column layout with minimal styling */}
-      <div className="grid grid-cols-3 divide-x divide-gray-200">
+      {/* Desktop View - Three column layout */}
+      <div className="hidden lg:grid md:grid-cols-3 divide-x divide-gray-200">
         {/* Free Board */}
         <div>
           <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
             자유 게시판
           </div>
-          <div className="h-[220px] overflow-y-auto no-scrollbar">
+          <div className="h-[220px] overflow-y-auto">
             {freeBoard.map((post, index) => (
               <div
                 key={index}
@@ -210,7 +214,7 @@ export function Community() {
           <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
             추억 게시판
           </div>
-          <div className="h-[220px] overflow-y-auto no-scrollbar">
+          <div className="h-[220px] overflow-y-auto">
             <div className="grid grid-cols-2 gap-2 p-2 border-b border-gray-100">
               <div className="relative rounded overflow-hidden">
                 <div className="aspect-video w-full bg-[#3498db]"></div>
@@ -248,7 +252,7 @@ export function Community() {
           <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
             교육게시판
           </div>
-          <div className="h-[220px] overflow-y-auto no-scrollbar">
+          <div className="h-[220px] overflow-y-auto">
             {educationBoard.map((post, index) => (
               <div
                 key={index}
@@ -260,6 +264,107 @@ export function Community() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Mobile View - Tab-based layout */}
+      <div className="md:hidden">
+        <Tabs
+          defaultValue="free"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="bg-gray-50"
+        >
+          <TabsList className="grid grid-cols-3 w-full rounded-none border-b border-gray-200">
+            <TabsTrigger
+              value="free"
+              className="text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:text-[#e74c3c] data-[state=active]:border-b-2 data-[state=active]:border-[#e74c3c] data-[state=active]:shadow-none rounded-none"
+            >
+              <span className="font-medium">자유 게시판</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="memory"
+              className="text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:text-[#e74c3c] data-[state=active]:border-b-2 data-[state=active]:border-[#e74c3c] data-[state=active]:shadow-none rounded-none"
+            >
+              <span className="font-medium">추억 게시판</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="education"
+              className="text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:text-[#e74c3c] data-[state=active]:border-b-2 data-[state=active]:border-[#e74c3c] data-[state=active]:shadow-none rounded-none"
+            >
+              <span className="font-medium">교육게시판</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="free" className="m-0 bg-white border-t-0">
+            <div className="h-[300px] overflow-y-auto">
+              {freeBoard.map((post, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                >
+                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                    자유
+                  </span>
+                  <span className="text-gray-700">{post}</span>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="memory" className="m-0 bg-white border-t-0">
+            <div className="p-3 border-b border-gray-100">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative rounded-md overflow-hidden shadow-sm">
+                  <div className="aspect-video w-full bg-[#3498db]"></div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">
+                    <p className="text-white text-[10px] truncate">
+                      차트데이터 스크린
+                    </p>
+                    <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
+                  </div>
+                </div>
+                <div className="relative rounded-md overflow-hidden shadow-sm">
+                  <div className="aspect-video w-full bg-[#2ecc71]"></div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">
+                    <p className="text-white text-[10px] truncate">
+                      차트데이터 스크린
+                    </p>
+                    <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="h-[220px] overflow-y-auto">
+              {memoryBoard.map((post, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                >
+                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                    추억
+                  </span>
+                  <span className="text-gray-700">{post}</span>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="education" className="m-0 bg-white border-t-0">
+            <div className="h-[300px] overflow-y-auto">
+              {educationBoard.map((post, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                >
+                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                    교육
+                  </span>
+                  <span className="text-gray-700">{post}</span>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

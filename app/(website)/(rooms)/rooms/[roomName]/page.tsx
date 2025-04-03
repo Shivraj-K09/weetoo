@@ -1,25 +1,23 @@
-import { createClient } from "@/lib/supabase/server";
 import TradingRoomPage from "@/components/room/room-page";
-import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-// Use the correct Next.js page props type
+// Update Props to match Next.js expected PageProps types
 type Props = {
-  params: Promise<{
-    roomName: string;
-  }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  params: Promise<{ roomName: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function RoomPageRoute({ params }: Props) {
+export default async function Page({ params }: Props) {
   try {
-    // Await both params and searchParams
+    // Wait for both promises
     const resolvedParams = await params;
     // const resolvedSearchParams = await searchParams;
     const { roomName } = resolvedParams;
 
     // Extract the UUID properly - UUIDs have a specific format
-    // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
     const roomId = roomName.substring(0, 36);
 
     const supabase = await createClient();

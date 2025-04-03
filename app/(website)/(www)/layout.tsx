@@ -23,9 +23,9 @@ export default function MainLayout({
         <TopBar />
         <Navigation />
         {/* <NavigationMenuDemo /> */}
-        <div className="container w-full mx-auto py-2 gap-4 flex">
+        <div className="xl:container lg:px-7 w-full xl:mx-auto py-2 gap-4 flex">
           <UserSidebar />
-          <div className="flex-1 h-full">{children}</div>
+          <div className="flex-1 h-full w-full">{children}</div>
         </div>
       </div>
     </div>
