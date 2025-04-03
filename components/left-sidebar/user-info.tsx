@@ -9,6 +9,7 @@ import {
   BadgeCheck,
   Mail,
   ArrowRight,
+  ShieldUserIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -29,6 +30,7 @@ type UserData = {
   notifications?: number;
   accountType?: string;
   avatar_url?: string;
+  role?: string;
 };
 
 export function UserInfo() {
@@ -414,7 +416,7 @@ export function UserInfo() {
       <footer className="border-t border-gray-100">
         <Link
           href="/my-profile"
-          className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
+          className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8] border-b border-gray-100"
         >
           <div className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4 text-gray-400" />
@@ -422,10 +424,21 @@ export function UserInfo() {
               Account Settings
             </span>
           </div>
-          {/* <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e9c3c0] text-xs font-medium text-[#c74135]">
-            1
-          </div> */}
         </Link>
+
+        {userData?.role === "admin" && (
+          <Link
+            href="/admin"
+            className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
+          >
+            <div className="flex items-center gap-2">
+              <ShieldUserIcon className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-600">
+                Go to Admin Page
+              </span>
+            </div>
+          </Link>
+        )}
       </footer>
 
       {/* Debug info (only in development) */}
