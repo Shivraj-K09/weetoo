@@ -40,7 +40,11 @@ export default function DepositsPage() {
     return value !== "all";
   }).length;
 
-  const handleFilterChange = (key: string, value: any) => {
+  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleFilterChange = (
+    key: Exclude<keyof typeof filters, "dateRange">,
+    value: string
+  ) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,

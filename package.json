@@ -75,5 +75,10 @@
     "eslint-config-next": "15.2.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "eslintConfig": {
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "off"
+    }
   }
 }

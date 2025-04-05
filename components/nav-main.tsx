@@ -24,6 +24,7 @@ export function NavMain({ items = [] }: { items?: NavGroup[] }) {
   }
 
   // Function to check if an icon is an animated custom icon
+  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
   const isAnimatedIcon = (Icon: any) => {
     // Check if the icon has a displayName
     if (!Icon || !Icon.displayName) return false;

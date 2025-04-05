@@ -171,7 +171,7 @@ export function IssueWarningDialog({
             <p className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <span>
-                Issuing a warning will increase the user's warning count.
+                Issuing a warning will increase the user&apos;s warning count.
                 Multiple warnings may lead to account restrictions or
                 suspension.
               </span>

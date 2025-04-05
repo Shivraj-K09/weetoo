@@ -12,9 +12,7 @@ import { WithDrawIcon } from "@/components/icons/withdraw-icon";
 import {
   IconCoins,
   IconExchange,
-  IconLink,
   IconNews,
-  IconNotes,
   IconStar,
 } from "@tabler/icons-react";
 
@@ -23,7 +21,6 @@ export interface NavItem {
   title: string;
   url: string;
   isActive?: boolean;
-  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
   icon?: any; // Changed from Icon to any to support our custom component
 }
 
