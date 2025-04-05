@@ -17,23 +17,23 @@ import {
   Clock,
   XCircle,
   Calendar,
-  CreditCard,
   User,
   FileText,
+  ArrowUpRight,
 } from "lucide-react";
-import type { Deposit } from "./deposit-table";
+import type { Withdraw } from "./withdraw-table";
 
-interface DepositDetailsDialogProps {
-  deposit: Deposit;
+interface WithdrawDetailsDialogProps {
+  withdraw: Withdraw;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DepositDetailsDialog({
-  deposit,
+export function WithdrawDetailsDialog({
+  withdraw,
   open,
   onOpenChange,
-}: DepositDetailsDialogProps) {
+}: WithdrawDetailsDialogProps) {
   // Format date to a readable format
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -95,64 +95,59 @@ export function DepositDetailsDialog({
     }
   };
 
-  // Mock additional deposit data
-  const additionalDepositData = {
-    transactionReference: "TRX-" + deposit.id.substring(4),
+  // Mock additional withdraw data
+  const additionalWithdrawData = {
+    transactionReference: "TRX-" + withdraw.id.substring(4),
     notes:
-      deposit.situation === "rejected"
-        ? "Insufficient verification documents provided."
+      withdraw.situation === "rejected"
+        ? "Suspicious activity detected on account. Withdrawal rejected for security reasons."
         : "",
     bankDetails:
-      deposit.paymentMethod === "Bank Transfer"
+      withdraw.withdrawalMethod === "Bank Transfer"
         ? {
             bankName: "Shinhan Bank",
             accountNumber: "110-123-456789",
-            accountHolder: deposit.user.name,
+            accountHolder: withdraw.user.name,
           }
         : null,
-    cardDetails:
-      deposit.paymentMethod === "Credit Card"
-        ? {
-            cardType: "Visa",
-            lastFourDigits: "4567",
-            cardHolder: deposit.user.name,
-            expiryMonth: "12",
-            expiryYear: "25",
-          }
-        : null,
-    mobileDetails:
-      deposit.paymentMethod === "Mobile Payment"
+    mobileWalletDetails:
+      withdraw.withdrawalMethod === "Mobile Wallet"
         ? {
             provider: "KakaoPay",
             phoneNumber: "+82 10-****-5678",
+            walletId:
+              "KP" +
+              Math.floor(Math.random() * 1000000)
+                .toString()
+                .padStart(6, "0"),
           }
         : null,
     timeline: [
       {
         status: "created",
         date: new Date(
-          new Date(deposit.date).getTime() - 3600000
+          new Date(withdraw.date).getTime() - 3600000
         ).toISOString(), // 1 hour before
-        by: deposit.user.name,
+        by: withdraw.user.name,
       },
       {
-        status: deposit.situation,
-        date: deposit.date,
-        by: deposit.approvedBy || "System",
+        status: withdraw.situation,
+        date: withdraw.date,
+        by: withdraw.approvedBy || "System",
       },
     ],
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="sticky top-0 z-10  pb-4 border-b">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="sticky top-0 z-10 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            Deposit Details
-            {getStatusBadge(deposit.situation)}
+            Withdrawal Details
+            {getStatusBadge(withdraw.situation)}
           </DialogTitle>
           <DialogDescription>
-            Transaction ID: <span className="font-mono">{deposit.id}</span>
+            Transaction ID: <span className="font-mono">{withdraw.id}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -160,13 +155,16 @@ export function DepositDetailsDialog({
           {/* User Information */}
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12">
-              <AvatarImage src={deposit.user.avatar} alt={deposit.user.name} />
-              <AvatarFallback>{getInitials(deposit.user.name)}</AvatarFallback>
+              <AvatarImage
+                src={withdraw.user.avatar}
+                alt={withdraw.user.name}
+              />
+              <AvatarFallback>{getInitials(withdraw.user.name)}</AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="text-lg font-medium">{deposit.user.name}</h3>
+              <h3 className="text-lg font-medium">{withdraw.user.name}</h3>
               <p className="text-sm text-muted-foreground font-mono">
-                {deposit.user.uid}
+                {withdraw.user.uid}
               </p>
             </div>
           </div>
@@ -176,82 +174,40 @@ export function DepositDetailsDialog({
           {/* Transaction Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-start gap-2">
-              <CreditCard className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <ArrowUpRight className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Amount</p>
-                <p className="text-lg">{formatAmount(deposit.amount)} KOR</p>
+                <p className="text-lg">{formatAmount(withdraw.amount)} KOR</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Date & Time</p>
-                <p>{formatDate(deposit.date)}</p>
+                <p>{formatDate(withdraw.date)}</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
-                <p className="text-sm font-medium">Payment Method</p>
-                <p>{deposit.paymentMethod}</p>
+                <p className="text-sm font-medium">Withdrawal Method</p>
+                <p>{withdraw.withdrawalMethod}</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <User className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Approved By</p>
-                <p>{deposit.approvedBy || "Pending Approval"}</p>
+                <p>{withdraw.approvedBy || "Pending Approval"}</p>
               </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Payment Details */}
+          {/* Withdrawal Details */}
           <div>
-            <h4 className="text-sm font-semibold mb-3">Payment Details</h4>
-
-            {deposit.paymentMethod === "Credit Card" &&
-              additionalDepositData.cardDetails && (
-                <div className="mb-4">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-6 text-white shadow-lg w-full h-[250px] relative overflow-hidden">
-                    {/* Card Brand Logo */}
-                    <div className="absolute top-4 right-4">
-                      <div className="text-white font-bold text-xl italic">
-                        VISA
-                      </div>
-                    </div>
-
-                    {/* Chip */}
-                    <div className="w-12 h-9 bg-yellow-300 rounded-md mb-6 flex items-center justify-center">
-                      <div className="w-10 h-7 border-2 border-yellow-600 rounded-sm"></div>
-                    </div>
-
-                    {/* Card Number */}
-                    <div className="text-xl font-mono tracking-wider mb-8">
-                      * * * * * * * * * * * *{" "}
-                      {additionalDepositData.cardDetails.lastFourDigits}
-                    </div>
-
-                    {/* Card Holder & Expiry - Bottom row */}
-                    <div className="flex justify-between items-end absolute bottom-6 left-6 right-6 w-[calc(100%-3rem)]">
-                      <div>
-                        <div className="text-xs mb-1">Card Holder</div>
-                        <div className="font-medium uppercase tracking-wider">
-                          {additionalDepositData.cardDetails.cardHolder}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs mb-1">Expires</div>
-                        <div className="font-medium">
-                          {additionalDepositData.cardDetails.expiryMonth}/
-                          {additionalDepositData.cardDetails.expiryYear}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <h4 className="text-sm font-semibold mb-3">Withdrawal Details</h4>
 
             <div className="bg-muted/50 p-4 rounded-md">
               <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
@@ -259,45 +215,53 @@ export function DepositDetailsDialog({
                   Transaction Reference
                 </span>
                 <span className="text-sm font-mono">
-                  {additionalDepositData.transactionReference}
+                  {additionalWithdrawData.transactionReference}
                 </span>
               </div>
 
-              {additionalDepositData.bankDetails && (
+              {additionalWithdrawData.bankDetails && (
                 <>
                   <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-sm font-medium">Bank Name</span>
                     <span className="text-sm">
-                      {additionalDepositData.bankDetails.bankName}
+                      {additionalWithdrawData.bankDetails.bankName}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <span className="text-sm font-medium">Account Number</span>
                     <span className="text-sm font-mono">
-                      {additionalDepositData.bankDetails.accountNumber}
+                      {additionalWithdrawData.bankDetails.accountNumber}
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-sm font-medium">Account Holder</span>
                     <span className="text-sm">
-                      {additionalDepositData.bankDetails.accountHolder}
+                      {additionalWithdrawData.bankDetails.accountHolder}
                     </span>
                   </div>
                 </>
               )}
 
-              {additionalDepositData.mobileDetails && (
+              {additionalWithdrawData.mobileWalletDetails && (
                 <>
                   <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-sm font-medium">Mobile Provider</span>
+                    <span className="text-sm font-medium">
+                      Mobile Wallet Provider
+                    </span>
                     <span className="text-sm">
-                      {additionalDepositData.mobileDetails.provider}
+                      {additionalWithdrawData.mobileWalletDetails.provider}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm font-medium">Phone Number</span>
+                    <span className="text-sm font-mono">
+                      {additionalWithdrawData.mobileWalletDetails.phoneNumber}
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-sm font-medium">Phone Number</span>
+                    <span className="text-sm font-medium">Wallet ID</span>
                     <span className="text-sm font-mono">
-                      {additionalDepositData.mobileDetails.phoneNumber}
+                      {additionalWithdrawData.mobileWalletDetails.walletId}
                     </span>
                   </div>
                 </>
@@ -309,7 +273,7 @@ export function DepositDetailsDialog({
           <div>
             <h4 className="text-sm font-semibold mb-3">Transaction Timeline</h4>
             <div className="space-y-3">
-              {additionalDepositData.timeline.map((event, index) => (
+              {additionalWithdrawData.timeline.map((event, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <div className="mt-0.5">
                     {event.status === "created" && (
@@ -329,12 +293,12 @@ export function DepositDetailsDialog({
                     <div className="flex justify-between">
                       <p className="text-sm font-medium capitalize">
                         {event.status === "created"
-                          ? "Deposit Initiated"
+                          ? "Withdrawal Initiated"
                           : event.status === "approved"
-                          ? "Deposit Approved"
+                          ? "Withdrawal Approved"
                           : event.status === "pending"
                           ? "Pending Approval"
-                          : "Deposit Rejected"}
+                          : "Withdrawal Rejected"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(event.date)}
@@ -350,36 +314,40 @@ export function DepositDetailsDialog({
           </div>
 
           {/* Notes (if any) */}
-          {additionalDepositData.notes && (
+          {additionalWithdrawData.notes && (
             <div>
               <h4 className="text-sm font-semibold mb-2">Notes</h4>
               <div className="bg-muted/50 p-3 rounded-md">
-                <p className="text-sm">{additionalDepositData.notes}</p>
+                <p className="text-sm">{additionalWithdrawData.notes}</p>
               </div>
             </div>
           )}
         </div>
 
         <DialogFooter className="sticky bottom-0 z-10 bg-background pt-4 border-t mt-auto">
-          {deposit.situation === "pending" && (
+          {withdraw.situation === "pending" && (
             <>
               <Button
                 variant="outline"
-                className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
+                className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 shadow-none h-10 cursor-pointer"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Approve
               </Button>
               <Button
                 variant="outline"
-                className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800"
+                className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 shadow-none h-10 cursor-pointer"
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 Reject
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            className="shadow-none h-10 cursor-pointer"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Close
           </Button>
         </DialogFooter>

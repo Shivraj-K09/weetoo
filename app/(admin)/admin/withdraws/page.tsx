@@ -5,7 +5,7 @@ import { Search, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DepositTable } from "@/components/admin/deposits/deposit-table";
+import { WithdrawTable } from "@/components/admin/withdraws/withdraw-table";
 import {
   Select,
   SelectContent,
@@ -19,16 +19,14 @@ import { format } from "date-fns";
 import { X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
-export default function DepositsPage() {
+export default function WithdrawsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     status: "all",
-    paymentMethod: "all",
     dateRange: {
       from: undefined as Date | undefined,
       to: undefined as Date | undefined,
     },
-    amountRange: "all",
   });
 
   // Count active filters
@@ -40,11 +38,7 @@ export default function DepositsPage() {
     return value !== "all";
   }).length;
 
-  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleFilterChange = (
-    key: Exclude<keyof typeof filters, "dateRange">,
-    value: string
-  ) => {
+  const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -61,21 +55,19 @@ export default function DepositsPage() {
   const clearFilters = () => {
     setFilters({
       status: "all",
-      paymentMethod: "all",
       dateRange: {
         from: undefined,
         to: undefined,
       },
-      amountRange: "all",
     });
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-2">Deposit Management</h1>
+        <h1 className="text-2xl font-semibold mb-2">Withdraw Management</h1>
         <p className="text-muted-foreground">
-          View and manage KOR_Coin deposit transactions
+          View and manage KOR_Coin withdrawal transactions
         </p>
       </div>
 
@@ -83,8 +75,8 @@ export default function DepositsPage() {
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search deposits..."
-            className="pl-9 shadow-none h-10"
+            placeholder="Search withdrawals..."
+            className="pl-9 shadow-none h-10 "
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -105,37 +97,6 @@ export default function DepositsPage() {
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.paymentMethod}
-          onValueChange={(value) => handleFilterChange("paymentMethod", value)}
-        >
-          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Payment Method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-            <SelectItem value="Credit Card">Credit Card</SelectItem>
-            <SelectItem value="Mobile Payment">Mobile Payment</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.amountRange}
-          onValueChange={(value) => handleFilterChange("amountRange", value)}
-        >
-          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Amount Range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All amounts</SelectItem>
-            <SelectItem value="0-100000">0 - 100,000 KOR</SelectItem>
-            <SelectItem value="100000-500000">100,000 - 500,000 KOR</SelectItem>
-            <SelectItem value="500000-1000000">
-              500,000 - 1,000,000 KOR
-            </SelectItem>
-            <SelectItem value="1000000+">1,000,000+ KOR</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -169,25 +130,6 @@ export default function DepositsPage() {
               />
             </Badge>
           )}
-          {filters.paymentMethod !== "all" && (
-            <Badge variant="secondary" className="text-xs">
-              Payment: {filters.paymentMethod}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("paymentMethod", "all")}
-              />
-            </Badge>
-          )}
-          {filters.amountRange !== "all" && (
-            <Badge variant="secondary" className="text-xs">
-              Amount:{" "}
-              {filters.amountRange.replace("-", " - ").replace("+", "+")}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("amountRange", "all")}
-              />
-            </Badge>
-          )}
           {filters.dateRange.from && (
             <Badge variant="secondary" className="text-xs">
               From: {format(filters.dateRange.from, "PP")}
@@ -216,7 +158,7 @@ export default function DepositsPage() {
         </div>
       )}
 
-      <DepositTable searchTerm={searchTerm} filters={filters} />
+      <WithdrawTable searchTerm={searchTerm} filters={filters} />
     </div>
   );
 }

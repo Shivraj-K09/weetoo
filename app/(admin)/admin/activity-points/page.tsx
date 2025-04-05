@@ -5,7 +5,7 @@ import { Search, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DepositTable } from "@/components/admin/deposits/deposit-table";
+import { ActivityPointsTable } from "@/components/admin/activity-points/activity-points-table";
 import {
   Select,
   SelectContent,
@@ -19,16 +19,14 @@ import { format } from "date-fns";
 import { X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
-export default function DepositsPage() {
+export default function ActivityPointsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
-    status: "all",
-    paymentMethod: "all",
+    activityType: "all",
     dateRange: {
       from: undefined as Date | undefined,
       to: undefined as Date | undefined,
     },
-    amountRange: "all",
   });
 
   // Count active filters
@@ -40,11 +38,7 @@ export default function DepositsPage() {
     return value !== "all";
   }).length;
 
-  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleFilterChange = (
-    key: Exclude<keyof typeof filters, "dateRange">,
-    value: string
-  ) => {
+  const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -54,28 +48,31 @@ export default function DepositsPage() {
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setFilters((prev) => ({
       ...prev,
-      dateRange: { from: range?.from, to: range?.to },
+      dateRange: range
+        ? { from: range.from, to: range.to }
+        : { from: undefined, to: undefined },
     }));
   };
 
   const clearFilters = () => {
     setFilters({
-      status: "all",
-      paymentMethod: "all",
+      activityType: "all",
       dateRange: {
         from: undefined,
         to: undefined,
       },
-      amountRange: "all",
     });
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-2">Deposit Management</h1>
+        <h1 className="text-2xl font-semibold mb-2">
+          Activity Points Management
+        </h1>
         <p className="text-muted-foreground">
-          View and manage KOR_Coin deposit transactions
+          View and manage user activity points earned through platform
+          engagement
         </p>
       </div>
 
@@ -83,7 +80,7 @@ export default function DepositsPage() {
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search deposits..."
+            placeholder="Search activity points..."
             className="pl-9 shadow-none h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -94,48 +91,22 @@ export default function DepositsPage() {
           onDateChange={handleDateRangeChange}
         />
         <Select
-          value={filters.status}
-          onValueChange={(value) => handleFilterChange("status", value)}
+          value={filters.activityType}
+          onValueChange={(value) => handleFilterChange("activityType", value)}
         >
-          <SelectTrigger className="w-[130px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[180px] shadow-none h-10 cursor-pointer">
+            <SelectValue placeholder="Activity Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.paymentMethod}
-          onValueChange={(value) => handleFilterChange("paymentMethod", value)}
-        >
-          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Payment Method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-            <SelectItem value="Credit Card">Credit Card</SelectItem>
-            <SelectItem value="Mobile Payment">Mobile Payment</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.amountRange}
-          onValueChange={(value) => handleFilterChange("amountRange", value)}
-        >
-          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Amount Range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All amounts</SelectItem>
-            <SelectItem value="0-100000">0 - 100,000 KOR</SelectItem>
-            <SelectItem value="100000-500000">100,000 - 500,000 KOR</SelectItem>
-            <SelectItem value="500000-1000000">
-              500,000 - 1,000,000 KOR
-            </SelectItem>
-            <SelectItem value="1000000+">1,000,000+ KOR</SelectItem>
+            <SelectItem value="all">All activity types</SelectItem>
+            <SelectItem value="post">Post Creation</SelectItem>
+            <SelectItem value="comment">Comment</SelectItem>
+            <SelectItem value="like">Like</SelectItem>
+            <SelectItem value="share">Share</SelectItem>
+            <SelectItem value="login">Login Bonus</SelectItem>
+            <SelectItem value="referral">Referral</SelectItem>
+            <SelectItem value="content">Content Creation</SelectItem>
+            <SelectItem value="checkin">Daily Check-in</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -143,7 +114,7 @@ export default function DepositsPage() {
           size="default"
           onClick={clearFilters}
           disabled={activeFilterCount === 0}
-          className="h-10 px-4 font-normal shadow-none cursor-pointer"
+          className="h-10 px-4 font-normal cursor-pointer shadow-none"
         >
           Clear Filters
         </Button>
@@ -160,31 +131,12 @@ export default function DepositsPage() {
       {/* Active filters display */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2">
-          {filters.status !== "all" && (
+          {filters.activityType !== "all" && (
             <Badge variant="secondary" className="text-xs">
-              Status: {filters.status}
+              Activity Type: {filters.activityType}
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("status", "all")}
-              />
-            </Badge>
-          )}
-          {filters.paymentMethod !== "all" && (
-            <Badge variant="secondary" className="text-xs">
-              Payment: {filters.paymentMethod}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("paymentMethod", "all")}
-              />
-            </Badge>
-          )}
-          {filters.amountRange !== "all" && (
-            <Badge variant="secondary" className="text-xs">
-              Amount:{" "}
-              {filters.amountRange.replace("-", " - ").replace("+", "+")}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("amountRange", "all")}
+                onClick={() => handleFilterChange("activityType", "all")}
               />
             </Badge>
           )}
@@ -216,7 +168,7 @@ export default function DepositsPage() {
         </div>
       )}
 
-      <DepositTable searchTerm={searchTerm} filters={filters} />
+      <ActivityPointsTable searchTerm={searchTerm} filters={filters} />
     </div>
   );
 }

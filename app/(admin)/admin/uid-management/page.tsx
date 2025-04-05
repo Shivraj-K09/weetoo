@@ -5,7 +5,7 @@ import { Search, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DepositTable } from "@/components/admin/deposits/deposit-table";
+import { UidManagementTable } from "@/components/admin/uid-management/uid-management-table";
 import {
   Select,
   SelectContent,
@@ -19,16 +19,15 @@ import { format } from "date-fns";
 import { X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
-export default function DepositsPage() {
+export default function UidManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
-    status: "all",
-    paymentMethod: "all",
+    situation: "all",
+    exchange: "all",
     dateRange: {
       from: undefined as Date | undefined,
       to: undefined as Date | undefined,
     },
-    amountRange: "all",
   });
 
   // Count active filters
@@ -40,11 +39,7 @@ export default function DepositsPage() {
     return value !== "all";
   }).length;
 
-  // es-lint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleFilterChange = (
-    key: Exclude<keyof typeof filters, "dateRange">,
-    value: string
-  ) => {
+  const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -60,22 +55,21 @@ export default function DepositsPage() {
 
   const clearFilters = () => {
     setFilters({
-      status: "all",
-      paymentMethod: "all",
+      situation: "all",
+      exchange: "all",
       dateRange: {
         from: undefined,
         to: undefined,
       },
-      amountRange: "all",
     });
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-2">Deposit Management</h1>
+        <h1 className="text-2xl font-semibold mb-2">UID Management</h1>
         <p className="text-muted-foreground">
-          View and manage KOR_Coin deposit transactions
+          View and manage user identification numbers for exchange verification
         </p>
       </div>
 
@@ -83,8 +77,8 @@ export default function DepositsPage() {
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search deposits..."
-            className="pl-9 shadow-none h-10"
+            placeholder="Search UIDs..."
+            className="pl-9 h-10 shadow-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -94,48 +88,34 @@ export default function DepositsPage() {
           onDateChange={handleDateRangeChange}
         />
         <Select
-          value={filters.status}
-          onValueChange={(value) => handleFilterChange("status", value)}
+          value={filters.situation}
+          onValueChange={(value) => handleFilterChange("situation", value)}
         >
-          <SelectTrigger className="w-[130px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
+            <SelectValue placeholder="Situation" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="all">All situations</SelectItem>
+            <SelectItem value="verified">Verified</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
         <Select
-          value={filters.paymentMethod}
-          onValueChange={(value) => handleFilterChange("paymentMethod", value)}
+          value={filters.exchange}
+          onValueChange={(value) => handleFilterChange("exchange", value)}
         >
           <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Payment Method" />
+            <SelectValue placeholder="Exchange" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-            <SelectItem value="Credit Card">Credit Card</SelectItem>
-            <SelectItem value="Mobile Payment">Mobile Payment</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.amountRange}
-          onValueChange={(value) => handleFilterChange("amountRange", value)}
-        >
-          <SelectTrigger className="w-[150px] shadow-none h-10 cursor-pointer">
-            <SelectValue placeholder="Amount Range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All amounts</SelectItem>
-            <SelectItem value="0-100000">0 - 100,000 KOR</SelectItem>
-            <SelectItem value="100000-500000">100,000 - 500,000 KOR</SelectItem>
-            <SelectItem value="500000-1000000">
-              500,000 - 1,000,000 KOR
-            </SelectItem>
-            <SelectItem value="1000000+">1,000,000+ KOR</SelectItem>
+            <SelectItem value="all">All exchanges</SelectItem>
+            <SelectItem value="Binance">Binance</SelectItem>
+            <SelectItem value="Coinbase">Coinbase</SelectItem>
+            <SelectItem value="Kraken">Kraken</SelectItem>
+            <SelectItem value="Upbit">Upbit</SelectItem>
+            <SelectItem value="Bithumb">Bithumb</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -160,31 +140,21 @@ export default function DepositsPage() {
       {/* Active filters display */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2">
-          {filters.status !== "all" && (
+          {filters.situation !== "all" && (
             <Badge variant="secondary" className="text-xs">
-              Status: {filters.status}
+              Situation: {filters.situation}
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("status", "all")}
+                onClick={() => handleFilterChange("situation", "all")}
               />
             </Badge>
           )}
-          {filters.paymentMethod !== "all" && (
+          {filters.exchange !== "all" && (
             <Badge variant="secondary" className="text-xs">
-              Payment: {filters.paymentMethod}
+              Exchange: {filters.exchange}
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("paymentMethod", "all")}
-              />
-            </Badge>
-          )}
-          {filters.amountRange !== "all" && (
-            <Badge variant="secondary" className="text-xs">
-              Amount:{" "}
-              {filters.amountRange.replace("-", " - ").replace("+", "+")}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("amountRange", "all")}
+                onClick={() => handleFilterChange("exchange", "all")}
               />
             </Badge>
           )}
@@ -216,7 +186,7 @@ export default function DepositsPage() {
         </div>
       )}
 
-      <DepositTable searchTerm={searchTerm} filters={filters} />
+      <UidManagementTable searchTerm={searchTerm} filters={filters} />
     </div>
   );
 }
