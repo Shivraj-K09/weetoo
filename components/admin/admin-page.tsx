@@ -1,7 +1,21 @@
+import { KorcoinChart } from "./chart/kor-coin-chart";
+import { UserSignupChart } from "./chart/user-signup-chart";
+import { SectionCards } from "./section-cards";
+import { KorCoinTable } from "./tables/kor-coin-table";
+import { UserSignUpTable } from "./tables/user-signup-table";
+
 export function AdminDevelopment() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-white">
-      <h1 className="text-3xl font-bold text-gray-800">Admin Page</h1>
+    <div className="flex flex-col gap-4 md:gap-6">
+      <SectionCards />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <KorcoinChart />
+        <UserSignupChart />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <KorCoinTable />
+        <UserSignUpTable />
+      </div>
     </div>
   );
 }

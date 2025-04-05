@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { IconBarrierBlock } from "@tabler/icons-react";
 
 export function DevIndicator() {
   // Only show in development environment
@@ -9,10 +10,8 @@ export function DevIndicator() {
   }
 
   return (
-    <Badge
-      variant="outline"
-      className="mb-4 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-300/20"
-    >
+    <Badge className="rounded-full flex items-center gap-2">
+      <IconBarrierBlock />
       Development Mode
     </Badge>
   );
