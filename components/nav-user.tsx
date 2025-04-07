@@ -1,32 +1,33 @@
 "use client";
 
-import React from "react"; // Import React
-import {
-  IconLogout,
-  IconUserCircle,
-  IconCrown,
-  IconShield,
-} from "@tabler/icons-react"; // Add IconUserCircle, IconCrown, IconShield
-import { useUserStore, useUserActions } from "@/lib/store/user-store"; // Import store and actions
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton for loading state
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import Link from "next/link"; // Import Link for login button
+import { Skeleton } from "@/components/ui/skeleton";
+import { useUserActions, useUserStore } from "@/lib/store/user-store";
+import { IconCrown, IconShield, IconUserCircle } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
-// Badge is no longer needed here if only icons are used for admin/super_admin
-// import { Badge } from "@/components/ui/badge";
-import { LogoutIcon } from "./icons/logout";
+import type React from "react"; // Added useEffect for redirection
+import { useEffect } from "react";
 import { Hint } from "./hint";
+import { LogoutIcon } from "./icons/logout";
 
 export function NavUser() {
   // Get state and actions from Zustand store
   const { user, profile, isLoggedIn, isLoading } = useUserStore();
   const { signOut } = useUserActions();
   const router = useRouter();
+
+  // Redirect to home page if not logged in
+  useEffect(() => {
+    if (!isLoading && (!isLoggedIn || (!user && !profile))) {
+      router.push("/");
+    }
+  }, [isLoggedIn, user, profile, isLoading, router]);
+
   const handleLogout = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent parent click
     signOut(); // Call the signOut action from the store
@@ -73,22 +74,8 @@ export function NavUser() {
 
   // --- Not Logged In State ---
   if (!isLoggedIn || (!user && !profile)) {
-    // Optionally render a login button or nothing
-    return (
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <Link href="/login">
-            <SidebarMenuButton size="lg">
-              <IconUserCircle className="size-6" />
-              <span className="flex-1 text-left text-sm font-medium">
-                Sign In
-              </span>
-            </SidebarMenuButton>
-          </Link>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    );
-    // return null; // Or return null if you don't want to show anything
+    // Return null instead of showing a sign in button
+    return null;
   }
 
   // --- Logged In State ---
@@ -99,7 +86,6 @@ export function NavUser() {
   const displayEmail = profile?.email || user?.email || "No email";
   const displayAvatar =
     profile?.avatar_url || user?.user_metadata?.avatar_url || "";
-  // You can access the role here if needed: const userRole = profile?.role;
 
   return (
     <SidebarMenu>
@@ -114,7 +100,7 @@ export function NavUser() {
             <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
               {displayName
                 ?.split(" ")
-                .map((n: string) => n[0]) // Add explicit type string for 'n'
+                .map((n: string) => n[0])
                 .join("")
                 .toUpperCase() || <IconUserCircle className="size-5" />}
             </AvatarFallback>
@@ -138,15 +124,6 @@ export function NavUser() {
                   </span>
                 </Hint>
               )}
-              {/* Optional: Keep Badge for other roles if needed */}
-              {/* {profile?.role && profile.role !== 'super_admin' && profile.role !== 'admin' && (
-                <Badge
-                  variant="secondary"
-                  className="capitalize text-xs px-1.5 py-0.5 mt-1 w-fit"
-                >
-                  {profile.role.replace("_", " ")}
-                </Badge>
-              )} */}
             </div>
             {/* Email */}
             <span className="text-muted-foreground truncate text-xs">

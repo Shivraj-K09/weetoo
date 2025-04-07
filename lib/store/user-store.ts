@@ -127,7 +127,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     // Action to listen for auth state changes
     listenToAuthState: () => {
       const { data: authListener } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
+        async (event) => {
           // session can be null here
 
           // Re-fetch the entire session and profile on relevant auth changes for consistency.
