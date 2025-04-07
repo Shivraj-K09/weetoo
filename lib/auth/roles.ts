@@ -28,9 +28,10 @@ export async function isAdmin(): Promise<boolean> {
       return false;
     }
 
-    return profile.role === "admin";
+    // Allow both 'admin' and 'super_admin' roles
+    return profile.role === "admin" || profile.role === "super_admin";
   } catch (error) {
-    console.error("Error checking admin status:", error);
+    console.error("Error checking admin/super_admin status:", error); // Updated log message
     return false;
   }
 }

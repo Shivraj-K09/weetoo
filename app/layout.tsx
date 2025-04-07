@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AuthProvider } from "@/components/providers/auth-provider"; // Import AuthProvider
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,7 +33,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={`antialiased`}>
-        {children}
+        <AuthProvider>
+          {" "}
+          {/* Wrap children with AuthProvider */}
+          {children}
+        </AuthProvider>
         <Analytics />
 
         <Toaster position="top-center" richColors />

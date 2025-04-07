@@ -97,7 +97,6 @@ export const Icons = {
       width="20"
       height="20"
       viewBox="0 0 24 22"
-      fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="mx-auto"
       aria-hidden="true"

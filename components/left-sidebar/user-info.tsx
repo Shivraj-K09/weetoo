@@ -12,204 +12,33 @@ import {
   ShieldUserIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react"; // Removed useEffect
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { toast } from "sonner";
+// Removed supabase client import, toast import (handled by store)
 import Image from "next/image";
+import { useUserStore, useUserActions } from "@/lib/store/user-store"; // Import store and actions
 
-type UserData = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  provider_type: string;
-  kor_coins: number;
-  level?: number;
-  levelProgress?: number;
-  notifications?: number;
-  accountType?: string;
-  avatar_url?: string;
-  role?: string;
-};
+// Removed UserData type, now using UserProfile from store
 
 export function UserInfo() {
   const router = useRouter();
   const [isHovering, setIsHovering] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        setIsLoading(true);
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+  // Get state and actions from Zustand store
+  const {
+    user,
+    profile,
+    isLoggedIn,
+    isLoading,
+    error: storeError,
+  } = useUserStore();
+  const { signOut } = useUserActions();
 
-        if (session) {
-          setIsLoggedIn(true);
-          console.log("User is logged in with ID:", session.user.id);
-          console.log("User metadata:", session.user.user_metadata);
-
-          // Fetch user data from public.users table
-          const { data: userProfile, error } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
-
-          if (error) {
-            console.error("Error fetching user profile:", error);
-            setDebugInfo(
-              JSON.stringify(
-                {
-                  error: error,
-                  userId: session.user.id,
-                  userMetadata: session.user.user_metadata,
-                },
-                null,
-                2
-              )
-            );
-
-            // Try to create a minimal user profile from session data
-            const userMetadata = session.user.user_metadata;
-            let firstName = userMetadata?.name || userMetadata?.full_name || "";
-            let lastName = "";
-
-            if (firstName && firstName.includes(" ")) {
-              const nameParts = firstName.split(" ");
-              firstName = nameParts[0];
-              lastName = nameParts.slice(1).join(" ");
-            }
-
-            // Set minimal user data from session
-            setUserData({
-              id: session.user.id,
-              first_name: firstName,
-              last_name: lastName,
-              email: session.user.email || "",
-              provider_type: userMetadata?.provider || "email",
-              kor_coins: 0,
-              level: 1,
-              levelProgress: 50,
-              notifications: 0,
-              accountType: userMetadata?.provider ? "Social" : "Standard",
-              avatar_url: userMetadata?.avatar_url || "",
-            });
-
-            return;
-          }
-
-          // Set default values for fields not in the database
-          setUserData({
-            ...userProfile,
-            level: 1,
-            levelProgress: 50,
-            notifications: 0,
-            accountType:
-              userProfile.provider_type === "email" ? "Standard" : "Social",
-          });
-        } else {
-          setIsLoggedIn(false);
-        }
-      } catch (error) {
-        console.error("Error checking session:", error);
-        setDebugInfo(JSON.stringify(error, null, 2));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          setIsLoggedIn(true);
-          console.log("Auth state changed: SIGNED_IN");
-
-          // Fetch user data
-          const { data: userProfile, error } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
-
-          if (error) {
-            console.error("Error fetching user profile:", error);
-
-            // Try to create a minimal user profile from session data
-            const userMetadata = session.user.user_metadata;
-            let firstName = userMetadata?.name || userMetadata?.full_name || "";
-            let lastName = "";
-
-            if (firstName && firstName.includes(" ")) {
-              const nameParts = firstName.split(" ");
-              firstName = nameParts[0];
-              lastName = nameParts.slice(1).join(" ");
-            }
-
-            // Set minimal user data from session
-            setUserData({
-              id: session.user.id,
-              first_name: firstName,
-              last_name: lastName,
-              email: session.user.email || "",
-              provider_type: userMetadata?.provider || "email",
-              kor_coins: 0,
-              level: 1,
-              levelProgress: 50,
-              notifications: 0,
-              accountType: userMetadata?.provider ? "Social" : "Standard",
-              avatar_url: userMetadata?.avatar_url || "",
-            });
-
-            return;
-          }
-
-          setUserData({
-            ...userProfile,
-            level: 1,
-            levelProgress: 50,
-            notifications: 0,
-            accountType:
-              userProfile.provider_type === "email" ? "Standard" : "Social",
-          });
-        } else if (event === "SIGNED_OUT") {
-          setIsLoggedIn(false);
-          setUserData(null);
-        }
-      }
-    );
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      // Update local state immediately
-      setIsLoggedIn(false);
-      setUserData(null);
-
-      toast.success("Signed out successfully");
-
-      // Don't redirect to login page, just show the login card
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast.error("Failed to sign out");
-    }
+  // Sign out handler now uses the action from the store
+  const handleSignOut = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent parent click if needed
+    signOut();
   };
-
   // Function to partially hide email
   const hideEmail = (email: string) => {
     if (!email) return "";
@@ -219,7 +48,7 @@ export function UserInfo() {
     return `${hiddenUsername}@${domain}`;
   };
 
-  // Show loading state
+  // Show loading state (using isLoading from store)
   if (isLoading) {
     return (
       <section className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300">
@@ -235,8 +64,9 @@ export function UserInfo() {
     );
   }
 
-  // Not logged in state
-  if (!isLoggedIn) {
+  // Not logged in state (using isLoggedIn from store)
+  if (!isLoggedIn || (!user && !profile)) {
+    // Added check for user/profile as well
     return (
       <section
         aria-label="User Profile - Not Logged In"
@@ -285,7 +115,39 @@ export function UserInfo() {
     );
   }
 
-  // Logged in state
+  // Logged in state (using profile and user from store)
+  // Add default values for level, progress, notifications, accountType if not in profile
+  const userData = profile
+    ? {
+        ...profile,
+        level: 1, // Example default
+        levelProgress: 50, // Example default
+        notifications: 0, // Example default
+        accountType: profile.provider_type === "email" ? "Standard" : "Social", // Example logic
+      }
+    : null; // Handle case where profile might still be null briefly
+
+  // If logged in but profile hasn't loaded yet (or failed), show a minimal state or loading
+  if (!userData && isLoggedIn) {
+    // You might want a slightly different loading/skeleton state here
+    // Or return null, or a basic message
+    return (
+      <section className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300">
+        <div className="h-1 w-full bg-gradient-to-r from-[#c74135] to-[#d15a4f]"></div>
+        <div className="p-5 flex flex-col items-center justify-center">
+          <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+            <div className="h-8 w-8 rounded-full animate-pulse bg-gray-200"></div>
+          </div>
+          <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-40 bg-gray-200 rounded animate-pulse mb-4"></div>
+          {storeError && (
+            <p className="text-xs text-red-500 mt-2">Error: {storeError}</p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="User Profile"
@@ -413,7 +275,7 @@ export function UserInfo() {
       </div>
 
       {/* Settings link */}
-      <footer className="border-t border-gray-100">
+      <div className="border-t border-gray-100">
         <Link
           href="/my-profile"
           className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8] border-b border-gray-100"
@@ -426,27 +288,31 @@ export function UserInfo() {
           </div>
         </Link>
 
-        {userData?.role === "admin" && (
-          <Link
-            href="/admin"
-            className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
-          >
-            <div className="flex items-center gap-2">
-              <ShieldUserIcon className="h-4 w-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">
-                Go to Admin Page
-              </span>
-            </div>
-          </Link>
-        )}
-      </footer>
+        {userData?.role === "admin" ||
+          (userData?.role === "super_admin" && (
+            <Link
+              href="/admin"
+              target="_blank"
+              className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldUserIcon className="h-4 w-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-600">
+                  Go to Admin Page
+                </span>
+              </div>
+            </Link>
+          ))}
+      </div>
 
-      {/* Debug info (only in development) */}
-      {process.env.NODE_ENV === "development" && debugInfo && (
+      {/* Debug info (only in development, using error from store) */}
+      {process.env.NODE_ENV === "development" && storeError && (
         <details className="border-t border-gray-100 p-4 text-xs">
-          <summary className="cursor-pointer text-gray-500">Debug Info</summary>
+          <summary className="cursor-pointer text-gray-500">
+            Debug Info (Store Error)
+          </summary>
           <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-2 rounded text-gray-700 overflow-auto max-h-60">
-            {debugInfo}
+            {storeError}
           </pre>
         </details>
       )}

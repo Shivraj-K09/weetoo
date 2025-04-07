@@ -63,7 +63,7 @@ export function useOnlinePresence() {
     // Set a timeout to ensure we don't get stuck in "connecting" state
     connectionTimeoutRef.current = setTimeout(() => {
       if (isConnecting) {
-        console.log("Connection timeout - setting fallback count");
+        // console.log("Connection timeout - setting fallback count");
         setIsConnecting(false);
         setOnlineUsers(0); // Default to 0
       }
@@ -100,7 +100,7 @@ export function useOnlinePresence() {
               });
             });
 
-            console.log("Presence sync - logged-in users:", loggedInCount);
+            // console.log("Presence sync - logged-in users:", loggedInCount);
 
             setOnlineUsers(loggedInCount);
             setIsOnline(!!userId);
@@ -114,7 +114,7 @@ export function useOnlinePresence() {
               connectionTimeoutRef.current = null;
             }
           } catch (error) {
-            console.error("Error processing presence sync:", error);
+            // console.error("Error processing presence sync:", error);
             setIsConnecting(false);
             setOnlineUsers(0); // Default to 0 on error
           }
@@ -154,7 +154,7 @@ export function useOnlinePresence() {
           }
         })
         .subscribe(async (status: string) => {
-          console.log("Presence channel status:", status);
+          // console.log("Presence channel status:", status);
 
           if (status === "SUBSCRIBED") {
             try {

@@ -303,11 +303,11 @@ function LoginContent() {
                   <Button
                     variant="outline"
                     type="button"
-                    className="h-12 w-full rounded-xl border-primary/20 bg-[#FEE500] px-0 text-black hover:bg-[#FEE500]/90 hover:text-black cursor-pointer"
+                    className="h-12 w-full rounded-xl border-primary/20 !bg-[#FEE500] px-0 !text-black hover:!bg-[#FEE500]/90 hover:!text-black cursor-pointer"
                     aria-label="Sign in with Kakao"
                     onClick={() => handleSocialLogin("kakao")}
                   >
-                    <Icons.kakao2Icon className="w-5 h-5" />
+                    <Icons.kakao2Icon className="w-5 h-5 " />
                     <span className="sr-only">Sign in with Kakao</span>
                   </Button>
                 </motion.div>
@@ -317,7 +317,7 @@ function LoginContent() {
                   <Button
                     variant="outline"
                     type="button"
-                    className="h-12 w-full rounded-xl border-primary/20 bg-[#03C75A] px-0 text-white hover:bg-[#03C75A]/90 hover:text-white cursor-pointer"
+                    className="h-12 w-full rounded-xl border-primary/20 !bg-[#03C75A] px-0 !text-white hover:!bg-[#03C75A]/90 hover:!text-white cursor-pointer"
                     aria-label="Sign in with Naver"
                     onClick={handleNaverLogin}
                   >
