@@ -288,21 +288,21 @@ export function UserInfo() {
           </div>
         </Link>
 
-        {userData?.role === "admin" ||
-          (userData?.role === "super_admin" && (
-            <Link
-              href="/admin"
-              target="_blank"
-              className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
-            >
-              <div className="flex items-center gap-2">
-                <ShieldUserIcon className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-600">
-                  Go to Admin Page
-                </span>
-              </div>
-            </Link>
-          ))}
+        {/* Corrected condition: Show link if role is admin OR super_admin */}
+        {(userData?.role === "admin" || userData?.role === "super_admin") && (
+          <Link
+            href="/admin"
+            target="_blank"
+            className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
+          >
+            <div className="flex items-center gap-2">
+              <ShieldUserIcon className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-600">
+                Go to Admin Page
+              </span>
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Debug info (only in development, using error from store) */}
