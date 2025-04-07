@@ -58,7 +58,7 @@ export function AdminSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   );
