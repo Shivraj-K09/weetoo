@@ -11,18 +11,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { navigationData } from "@/lib/navigation-data";
 import { NavMain } from "../nav-main";
 import { NavUser } from "../nav-user";
-import { navigationData } from "@/lib/navigation-data";
-
-const data = {
-  user: {
-    name: "Test User",
-    email: "test-user@example.com",
-    avatar:
-      "https://images.unsplash.com/photo-1499281851221-5bce936073b0?q=80&w=2080&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-  },
-};
 
 export function AdminSidebar({
   ...props
