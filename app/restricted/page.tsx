@@ -20,8 +20,8 @@ export default function Restricted() {
           Access Restricted
         </h1>
         <p className="mb-6 text-gray-600">
-          You don't have permission to access this page. This area is restricted
-          to administrators only.
+          You don&apos;t have permission to access this page. This area is
+          restricted to administrators only.
         </p>
         <div className="space-y-4">
           <Button asChild className="w-full h-10 shadow-none">
