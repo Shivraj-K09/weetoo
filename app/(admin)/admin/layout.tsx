@@ -2,6 +2,12 @@ import type React from "react";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Admin - Weetoo",
+  description: "Weetoo: A Trading Platform",
+};
 
 export default function RootLayout({
   children,
