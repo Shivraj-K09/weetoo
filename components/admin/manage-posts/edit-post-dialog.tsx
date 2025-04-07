@@ -95,7 +95,7 @@ Understanding these trends is essential for anyone involved in cryptocurrency in
         <DialogHeader className="sticky top-0 z-10 bg-background pb-4 border-b">
           <DialogTitle>Edit Post</DialogTitle>
           <DialogDescription>
-            Make changes to the post. Click save when you're done.
+            Make changes to the post. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
 

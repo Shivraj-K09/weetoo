@@ -104,7 +104,7 @@ export function EditNoteDialog({
         <DialogHeader>
           <DialogTitle>Edit Administration Note</DialogTitle>
           <DialogDescription>
-            Make changes to the administration note. Click save when you're
+            Make changes to the administration note. Click save when you&apos;re
             done.
           </DialogDescription>
         </DialogHeader>

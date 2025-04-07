@@ -82,8 +82,8 @@ export function CreateNoteDialog({
         <DialogHeader>
           <DialogTitle>Create New Administration Note</DialogTitle>
           <DialogDescription>
-            Add a new note for administrative purposes. Click save when you're
-            done.
+            Add a new note for administrative purposes. Click save when
+            you&apos;re done.
           </DialogDescription>
         </DialogHeader>
 
