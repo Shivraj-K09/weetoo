@@ -1,5 +1,7 @@
 "use client";
 
+import type React from "react";
+
 import {
   CircleUserRoundIcon,
   SettingsIcon,
@@ -9,7 +11,7 @@ import {
   BadgeCheck,
   Mail,
   ArrowRight,
-  ShieldUserIcon,
+  ShieldIcon as ShieldUserIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react"; // Removed useEffect
@@ -17,6 +19,7 @@ import { useRouter } from "next/navigation";
 // Removed supabase client import, toast import (handled by store)
 import Image from "next/image";
 import { useUserStore, useUserActions } from "@/lib/store/user-store"; // Import store and actions
+import { Hint } from "../hint";
 
 // Removed UserData type, now using UserProfile from store
 
@@ -199,9 +202,7 @@ export function UserInfo() {
             onClick={handleSignOut}
           >
             <LogOut
-              className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                isHovering ? "translate-x-0.5" : ""
-              }`}
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${isHovering ? "translate-x-0.5" : ""}`}
             />
             <span>Log Out</span>
           </button>
@@ -249,13 +250,22 @@ export function UserInfo() {
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white transition-all duration-200">
             <Wallet className="h-4.5 w-4.5 text-[#c74135]" />
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col cursor-pointer">
             <span className="text-xs font-medium text-gray-500 group-hover:text-[#c74135]">
               kor_coin
             </span>
-            <span className="font-medium text-[#c74135]">
-              {userData?.kor_coins?.toLocaleString() || "0"}
-            </span>
+            <Hint
+              label={userData?.kor_coins?.toLocaleString() || "0"}
+              side="bottom"
+            >
+              <span className="font-medium text-[#c74135]">
+                {userData?.kor_coins
+                  ? userData.kor_coins >= 100000
+                    ? `${Math.floor(userData.kor_coins / 1000).toLocaleString()}K`
+                    : userData.kor_coins.toLocaleString()
+                  : "0"}
+              </span>
+            </Hint>
           </div>
         </div>
 
