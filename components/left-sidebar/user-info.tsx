@@ -306,7 +306,7 @@ export function UserInfo() {
       </div>
 
       {/* Debug info (only in development, using error from store) */}
-      {process.env.NODE_ENV === "development" && storeError && (
+      {/* {process.env.NODE_ENV === "development" && storeError && (
         <details className="border-t border-gray-100 p-4 text-xs">
           <summary className="cursor-pointer text-gray-500">
             Debug Info (Store Error)
@@ -315,7 +315,7 @@ export function UserInfo() {
             {storeError}
           </pre>
         </details>
-      )}
+      )} */}
     </section>
   );
 }

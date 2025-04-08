@@ -1,24 +1,25 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase/client"; // Assuming client is the correct export
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import type { User } from "@supabase/supabase-js";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+import type { UserProfile } from "@/types";
 
 // Define the structure of the user profile data we expect from the 'users' table
-export type UserProfile = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string; // Email might also be directly on the Auth user
-  provider_type: string;
-  kor_coins: number;
-  avatar_url?: string;
-  role?: string; // This is the important field
-  // Add any other fields you have in your public.users table
-};
+// export type UserProfile = { // Removed redundant declaration
+// id: string
+// first_name: string
+// last_name: string
+// email: string // Email might also be directly on the Auth user
+// provider_type: string
+// kor_coins: number
+// avatar_url?: string
+// role?: string // This is the important field
+// // Add any other fields you have in your public.users table
+// }
 
 // Define the state structure for the store
 interface UserState {
-  user: User | null; // Supabase Auth user
+  user: SupabaseUser | null; // Supabase Auth user
   profile: UserProfile | null; // User profile from your public.users table
   isLoggedIn: boolean;
   isLoading: boolean;
@@ -167,6 +168,11 @@ export const useUserStore = create<UserState>((set, get) => ({
         // which will set isLoading: false.
 
         toast.success("Signed out successfully");
+
+        // Also clear admin OTP verification when signing out
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("adminOtpVerified");
+        }
       } catch (error: any) {
         toast.error(`Failed to sign out: ${error.message}`);
         // Explicitly set loading false and error state here in case the listener fails
