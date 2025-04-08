@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   InputOTP,
@@ -15,7 +15,28 @@ import { toast } from "sonner";
 import { useUserStore } from "@/lib/store/user-store";
 import { sendAdminOtp, verifyAdminOtp } from "@/app/actions/admin-actions";
 import { Button } from "@/components/ui/button";
-import { Loader2Icon, Mail, ShieldIcon } from "lucide-react";
+import { Mail, Shield, Loader2 } from "lucide-react";
+
+// Add this new component after the imports and before the AdminOtpVerification component
+function OtpFromUrl({
+  onOtpFound,
+  email,
+}: {
+  onOtpFound: (otp: string) => Promise<void>;
+  email?: string;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const otpFromUrl = searchParams.get("otp");
+    if (otpFromUrl && email) {
+      console.log("Found OTP in URL:", otpFromUrl);
+      onOtpFound(otpFromUrl);
+    }
+  }, [searchParams, email, onOtpFound]);
+
+  return null;
+}
 
 interface AdminOtpVerificationProps {
   children: React.ReactNode;
@@ -29,7 +50,6 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
   const [otpSent, setOtpSent] = useState(false);
   const { user, profile, isLoggedIn } = useUserStore();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const initializationRef = useRef(false);
 
   // Check localStorage for verification immediately on component mount
@@ -85,19 +105,6 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
           profile.role
         );
 
-        // Check for OTP in URL (from email link)
-        const otpFromUrl = searchParams.get("otp");
-        if (otpFromUrl && profile?.email) {
-          console.log("Found OTP in URL:", otpFromUrl);
-          setOtp(otpFromUrl);
-          // Verify the OTP from URL
-          await handleOtpComplete(otpFromUrl);
-          // Remove the OTP from URL to prevent reuse
-          router.replace("/admin");
-          return;
-        }
-
-        // If we reach here, we need to verify the user
         // Check if user has admin role
         if (
           !profile ||
@@ -135,7 +142,7 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
     if (isLoggedIn && user && isVerified === false) {
       checkVerification();
     }
-  }, [user, profile, router, isLoggedIn, searchParams, otpSent, isVerified]);
+  }, [user, profile, router, isLoggedIn, otpSent, isVerified]);
 
   const handleSendOtp = async () => {
     if (!profile?.email) {
@@ -219,7 +226,7 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
     return `${maskedUsername}@${domain}`;
   };
 
-  // Show loading state while we determine verification status
+  // Show a meaningful loading state while we determine verification status
   if (isVerified === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -231,11 +238,11 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
         >
           <div className="flex flex-col items-center justify-center gap-4 p-6 max-w-md w-full bg-card rounded-lg shadow-lg border text-center">
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-[#f8e9e8] mb-2">
-              <ShieldIcon className="h-8 w-8 text-[#c74135]" />
+              <Shield className="h-8 w-8 text-[#c74135]" />
             </div>
             <h2 className="text-xl font-semibold">Verifying Admin Access</h2>
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2Icon className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               <span>Checking your verification status...</span>
             </div>
           </div>
@@ -244,8 +251,8 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
     );
   }
 
-  // Show OTP verification screen if not verified
-  if (isVerified === false) {
+  // Add this right before the final return statement (before the `return <>{children}</>` line)
+  if (isVerified === false && profile?.email) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <ThemeProvider
@@ -316,6 +323,14 @@ export function AdminOtpVerification({ children }: AdminOtpVerificationProps) {
               <br />
               This verification is valid for 24 hours.
             </p>
+
+            {/* Add Suspense boundary for URL params */}
+            <Suspense fallback={null}>
+              <OtpFromUrl
+                onOtpFound={handleOtpComplete}
+                email={profile?.email}
+              />
+            </Suspense>
           </div>
         </ThemeProvider>
       </div>
