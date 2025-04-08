@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AdministrationSettingsTable } from "@/components/admin/administration-settings/administration-settings-table";
 
 export const metadata: Metadata = {
-  title: "Administration Settings",
+  title: "Weetoo | Administration Settings",
   description: "Manage administrator accounts and permissions.",
 };
 

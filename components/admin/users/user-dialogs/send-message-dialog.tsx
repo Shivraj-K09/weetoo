@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Check, AlertCircle, Bell, Info } from "lucide-react";
+import { toast } from "sonner";
 import type { User } from "../users-table";
 
 interface SendMessageDialogProps {
@@ -38,6 +40,8 @@ export function SendMessageDialog({
   open,
   onOpenChange,
 }: SendMessageDialogProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     subject: "",
@@ -48,12 +52,15 @@ export function SendMessageDialog({
   });
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   // Handle form input changes
@@ -76,10 +83,52 @@ export function SendMessageDialog({
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Message data:", formData);
-    onOpenChange(false);
+    setIsLoading(true);
+
+    try {
+      // Save the message to the database
+      const { error } = await supabase.from("messages").insert({
+        user_id: user.id,
+        subject: formData.subject,
+        message: formData.message,
+        message_type: formData.messageType,
+        send_email: formData.sendEmail,
+        send_push: formData.sendPush,
+        sent_at: new Date().toISOString(),
+        read: false,
+      });
+
+      if (error) throw error;
+
+      // toast({
+      //   title: "Message sent",
+      //   description: "Your message has been sent successfully.",
+      // })
+      toast.success("Your message has been sent successfully.");
+
+      // Reset form
+      setFormData({
+        subject: "",
+        messageType: "info",
+        message: "",
+        sendEmail: true,
+        sendPush: true,
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      // toast({
+      //   title: "Error",
+      //   description: "There was an error sending your message.",
+      //   variant: "destructive",
+      // })
+      toast.error("There was an error sending your message.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -96,13 +145,20 @@ export function SendMessageDialog({
           {/* Recipient Information */}
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              <AvatarImage
+                src={user.avatar_url || "/placeholder.svg?height=40&width=40"}
+                alt={getFullName(user.first_name, user.last_name)}
+              />
+              <AvatarFallback>
+                {getInitials(user.first_name, user.last_name)}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{user.name}</h3>
+              <h3 className="font-medium">
+                {getFullName(user.first_name, user.last_name)}
+              </h3>
               <p className="text-sm text-muted-foreground font-mono">
-                {user.uid}
+                {user.id}
               </p>
             </div>
           </div>
@@ -222,8 +278,12 @@ export function SendMessageDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" className="shadow-none cursor-pointer">
-              Send Message
+            <Button
+              type="submit"
+              className="shadow-none cursor-pointer"
+              disabled={isLoading}
+            >
+              {isLoading ? "Sending..." : "Send Message"}
             </Button>
           </DialogFooter>
         </form>

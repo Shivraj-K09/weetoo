@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AdministrationNotesTable } from "@/components/admin/administration-notes/administration-notes-table";
 
 export const metadata: Metadata = {
-  title: "Administration Notes | Admin Dashboard",
+  title: "Weetoo | Administration Notes",
   description: "Manage administration notes and tasks",
 };
 

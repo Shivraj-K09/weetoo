@@ -1,32 +1,35 @@
 "use client";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { IconCrown, IconShield, IconUserCircle } from "@tabler/icons-react";
 import {
+  Activity,
+  AlertTriangle,
+  Ban,
   Calendar,
+  CheckCircle,
   Clock,
   Coins,
-  AlertTriangle,
-  MapPin,
   Mail,
+  MapPin,
   Phone,
-  Shield,
-  Activity,
+  XCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import type { User as UserType } from "../users-table";
+import type { User } from "../users-table";
 
 interface ViewUserDialogProps {
-  user: UserType;
+  user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -38,6 +41,7 @@ export function ViewUserDialog({
 }: ViewUserDialogProps) {
   // Format date to a readable format
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
@@ -54,53 +58,19 @@ export function ViewUserDialog({
   };
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
   };
 
-  // Mock additional user data
-  const additionalUserData = {
-    email: "user@example.com",
-    phone: "+82 10-1234-5678",
-    address: "Seoul, South Korea",
-    role: "Standard User",
-    accountActivity: [
-      {
-        type: "Login",
-        date: "2024-06-30T09:15:00",
-        details: "Successful login from Seoul, South Korea",
-      },
-      {
-        type: "Transaction",
-        date: "2024-06-29T14:22:00",
-        details: "Purchased item with 5,000 KOR_COIN",
-      },
-      {
-        type: "Profile Update",
-        date: "2024-06-28T10:30:00",
-        details: "Updated profile information",
-      },
-      {
-        type: "Profile Update",
-        date: "2024-06-28T10:30:00",
-        details: "Updated profile information",
-      },
-      {
-        type: "Profile Update",
-        date: "2024-06-28T10:30:00",
-        details: "Updated profile information",
-      },
-      {
-        type: "Profile Update",
-        date: "2024-06-28T10:30:00",
-        details: "Updated profile information",
-      },
-    ],
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
+
+  const fullName = getFullName(user.first_name, user.last_name);
+  const status = (user.status || "Active").toLowerCase();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,56 +85,77 @@ export function ViewUserDialog({
         <div className="flex flex-col gap-6 py-4">
           {/* User Profile Section */}
           <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={user.avatar} alt={user.name} />
+            <Avatar className="h-20 w-20 border">
+              <AvatarImage src={user.avatar_url || ""} alt={fullName} />
               <AvatarFallback className="text-lg">
-                {getInitials(user.name)}
+                {getInitials(user.first_name, user.last_name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-center sm:items-start gap-2">
-              <h3 className="text-xl font-semibold">{user.name}</h3>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono">
-                  {user.uid}
-                </Badge>
-                {user.status === "active" && (
+                <h3 className="text-xl font-semibold">{fullName}</h3>
+                {status === "active" && (
                   <Badge
                     variant="outline"
-                    className="bg-green-50 text-green-700 dark:bg-green-900/20"
+                    className="bg-green-50 text-green-700 dark:bg-green-900/20 flex gap-1 items-center"
                   >
+                    <CheckCircle className="h-3 w-3" />
                     Active
                   </Badge>
                 )}
-                {user.status === "pending" && (
+                {status === "pending" && (
                   <Badge
                     variant="outline"
-                    className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
+                    className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 flex gap-1 items-center"
                   >
+                    <Clock className="h-3 w-3" />
                     Pending
                   </Badge>
                 )}
-                {user.status === "suspended" && (
+                {status === "suspended" && (
                   <Badge
                     variant="outline"
-                    className="bg-red-50 text-red-700 dark:bg-red-900/20"
+                    className="bg-red-50 text-red-700 dark:bg-red-900/20 flex gap-1 items-center"
                   >
+                    <Ban className="h-3 w-3" />
                     Suspended
                   </Badge>
                 )}
-                {user.status === "inactive" && (
+                {status === "inactive" && (
                   <Badge
                     variant="outline"
-                    className="bg-gray-50 text-gray-700 dark:bg-gray-900/20"
+                    className="bg-gray-50 text-gray-700 dark:bg-gray-900/20 flex gap-1 items-center"
                   >
+                    <XCircle className="h-3 w-3" />
                     Inactive
                   </Badge>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="font-mono">
+                  {user.id}
+                </Badge>
+              </div>
               <div className="text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Shield className="h-3.5 w-3.5" />
-                  {additionalUserData.role}
-                </span>
+                {user.role === "user" && (
+                  <span className="flex items-center gap-1 capitalize">
+                    <IconUserCircle className="h-4.5 w-4.5" />
+                    {user.role}
+                  </span>
+                )}
+                {user.role === "admin" && (
+                  <span className="flex items-center gap-1 capitalize text-blue-500">
+                    <IconShield className="h-5 w-5 fill-blue-500 stroke-blue-700" />
+                    {user.role}
+                  </span>
+                )}
+
+                {user.role === "super_admin" && (
+                  <span className="flex items-center gap-1 capitalize text-amber-500">
+                    <IconCrown className="h-5 w-5 fill-yellow-500 stroke-yellow-700" />
+                    {user.role === "super_admin" && "Super Admin"}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -176,40 +167,40 @@ export function ViewUserDialog({
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Email:</span>
-              <span className="text-sm">{additionalUserData.email}</span>
+              <span className="text-sm">{user.email}</span>
             </div>
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Phone:</span>
-              <span className="text-sm">{additionalUserData.phone}</span>
+              <span className="text-sm">Not provided</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Location:</span>
-              <span className="text-sm">{additionalUserData.address}</span>
+              <span className="text-sm">Not provided</span>
             </div>
             <div className="flex items-center gap-2">
               <Coins className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">KOR_COIN:</span>
-              <span className="text-sm">{formatAmount(user.korCoin)}</span>
+              <span className="text-sm">{formatAmount(user.kor_coins)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Registered:</span>
-              <span className="text-sm">{formatDate(user.registered)}</span>
+              <span className="text-sm">{formatDate(user.created_at)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Last Login:</span>
-              <span className="text-sm">{formatDate(user.lastLogin)}</span>
+              <span className="text-sm">
+                {formatDate(user.last_login || user.updated_at)}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Warnings:</span>
               <span
-                className={`text-sm ${
-                  user.warnings > 0 ? "text-amber-600 font-medium" : ""
-                }`}
+                className={`text-sm ${user.warnings > 0 ? "text-amber-600 font-medium" : ""}`}
               >
                 {user.warnings}
               </span>
@@ -225,17 +216,11 @@ export function ViewUserDialog({
               Recent Activity
             </h4>
             <div className="space-y-3">
-              {additionalUserData.accountActivity.map((activity, index) => (
-                <div key={index} className="bg-muted/50 p-3 rounded-md">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">{activity.type}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(activity.date)}
-                    </span>
-                  </div>
-                  <p className="text-sm">{activity.details}</p>
-                </div>
-              ))}
+              <div className="bg-muted/50 p-3 rounded-md">
+                <p className="text-sm text-center text-muted-foreground">
+                  No recent activity to display
+                </p>
+              </div>
             </div>
           </div>
         </div>

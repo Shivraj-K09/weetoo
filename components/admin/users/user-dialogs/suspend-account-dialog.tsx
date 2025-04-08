@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -24,19 +25,24 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Ban, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import type { User } from "../users-table";
 
 interface SuspendAccountDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUserUpdated?: () => Promise<void>;
 }
 
 export function SuspendAccountDialog({
   user,
   open,
   onOpenChange,
+  onUserUpdated,
 }: SuspendAccountDialogProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     suspensionType: "temporary",
@@ -46,12 +52,15 @@ export function SuspendAccountDialog({
   });
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   // Handle form input changes
@@ -71,11 +80,139 @@ export function SuspendAccountDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Calculate end date for temporary suspension
+  const calculateEndDate = (days: number) => {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + days);
+    return endDate.toISOString();
+  };
+
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Suspension data:", formData);
-    onOpenChange(false);
+    setIsLoading(true);
+
+    try {
+      // Check if the account is already suspended
+      if (user.status === "Suspended") {
+        // toast({
+        //   title: "Account already suspended",
+        //   description: "This user's account is already suspended.",
+        //   variant: "destructive",
+        // })
+        toast.error("This user's account is already suspended.");
+        onOpenChange(false);
+        return;
+      }
+
+      // Calculate suspension end date for temporary suspensions
+      const suspensionEndDate =
+        formData.suspensionType === "temporary"
+          ? calculateEndDate(Number.parseInt(formData.duration))
+          : null;
+
+      // Update the user's status to suspended
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          status: "Suspended",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Log the suspension in the user_suspensions table
+      const { error: logError } = await supabase
+        .from("user_suspensions")
+        .insert({
+          user_id: user.id,
+          reason: formData.reason,
+          suspension_type: formData.suspensionType,
+          duration_days:
+            formData.suspensionType === "temporary"
+              ? Number.parseInt(formData.duration)
+              : null,
+          suspended_at: new Date().toISOString(),
+          end_date: suspensionEndDate,
+          is_permanent: formData.suspensionType === "permanent",
+          notify_user: formData.notifyUser,
+        });
+
+      if (logError) throw logError;
+
+      // If notify user is checked, send a message
+      if (formData.notifyUser) {
+        const suspensionTypeText =
+          formData.suspensionType === "permanent"
+            ? "Permanent Ban"
+            : "Temporary Suspension";
+        const durationText =
+          formData.suspensionType === "temporary"
+            ? `for ${formData.duration} days`
+            : "permanently";
+
+        const { error: messageError } = await supabase.from("messages").insert({
+          user_id: user.id,
+          subject: `Account ${suspensionTypeText}`,
+          message: `Your account has been ${
+            formData.suspensionType === "permanent"
+              ? "permanently banned"
+              : "temporarily suspended"
+          } ${durationText}.\n\nReason: ${
+            formData.reason
+          }\n\nIf you believe this action was taken in error, please contact support.`,
+          message_type: "alert",
+          send_email: true,
+          send_push: true,
+          sent_at: new Date().toISOString(),
+          read: false,
+        });
+
+        if (messageError)
+          console.error("Error sending suspension message:", messageError);
+      }
+
+      // toast({
+      //   title: formData.suspensionType === "permanent" ? "Account banned" : "Account suspended",
+      //   description: `${getFullName(user.first_name, user.last_name)}'s account has been ${
+      //     formData.suspensionType === "permanent" ? "permanently banned" : "suspended"
+      //   }.`,
+      //   variant: "destructive",
+      // })
+      toast.success(
+        `${getFullName(user.first_name, user.last_name)}'s account has been ${
+          formData.suspensionType === "permanent"
+            ? "permanently banned"
+            : "suspended"
+        }.`
+      );
+
+      // Call the onUserUpdated function if provided
+      if (onUserUpdated) {
+        await onUserUpdated();
+      }
+
+      // Reset form
+      setFormData({
+        suspensionType: "temporary",
+        duration: "7",
+        reason: "",
+        notifyUser: true,
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error suspending account:", error);
+      // toast({
+      //   title: "Error",
+      //   description: "There was an error suspending the account.",
+      //   variant: "destructive",
+      // })
+      toast.error("There was an error suspending the account.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -95,13 +232,20 @@ export function SuspendAccountDialog({
           {/* User Information */}
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              <AvatarImage
+                src={user.avatar_url || "/placeholder.svg?height=40&width=40"}
+                alt={getFullName(user.first_name, user.last_name)}
+              />
+              <AvatarFallback>
+                {getInitials(user.first_name, user.last_name)}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{user.name}</h3>
+              <h3 className="font-medium">
+                {getFullName(user.first_name, user.last_name)}
+              </h3>
               <p className="text-sm text-muted-foreground font-mono">
-                {user.uid}
+                {user.id}
               </p>
             </div>
             <div className="ml-auto bg-red-50 text-red-700 dark:bg-red-900/20 px-2 py-1 rounded-md text-sm flex items-center gap-1">
@@ -215,10 +359,13 @@ export function SuspendAccountDialog({
               type="submit"
               variant="destructive"
               className="shadow-none cursor-pointer"
+              disabled={isLoading}
             >
-              {formData.suspensionType === "permanent"
-                ? "Permanently Ban Account"
-                : "Suspend Account"}
+              {isLoading
+                ? "Processing..."
+                : formData.suspensionType === "permanent"
+                  ? "Permanently Ban Account"
+                  : "Suspend Account"}
             </Button>
           </DialogFooter>
         </form>

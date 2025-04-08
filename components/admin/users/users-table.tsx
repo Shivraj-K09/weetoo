@@ -25,6 +25,7 @@ import {
   Clock,
 } from "lucide-react";
 
+import { supabase } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,123 +50,28 @@ import { SendMessageDialog } from "./user-dialogs/send-message-dialog";
 import { IssueWarningDialog } from "./user-dialogs/issue-warning-dialog";
 import { SuspendAccountDialog } from "./user-dialogs/suspend-account-dialog";
 
-// Sample user data
-const userData = [
-  {
-    id: "1",
-    name: "Kim Min-ji",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060501",
-    status: "active",
-    warnings: 0,
-    korCoin: 250000,
-    registered: "2024-01-15T08:45:00",
-    lastLogin: "2024-06-30T09:15:00",
-  },
-  {
-    id: "2",
-    name: "Park Ji-sung",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060502",
-    status: "active",
-    warnings: 1,
-    korCoin: 180000,
-    registered: "2024-02-20T15:30:00",
-    lastLogin: "2024-06-29T14:22:00",
-  },
-  {
-    id: "3",
-    name: "Lee Soo-jin",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060503",
-    status: "pending",
-    warnings: 0,
-    korCoin: 0,
-    registered: "2024-06-29T12:15:00",
-    lastLogin: "2024-06-29T12:15:00",
-  },
-  {
-    id: "4",
-    name: "Choi Woo-shik",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060504",
-    status: "suspended",
-    warnings: 3,
-    korCoin: 320000,
-    registered: "2023-11-10T09:20:00",
-    lastLogin: "2024-06-15T16:48:00",
-  },
-  {
-    id: "5",
-    name: "Kang Hye-jung",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060505",
-    status: "active",
-    warnings: 0,
-    korCoin: 150000,
-    registered: "2023-09-05T14:10:00",
-    lastLogin: "2024-06-28T10:30:00",
-  },
-  {
-    id: "6",
-    name: "Jung Ho-yeon",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060506",
-    status: "active",
-    warnings: 2,
-    korCoin: 750000,
-    registered: "2023-12-12T11:05:00",
-    lastLogin: "2024-06-26T11:05:00",
-  },
-  {
-    id: "7",
-    name: "Bae Suzy",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060507",
-    status: "active",
-    warnings: 0,
-    korCoin: 420000,
-    registered: "2024-03-18T13:25:00",
-    lastLogin: "2024-06-27T15:40:00",
-  },
-  {
-    id: "8",
-    name: "Gong Yoo",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060508",
-    status: "inactive",
-    warnings: 0,
-    korCoin: 180000,
-    registered: "2023-08-22T10:15:00",
-    lastLogin: "2024-05-10T09:30:00",
-  },
-  {
-    id: "9",
-    name: "Son Ye-jin",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060509",
-    status: "active",
-    warnings: 1,
-    korCoin: 560000,
-    registered: "2024-01-30T16:20:00",
-    lastLogin: "2024-06-29T18:15:00",
-  },
-  {
-    id: "10",
-    name: "Hyun Bin",
-    avatar: "/placeholder.svg?height=40&width=40",
-    uid: "UID-24060510",
-    status: "active",
-    warnings: 0,
-    korCoin: 890000,
-    registered: "2023-10-15T11:45:00",
-    lastLogin: "2024-06-30T08:20:00",
-  },
-];
-
-export type User = (typeof userData)[0];
+export interface User {
+  id: string;
+  uuid: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  avatar_url: string | null;
+  provider_type: string | null;
+  created_at: string;
+  updated_at: string;
+  kor_coins: number;
+  naver_id: string | null;
+  role: string;
+  status: "Active" | "Suspended" | "Inactive";
+  warnings: number;
+  last_login?: string; // This might need to be fetched from another table
+}
 
 export function UserTable({ searchTerm }: { searchTerm: string }) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -174,23 +80,133 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [warningDialogOpen, setWarningDialogOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [, setCurrentUserRole] = useState<string | null>(null);
 
-  // Format date to a readable format
+  // Fetch current user role
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!error && userData) {
+          setCurrentUserRole(userData.role);
+        }
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Fetch users from Supabase
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.from("users").select("*");
+
+        if (error) {
+          console.error("Error fetching users:", error);
+          return;
+        }
+
+        setUsers(data || []);
+        setFilteredUsers(data || []);
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  // Filter users when search term changes
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    const filtered = users.filter((user) => {
+      const fullName =
+        `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
+      const email = (user.email || "").toLowerCase();
+      const id = (user.id || "").toLowerCase();
+
+      return (
+        fullName.includes(searchLower) ||
+        email.includes(searchLower) ||
+        id.includes(searchLower)
+      );
+    });
+
+    setFilteredUsers(filtered);
+  }, [searchTerm, users]);
+
+  // Function to refresh users data
+  const refreshUsers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from("users").select("*");
+
+      if (error) {
+        console.error("Error fetching users:", error);
+        return;
+      }
+
+      setUsers(data || []);
+      // Apply current search filter to the new data
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        const filtered = (data || []).filter((user) => {
+          const fullName =
+            `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
+          const email = (user.email || "").toLowerCase();
+          const id = (user.id || "").toLowerCase();
+
+          return (
+            fullName.includes(searchLower) ||
+            email.includes(searchLower) ||
+            id.includes(searchLower)
+          );
+        });
+        setFilteredUsers(filtered);
+      } else {
+        setFilteredUsers(data || []);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format date to a readable format based on user's locale
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(navigator.language, {
       month: "short",
       day: "numeric",
       year: "numeric",
     }).format(date);
   };
 
-  // Format time to a readable format
+  // Format time to a readable format based on user's locale
   const formatTime = (dateString: string) => {
+    if (!dateString) return "";
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(navigator.language, {
       hour: "2-digit",
       minute: "2-digit",
+      timeZoneName: "short",
     }).format(date);
   };
 
@@ -200,12 +216,15 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
   };
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   const columns: ColumnDef<User>[] = [
@@ -223,18 +242,27 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
           </Button>
         );
       },
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={row.original.avatar} alt={row.getValue("name")} />
-            <AvatarFallback>{getInitials(row.getValue("name"))}</AvatarFallback>
-          </Avatar>
-          <div className="font-medium">{row.getValue("name")}</div>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const user = row.original;
+        const fullName = getFullName(user.first_name, user.last_name);
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage
+                src={user.avatar_url || "/placeholder.svg?height=40&width=40"}
+                alt={fullName}
+              />
+              <AvatarFallback>
+                {getInitials(user.first_name, user.last_name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="font-medium">{fullName}</div>
+          </div>
+        );
+      },
     },
     {
-      accessorKey: "uid",
+      accessorKey: "id",
       header: ({ column }) => {
         return (
           <Button
@@ -248,7 +276,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => (
-        <div className="font-mono text-sm">{row.getValue("uid")}</div>
+        <div className="font-mono text-sm">{row.getValue("id")}</div>
       ),
     },
     {
@@ -266,7 +294,8 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => {
-        const status = row.getValue("status") as string;
+        const status =
+          (row.getValue("status") as string)?.toLowerCase() || "active";
         return (
           <>
             {status === "active" && (
@@ -338,7 +367,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
       },
     },
     {
-      accessorKey: "korCoin",
+      accessorKey: "kor_coins",
       header: ({ column }) => {
         return (
           <Button
@@ -352,12 +381,12 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => {
-        const amount = row.getValue("korCoin") as number;
+        const amount = row.getValue("kor_coins") as number;
         return <div className="font-medium">{formatAmount(amount)}</div>;
       },
     },
     {
-      accessorKey: "registered",
+      accessorKey: "created_at",
       header: ({ column }) => {
         return (
           <Button
@@ -371,11 +400,11 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => {
-        return <div>{formatDate(row.getValue("registered"))}</div>;
+        return <div>{formatDate(row.getValue("created_at"))}</div>;
       },
     },
     {
-      accessorKey: "lastLogin",
+      accessorKey: "last_login",
       header: ({ column }) => {
         return (
           <Button
@@ -389,8 +418,9 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => {
-        const date = formatDate(row.getValue("lastLogin"));
-        const time = formatTime(row.getValue("lastLogin"));
+        const lastLogin = row.original.last_login || row.original.updated_at;
+        const date = formatDate(lastLogin);
+        const time = formatTime(lastLogin);
         return (
           <div>
             <div>{date}</div>
@@ -474,7 +504,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
   ];
 
   const table = useReactTable({
-    data: userData,
+    data: filteredUsers,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -486,28 +516,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
       sorting,
       columnFilters,
     },
-    filterFns: {
-      fuzzy: (row, columnId, value) => {
-        const itemValue = String(row.getValue(columnId)).toLowerCase();
-        return itemValue.includes(String(value).toLowerCase());
-      },
-    },
-    globalFilterFn: (row, columnId, filterValue) => {
-      const value = row.getValue(columnId);
-      if (typeof value === "string") {
-        return value.toLowerCase().includes(filterValue.toLowerCase());
-      }
-      return false;
-    },
   });
-
-  useEffect(() => {
-    if (searchTerm) {
-      table.setGlobalFilter(searchTerm);
-    } else {
-      table.setGlobalFilter("");
-    }
-  }, [searchTerm, table]);
 
   return (
     <>
@@ -532,7 +541,16 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading users...
+                </TableCell>
+              </TableRow>
+            ) : filteredUsers.length > 0 ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -554,7 +572,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  No results found.
                 </TableCell>
               </TableRow>
             )}
@@ -563,7 +581,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          Showing {table.getRowModel().rows.length} of {userData.length} users
+          Showing {filteredUsers.length} of {users.length} users
         </div>
         <div className="space-x-2">
           <Button
@@ -598,6 +616,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
             user={selectedUser}
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
+            onUserUpdated={refreshUsers}
           />
 
           <SendMessageDialog
@@ -610,12 +629,14 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
             user={selectedUser}
             open={warningDialogOpen}
             onOpenChange={setWarningDialogOpen}
+            onUserUpdated={refreshUsers}
           />
 
           <SuspendAccountDialog
             user={selectedUser}
             open={suspendDialogOpen}
             onOpenChange={setSuspendDialogOpen}
+            onUserUpdated={refreshUsers}
           />
         </>
       )}

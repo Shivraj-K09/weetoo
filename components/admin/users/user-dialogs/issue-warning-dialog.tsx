@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -24,19 +25,24 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import type { User } from "../users-table";
 
 interface IssueWarningDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUserUpdated?: () => Promise<void>;
 }
 
 export function IssueWarningDialog({
   user,
   open,
   onOpenChange,
+  onUserUpdated,
 }: IssueWarningDialogProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     warningType: "content",
@@ -45,12 +51,15 @@ export function IssueWarningDialog({
   });
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   // Handle form input changes
@@ -71,10 +80,124 @@ export function IssueWarningDialog({
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Warning data:", formData);
-    onOpenChange(false);
+    setIsLoading(true);
+
+    try {
+      // First, update the warnings count for the user
+      const newWarningCount = (user.warnings || 0) + 1;
+
+      // Check if this would exceed the maximum warnings (3)
+      if (newWarningCount > 3) {
+        // toast({
+        //   title: "Warning limit reached",
+        //   description: "This user already has the maximum number of warnings.",
+        //   variant: "destructive",
+        // });
+        toast.error("This user already has the maximum number of warnings.");
+        onOpenChange(false);
+        return;
+      }
+
+      // Update the user's warning count
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          warnings: newWarningCount,
+          // If this is the third warning, automatically suspend the account
+          status: newWarningCount >= 3 ? "Suspended" : user.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Log the warning in the user_warnings table
+      const { error: logError } = await supabase.from("user_warnings").insert({
+        user_id: user.id,
+        reason: formData.reason,
+        warning_type: formData.warningType,
+        issued_at: new Date().toISOString(),
+        warning_number: newWarningCount,
+        notify_user: formData.notifyUser,
+      });
+
+      if (logError) throw logError;
+
+      // If notify user is checked, send a message
+      if (formData.notifyUser) {
+        const warningTypeMap: Record<string, string> = {
+          content: "Inappropriate Content",
+          behavior: "Disruptive Behavior",
+          spam: "Spam or Advertising",
+          terms: "Terms of Service Violation",
+          other: "Policy Violation",
+        };
+
+        const warningTypeText =
+          warningTypeMap[formData.warningType] || "Policy Violation";
+
+        const { error: messageError } = await supabase.from("messages").insert({
+          user_id: user.id,
+          subject: `Warning: ${warningTypeText}`,
+          message: `You have received a warning for: ${warningTypeText}\n\n${formData.reason}\n\nThis is warning #${newWarningCount} on your account. Please review our community guidelines and terms of service.`,
+          message_type: "warning",
+          send_email: true,
+          send_push: true,
+          sent_at: new Date().toISOString(),
+          read: false,
+        });
+
+        if (messageError)
+          console.error("Error sending warning message:", messageError);
+      }
+
+      // toast({
+      //   title: "Warning issued",
+      //   description: `Warning has been issued to ${getFullName(user.first_name, user.last_name)}.`,
+      // });
+      toast.success(
+        `Warning has been issued to ${getFullName(user.first_name, user.last_name)}.`
+      );
+
+      // If this was the third warning, show an additional notification
+      if (newWarningCount >= 3) {
+        // toast({
+        //   title: "Account suspended",
+        //   description:
+        //     "User has reached 3 warnings and their account has been automatically suspended.",
+        //   variant: "destructive",
+        // });
+        toast.error(
+          "User has reached 3 warnings and their account has been automatically suspended."
+        );
+      }
+
+      // Call the onUserUpdated function if provided
+      if (onUserUpdated) {
+        await onUserUpdated();
+      }
+
+      // Reset form
+      setFormData({
+        warningType: "content",
+        reason: "",
+        notifyUser: true,
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error issuing warning:", error);
+      // toast({
+      //   title: "Error",
+      //   description: "There was an error issuing the warning.",
+      //   variant: "destructive",
+      // });
+      toast.error("There was an error issuing the warning.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -94,13 +217,20 @@ export function IssueWarningDialog({
           {/* User Information */}
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              <AvatarImage
+                src={user.avatar_url || "/placeholder.svg?height=40&width=40"}
+                alt={getFullName(user.first_name, user.last_name)}
+              />
+              <AvatarFallback>
+                {getInitials(user.first_name, user.last_name)}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{user.name}</h3>
+              <h3 className="font-medium">
+                {getFullName(user.first_name, user.last_name)}
+              </h3>
               <p className="text-sm text-muted-foreground font-mono">
-                {user.uid}
+                {user.id}
               </p>
             </div>
             <div className="ml-auto bg-amber-50 text-amber-700 dark:bg-amber-900/20 px-2 py-1 rounded-md text-sm flex items-center gap-1">
@@ -191,8 +321,9 @@ export function IssueWarningDialog({
               type="submit"
               variant="default"
               className="bg-amber-600 hover:bg-amber-700 shadow-none cursor-pointer"
+              disabled={isLoading}
             >
-              Issue Warning
+              {isLoading ? "Processing..." : "Issue Warning"}
             </Button>
           </DialogFooter>
         </form>

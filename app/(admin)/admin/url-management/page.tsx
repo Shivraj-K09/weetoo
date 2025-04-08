@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { URLManagementTable } from "@/components/admin/url-management/url-management-table";
 
 export const metadata: Metadata = {
-  title: "URL Management | Admin Dashboard",
+  title: "Weetoo | URL Management",
   description: "Manage URLs in the system",
 };
 
