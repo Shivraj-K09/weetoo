@@ -73,8 +73,8 @@ export const OTPEmail = ({
             </Text>
 
             <Text className="text-[16px] text-gray-600 mb-[24px]">
-              You've requested access to the WEETOO admin panel. Please use the
-              following One-Time Password (OTP) to verify your identity:
+              You&apos;ve requested access to the WEETOO admin panel. Please use
+              the following One-Time Password (OTP) to verify your identity:
             </Text>
 
             <Section className="bg-gradient-to-r from-[#f8f9fa] to-[#f1f3f5] border border-gray-200 rounded-[8px] py-[24px] px-[24px] text-center mb-[24px]">
