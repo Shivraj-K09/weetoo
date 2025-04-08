@@ -34,7 +34,6 @@ export default function RootLayout({
     >
       <body className={`antialiased`}>
         <AuthProvider>
-          {" "}
           {/* Wrap children with AuthProvider */}
           {children}
         </AuthProvider>

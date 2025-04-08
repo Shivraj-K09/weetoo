@@ -50,6 +50,7 @@
     "embla-carousel-autoplay": "^8.5.2",
     "embla-carousel-react": "^8.5.2",
     "frimousse": "^0.1.1",
+    "input-otp": "^1.4.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.479.0",
     "motion": "^12.5.0",

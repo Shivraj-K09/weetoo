@@ -14,6 +14,7 @@ import {
 import { navigationData } from "@/lib/navigation-data";
 import { NavMain } from "../nav-main";
 import { NavUser } from "../nav-user";
+import Link from "next/link";
 
 export function AdminSidebar({
   ...props
@@ -27,7 +28,7 @@ export function AdminSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="#">
+              <Link href="#">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <span>W</span>
                 </div>
@@ -40,7 +41,7 @@ export function AdminSidebar({
                   </div>
                   <span className="text-xs">Admin Dashboard</span>
                 </div>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -64,7 +64,7 @@ export function NavMain({ items = [] }: { items?: NavGroup[] }) {
                         tooltip={item.title}
                         isActive={isActive}
                         asChild
-                        className="data-[active=true]:bg-zinc-200/80 data-[active=true]:text-sidebar-accent-foreground hover:bg-zinc-200/80"
+                        className="data-[active=true]:bg-zinc-200/80  data-[active=true]:dark:bg-zinc-800/80 data-[active=true]:text-sidebar-accent-foreground hover:bg-zinc-200/80 hover:dark:bg-zinc-800/80"
                       >
                         <Link
                           href={item.url}
