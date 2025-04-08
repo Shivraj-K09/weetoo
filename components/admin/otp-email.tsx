@@ -1,17 +1,16 @@
 import {
   Body,
-  Button,
+  Column,
   Container,
   Head,
   Heading,
   Hr,
   Html,
   Preview,
-  Section,
-  Text,
-  Tailwind,
   Row,
-  Column,
+  Section,
+  Tailwind,
+  Text,
 } from "@react-email/components";
 
 interface OTPEmailProps {
