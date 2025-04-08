@@ -12,6 +12,7 @@ import { WithDrawIcon } from "@/components/icons/withdraw-icon";
 import {
   IconCoins,
   IconExchange,
+  IconHome,
   IconNews,
   IconStar,
 } from "@tabler/icons-react";
@@ -124,6 +125,21 @@ export const navigationData: NavGroup[] = [
         icon: SettingsGearIcon,
       },
     ],
+  },
+];
+
+// Define the types for the secondary navigation items
+export interface SecondaryNavItem {
+  title: string;
+  url: string;
+  icon: any; // Changed from Icon to any to support our custom component
+}
+
+export const secondaryItems: SecondaryNavItem[] = [
+  {
+    title: "Go back to Main Page",
+    url: "/",
+    icon: IconHome,
   },
 ];
 

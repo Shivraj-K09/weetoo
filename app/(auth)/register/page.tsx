@@ -621,7 +621,7 @@ export default function RegisterPage() {
                 aria-hidden={currentSlide !== index}
               >
                 <Image
-                  src={slide.image || "/placeholder.svg"}
+                  src={slide.image || ""}
                   alt={slide.title}
                   fill
                   className="object-cover"

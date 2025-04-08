@@ -11,10 +11,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { navigationData } from "@/lib/navigation-data";
+import { navigationData, secondaryItems } from "@/lib/navigation-data";
 import { NavMain } from "../nav-main";
 import { NavUser } from "../nav-user";
 import Link from "next/link";
+import { NavSecondary } from "../nav-secondary";
 
 export function AdminSidebar({
   ...props
@@ -50,6 +51,7 @@ export function AdminSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
+        <NavSecondary items={secondaryItems} />
         <NavUser />
       </SidebarFooter>
     </Sidebar>

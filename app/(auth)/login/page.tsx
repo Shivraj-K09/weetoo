@@ -512,7 +512,7 @@ function LoginContent() {
                 aria-hidden={currentSlide !== index}
               >
                 <Image
-                  src={slide.image || "/placeholder.svg"}
+                  src={slide.image || ""}
                   alt=""
                   fill
                   className="object-cover"
