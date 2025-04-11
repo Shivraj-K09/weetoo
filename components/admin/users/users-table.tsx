@@ -52,7 +52,7 @@ import { SuspendAccountDialog } from "./user-dialogs/suspend-account-dialog";
 
 export interface User {
   id: string;
-  uuid: string;
+  uid: string;
   first_name: string | null;
   last_name: string | null;
   email: string;
@@ -65,7 +65,7 @@ export interface User {
   role: string;
   status: "Active" | "Suspended" | "Inactive";
   warnings: number;
-  last_login?: string; // This might need to be fetched from another table
+  last_login?: string;
 }
 
 export function UserTable({ searchTerm }: { searchTerm: string }) {
@@ -138,12 +138,12 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
       const fullName =
         `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
       const email = (user.email || "").toLowerCase();
-      const id = (user.id || "").toLowerCase();
+      const uid = (user.uid || "").toLowerCase();
 
       return (
         fullName.includes(searchLower) ||
         email.includes(searchLower) ||
-        id.includes(searchLower)
+        uid.includes(searchLower)
       );
     });
 
@@ -262,7 +262,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
       },
     },
     {
-      accessorKey: "id",
+      accessorKey: "uid",
       header: ({ column }) => {
         return (
           <Button
@@ -276,7 +276,7 @@ export function UserTable({ searchTerm }: { searchTerm: string }) {
         );
       },
       cell: ({ row }) => (
-        <div className="font-mono text-sm">{row.getValue("id")}</div>
+        <div className="font-mono text-sm">{row.getValue("uid")}</div>
       ),
     },
     {

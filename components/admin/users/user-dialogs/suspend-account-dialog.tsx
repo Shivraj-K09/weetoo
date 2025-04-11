@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Ban, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "../users-table";
+import { logUserAction } from "@/lib/service/activity-logger-client";
 
 interface SuspendAccountDialogProps {
   user: User;
@@ -42,6 +43,7 @@ export function SuspendAccountDialog({
   onUserUpdated,
 }: SuspendAccountDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,6 +52,18 @@ export function SuspendAccountDialog({
     reason: "",
     notifyUser: true,
   });
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Get initials from name
   const getInitials = (firstName: string | null, lastName: string | null) => {
@@ -95,12 +109,9 @@ export function SuspendAccountDialog({
     try {
       // Check if the account is already suspended
       if (user.status === "Suspended") {
-        // toast({
-        //   title: "Account already suspended",
-        //   description: "This user's account is already suspended.",
-        //   variant: "destructive",
-        // })
-        toast.error("This user's account is already suspended.");
+        toast.error("This user's account is already suspended.", {
+          description: "Account already suspended",
+        });
         onOpenChange(false);
         return;
       }
@@ -173,20 +184,36 @@ export function SuspendAccountDialog({
           console.error("Error sending suspension message:", messageError);
       }
 
-      // toast({
-      //   title: formData.suspensionType === "permanent" ? "Account banned" : "Account suspended",
-      //   description: `${getFullName(user.first_name, user.last_name)}'s account has been ${
-      //     formData.suspensionType === "permanent" ? "permanently banned" : "suspended"
-      //   }.`,
-      //   variant: "destructive",
-      // })
-      toast.success(
-        `${getFullName(user.first_name, user.last_name)}'s account has been ${
-          formData.suspensionType === "permanent"
-            ? "permanently banned"
-            : "suspended"
-        }.`
+      toast.error(
+        formData.suspensionType === "permanent"
+          ? "Account banned"
+          : "Account suspended",
+        {
+          description: `${getFullName(user.first_name, user.last_name)}'s account has been ${
+            formData.suspensionType === "permanent"
+              ? "permanently banned"
+              : "suspended"
+          }.`,
+        }
       );
+
+      // After successful suspension
+      const durationText =
+        formData.suspensionType === "permanent"
+          ? "permanently"
+          : `${formData.duration} days`;
+
+      if (currentUserId) {
+        await logUserAction(
+          "user_suspend",
+          currentUserId,
+          user.id,
+          getFullName(user.first_name, user.last_name),
+          `Suspended user "${getFullName(user.first_name, user.last_name)}" for ${durationText}. Reason: ${formData.reason}`,
+          "high",
+          user.uid // Add the UID parameter
+        );
+      }
 
       // Call the onUserUpdated function if provided
       if (onUserUpdated) {
@@ -204,11 +231,6 @@ export function SuspendAccountDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error suspending account:", error);
-      // toast({
-      //   title: "Error",
-      //   description: "There was an error suspending the account.",
-      //   variant: "destructive",
-      // })
       toast.error("There was an error suspending the account.");
     } finally {
       setIsLoading(false);

@@ -12,7 +12,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, AlertTriangle, Info, AlertCircle } from "lucide-react";
+import {
+  ArrowUpDown,
+  AlertTriangle,
+  Info,
+  AlertCircle,
+  ClipboardList,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,148 +33,25 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Sample activity log data
-const activityLogData = [
-  {
-    id: "1",
-    timestamp: "2024-06-30T10:15:00",
-    action: "user_suspend",
-    actionLabel: "User Suspend",
-    admin: "Admin 1",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Choi Woo-shik (UID-24060504)",
-    details:
-      "Suspended user account for 7 days due to multiple policy violations.",
-    severity: "high",
-  },
-  {
-    id: "2",
-    timestamp: "2024-06-30T09:45:00",
-    action: "transaction_approve",
-    actionLabel: "Transaction Approve",
-    admin: "Admin 2",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Transaction #TR-24063001",
-    details: "Approved deposit of 1,500,000 KOR for user Kim Min-ji.",
-    severity: "medium",
-  },
-  {
-    id: "3",
-    timestamp: "2024-06-29T16:30:00",
-    action: "user_warning",
-    actionLabel: "User Warning",
-    admin: "Admin 1",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Park Ji-sung (UID-24060502)",
-    details: "Issued warning for inappropriate content in user profile.",
-    severity: "medium",
-  },
-  {
-    id: "4",
-    timestamp: "2024-06-29T14:20:00",
-    action: "settings_change",
-    actionLabel: "Settings Change",
-    admin: "Admin 3",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "System Settings",
-    details: "Updated KOR_COIN exchange rate from 1.2 to 1.25.",
-    severity: "high",
-  },
-  {
-    id: "5",
-    timestamp: "2024-06-29T11:05:00",
-    action: "user_create",
-    actionLabel: "User Create",
-    admin: "Admin 2",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Lee Soo-jin (UID-24060503)",
-    details: "Created new admin user account with moderator privileges.",
-    severity: "medium",
-  },
-  {
-    id: "6",
-    timestamp: "2024-06-28T15:40:00",
-    action: "transaction_reject",
-    actionLabel: "Transaction Reject",
-    admin: "Admin 4",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Transaction #TR-24062801",
-    details:
-      "Rejected withdrawal of 2,000,000 KOR for user Choi Woo-shik due to suspicious activity.",
-    severity: "high",
-  },
-  {
-    id: "7",
-    timestamp: "2024-06-28T13:15:00",
-    action: "user_update",
-    actionLabel: "User Update",
-    admin: "Admin 1",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Kang Hye-jung (UID-24060505)",
-    details:
-      "Updated user profile information and verified identity documents.",
-    severity: "low",
-  },
-  {
-    id: "8",
-    timestamp: "2024-06-27T16:50:00",
-    action: "settings_change",
-    actionLabel: "Settings Change",
-    admin: "Admin 3",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Security Settings",
-    details:
-      "Enabled two-factor authentication requirement for all admin accounts.",
-    severity: "critical",
-  },
-  {
-    id: "9",
-    timestamp: "2024-06-27T10:30:00",
-    action: "user_delete",
-    actionLabel: "User Delete",
-    admin: "Admin 4",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Test Account (UID-24060001)",
-    details: "Deleted test user account after testing completion.",
-    severity: "low",
-  },
-  {
-    id: "10",
-    timestamp: "2024-06-26T14:25:00",
-    action: "transaction_approve",
-    actionLabel: "Transaction Approve",
-    admin: "Admin 2",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Transaction #TR-24062601",
-    details: "Approved withdrawal of 750,000 KOR for user Jung Ho-yeon.",
-    severity: "medium",
-  },
-  {
-    id: "11",
-    timestamp: "2024-06-26T11:10:00",
-    action: "user_suspend",
-    actionLabel: "User Suspend",
-    admin: "Admin 1",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Anonymous User (UID-24060201)",
-    details:
-      "Permanently suspended account for repeated terms of service violations.",
-    severity: "critical",
-  },
-  {
-    id: "12",
-    timestamp: "2024-06-25T15:35:00",
-    action: "settings_change",
-    actionLabel: "Settings Change",
-    admin: "Admin 3",
-    adminAvatar: "/placeholder.svg?height=40&width=40",
-    target: "Notification Settings",
-    details: "Updated system notification templates for user warnings.",
-    severity: "low",
-  },
-];
-
-export type ActivityLog = (typeof activityLogData)[0];
+interface ActivityLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  action_label: string;
+  admin_id: string;
+  target: string;
+  details: string;
+  severity: string;
+  target_id?: string;
+  target_type?: string;
+  admin?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  };
+}
 
 interface ActivityLogTableProps {
   searchTerm: string;
@@ -187,7 +71,93 @@ export function ActivityLogTable({
     { id: "timestamp", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filteredData, setFilteredData] = useState(activityLogData);
+  const [activityData, setActivityData] = useState<ActivityLog[]>([]);
+  const [filteredData, setFilteredData] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [, setAdminUsers] = useState<
+    { id: string; name: string; avatar_url: string | null }[]
+  >([]);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
+
+  // Fetch admin users for filtering
+  useEffect(() => {
+    const fetchAdminUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, first_name, last_name, avatar_url")
+          .or("role.eq.admin,role.eq.super_admin");
+
+        if (error) {
+          console.error("Error fetching admin users:", error);
+          return;
+        }
+
+        const formattedAdmins = data.map((user) => ({
+          id: user.id,
+          name:
+            `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+            "Unknown User",
+          avatar_url: user.avatar_url,
+        }));
+
+        setAdminUsers(formattedAdmins);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    };
+
+    fetchAdminUsers();
+  }, []);
+
+  // Check if filters are applied
+  useEffect(() => {
+    const isFiltered =
+      filters.action !== "all" ||
+      filters.admin !== "all" ||
+      filters.severity !== "all" ||
+      filters.timeRange !== "all" ||
+      searchTerm.trim() !== "";
+
+    setHasAppliedFilters(isFiltered);
+  }, [filters, searchTerm]);
+
+  // Fetch activity log data
+  useEffect(() => {
+    const fetchActivityLog = async () => {
+      try {
+        setLoading(true);
+
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (filters.action !== "all") params.append("action", filters.action);
+        if (filters.admin !== "all") params.append("admin", filters.admin);
+        if (filters.severity !== "all")
+          params.append("severity", filters.severity);
+        if (filters.timeRange !== "all")
+          params.append("timeRange", filters.timeRange);
+        if (searchTerm) params.append("searchTerm", searchTerm);
+
+        const response = await fetch(
+          `/api/admin/activity-log?${params.toString()}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setActivityData(data);
+        setFilteredData(data);
+      } catch (error) {
+        console.error("Error fetching activity log:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivityLog();
+  }, [searchTerm, filters]);
 
   // Format date to a readable format
   const formatDate = (dateString: string) => {
@@ -209,12 +179,15 @@ export function ActivityLogTable({
   };
 
   // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   // Get severity icon
@@ -253,22 +226,32 @@ export function ActivityLogTable({
   const getActionBadgeClass = (action: string) => {
     if (
       action.includes("user_create") ||
-      action.includes("transaction_approve")
+      action.includes("post_approve") ||
+      action.includes("post_show")
     ) {
       return "bg-green-50 text-green-700 dark:bg-green-900/20";
     } else if (
       action.includes("user_update") ||
-      action.includes("settings_change")
+      action.includes("settings_change") ||
+      action.includes("admin_note_update") ||
+      action.includes("post_hide")
     ) {
       return "bg-blue-50 text-blue-700 dark:bg-blue-900/20";
-    } else if (action.includes("user_warning")) {
+    } else if (
+      action.includes("user_warning") ||
+      action.includes("admin_note_create")
+    ) {
       return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20";
     } else if (
       action.includes("user_suspend") ||
-      action.includes("transaction_reject")
+      action.includes("post_reject")
     ) {
       return "bg-orange-50 text-orange-700 dark:bg-orange-900/20";
-    } else if (action.includes("user_delete")) {
+    } else if (
+      action.includes("user_delete") ||
+      action.includes("post_delete") ||
+      action.includes("admin_note_delete")
+    ) {
       return "bg-red-50 text-red-700 dark:bg-red-900/20";
     } else {
       return "bg-gray-50 text-gray-700 dark:bg-gray-900/20";
@@ -317,7 +300,7 @@ export function ActivityLogTable({
       },
       cell: ({ row }) => {
         const action = row.getValue("action") as string;
-        const actionLabel = row.original.actionLabel;
+        const actionLabel = row.original.action_label;
         return (
           <Badge variant="outline" className={`${getActionBadgeClass(action)}`}>
             {actionLabel}
@@ -326,7 +309,7 @@ export function ActivityLogTable({
       },
     },
     {
-      accessorKey: "admin",
+      accessorKey: "admin_id",
       header: ({ column }) => {
         return (
           <Button
@@ -339,20 +322,31 @@ export function ActivityLogTable({
           </Button>
         );
       },
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage
-              src={row.original.adminAvatar}
-              alt={row.getValue("admin")}
-            />
-            <AvatarFallback>
-              {getInitials(row.getValue("admin"))}
-            </AvatarFallback>
-          </Avatar>
-          <div className="font-medium">{row.getValue("admin")}</div>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const admin = row.original.admin;
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage
+                src={admin?.avatar_url || "/placeholder.svg?height=24&width=24"}
+                alt={
+                  admin
+                    ? getFullName(admin.first_name, admin.last_name)
+                    : "Unknown"
+                }
+              />
+              <AvatarFallback>
+                {admin ? getInitials(admin.first_name, admin.last_name) : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="font-medium">
+              {admin
+                ? getFullName(admin.first_name, admin.last_name)
+                : "Unknown Admin"}
+            </div>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "target",
@@ -368,7 +362,29 @@ export function ActivityLogTable({
           </Button>
         );
       },
-      cell: ({ row }) => <div>{row.getValue("target")}</div>,
+      cell: ({ row }) => {
+        const target = row.getValue("target") as string;
+
+        // For existing logs, try to display the target with UID highlighted if it's a user target
+        if (target && target.startsWith("User:")) {
+          // Extract the ID/UID part which is in parentheses
+          const match = target.match(/$$(.*?)$$/);
+          if (match && match[1]) {
+            const idOrUid = match[1];
+            // Highlight the UID part
+            return (
+              <div>
+                {target.replace(/$$.*?$$/, "")}
+                <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">
+                  ({idOrUid})
+                </span>
+              </div>
+            );
+          }
+        }
+
+        return <div>{target}</div>;
+      },
     },
     {
       accessorKey: "details",
@@ -396,9 +412,7 @@ export function ActivityLogTable({
         return (
           <Badge
             variant="outline"
-            className={`flex items-center gap-1 capitalize ${getSeverityBadgeClass(
-              severity
-            )}`}
+            className={`flex items-center gap-1 capitalize ${getSeverityBadgeClass(severity)}`}
           >
             {getSeverityIcon(severity)}
             {severity}
@@ -407,69 +421,6 @@ export function ActivityLogTable({
       },
     },
   ];
-
-  // Apply filters to data
-  useEffect(() => {
-    let result = [...activityLogData];
-
-    // Apply search term filter
-    if (searchTerm) {
-      const lowercasedSearch = searchTerm.toLowerCase();
-      result = result.filter(
-        (item) =>
-          item.action.toLowerCase().includes(lowercasedSearch) ||
-          item.actionLabel.toLowerCase().includes(lowercasedSearch) ||
-          item.admin.toLowerCase().includes(lowercasedSearch) ||
-          item.target.toLowerCase().includes(lowercasedSearch) ||
-          item.details.toLowerCase().includes(lowercasedSearch) ||
-          item.severity.toLowerCase().includes(lowercasedSearch)
-      );
-    }
-
-    // Apply action filter - only if not "all"
-    if (filters.action && filters.action !== "all") {
-      result = result.filter((item) => item.action === filters.action);
-    }
-
-    // Apply admin filter - only if not "all"
-    if (filters.admin && filters.admin !== "all") {
-      result = result.filter((item) => item.admin === filters.admin);
-    }
-
-    // Apply severity filter - only if not "all"
-    if (filters.severity && filters.severity !== "all") {
-      result = result.filter((item) => item.severity === filters.severity);
-    }
-
-    // Apply time range filter - only if not "all"
-    if (filters.timeRange !== "all") {
-      const now = new Date();
-      const startDate = new Date();
-
-      if (filters.timeRange === "today") {
-        startDate.setHours(0, 0, 0, 0);
-      } else if (filters.timeRange === "yesterday") {
-        startDate.setDate(startDate.getDate() - 1);
-        startDate.setHours(0, 0, 0, 0);
-        now.setDate(now.getDate() - 1);
-        now.setHours(23, 59, 59, 999);
-      } else if (filters.timeRange === "week") {
-        const day = startDate.getDay() || 7;
-        startDate.setDate(startDate.getDate() - day + 1);
-        startDate.setHours(0, 0, 0, 0);
-      } else if (filters.timeRange === "month") {
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-      }
-
-      result = result.filter((item) => {
-        const date = new Date(item.timestamp);
-        return date >= startDate && date <= now;
-      });
-    }
-
-    setFilteredData(result);
-  }, [searchTerm, filters]);
 
   const table = useReactTable({
     data: filteredData,
@@ -485,6 +436,53 @@ export function ActivityLogTable({
       columnFilters,
     },
   });
+
+  // Render empty state when there's no data
+  const renderEmptyState = () => {
+    if (loading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={columns.length} className="h-24 text-center">
+            Loading activity log...
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (activityData.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={columns.length} className="h-64">
+            <div className="flex flex-col items-center justify-center text-center p-6">
+              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">No activity logs found</h3>
+              <p className="text-muted-foreground mt-2 max-w-md">
+                There are no admin activities recorded yet.
+              </p>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (filteredData.length === 0 && hasAppliedFilters) {
+      return (
+        <TableRow>
+          <TableCell colSpan={columns.length} className="h-64">
+            <div className="flex flex-col items-center justify-center text-center p-6">
+              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">No matching activities</h3>
+              <p className="text-muted-foreground mt-2 max-w-md">
+                No activities match your current filters.
+              </p>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
@@ -509,7 +507,7 @@ export function ActivityLogTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {renderEmptyState() ||
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -524,46 +522,38 @@ export function ActivityLogTable({
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          Showing {table.getRowModel().rows.length} of {activityLogData.length}{" "}
-          activities
+      {activityData.length > 0 && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <div className="flex-1 text-sm text-muted-foreground">
+            Showing {table.getRowModel().rows.length} of {activityData.length}{" "}
+            activities
+          </div>
+          <div className="space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="shadow-none cursor-pointer h-10"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shadow-none cursor-pointer h-10"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Next
+            </Button>
+          </div>
         </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-none cursor-pointer h-10"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-none cursor-pointer h-10"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      )}
     </>
   );
 }

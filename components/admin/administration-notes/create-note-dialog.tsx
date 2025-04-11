@@ -1,32 +1,21 @@
 "use client";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
 
-import { Button } from "@/components/ui/button";
+import type React from "react";
+
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -34,179 +23,419 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-
-const formSchema = z.object({
-  user: z.string().min(1, "User is required"),
-  note: z.string().min(1, "Note is required"),
-  priority: z.string().min(1, "Priority is required"),
-  date: z.date(),
-});
-
-type CreateNoteFormValues = z.infer<typeof formSchema>;
+import { toast } from "sonner";
+import { logNoteAction } from "@/lib/service/activity-logger-client";
 
 interface CreateNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNoteCreated?: () => Promise<void>;
+}
+
+interface AdminUser {
+  id: string;
+  uid: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  role: string;
+  avatar_url: string | null;
 }
 
 export function CreateNoteDialog({
   open,
   onOpenChange,
+  onNoteCreated,
 }: CreateNoteDialogProps) {
-  const form = useForm<CreateNoteFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      user: "",
-      note: "",
-      priority: "",
-      date: new Date(),
-    },
+  const [isLoading, setIsLoading] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [openCombobox, setOpenCombobox] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    userId: "",
+    priority: "Medium",
+    date: new Date(),
+    note: "",
   });
 
-  const onSubmit = (data: CreateNoteFormValues) => {
-    // Here you would typically send the data to your API
-    console.log("Creating new note:", data);
+  // Fetch current user role
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
 
-    // Close the dialog and reset the form
-    onOpenChange(false);
-    form.reset();
+        if (!error && userData) {
+          setCurrentUserRole(userData.role);
+        }
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Update the fetchAdminUsers function to filter out the current user
+
+  // Fetch admin users
+  useEffect(() => {
+    const fetchAdminUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, uid, first_name, last_name, email, role, avatar_url")
+          .or("role.eq.admin,role.eq.super_admin");
+
+        if (error) {
+          console.error("Error fetching admin users:", error);
+          return;
+        }
+
+        // Filter out the current user from the list
+        const filteredUsers =
+          data?.filter((user) => user.id !== currentUserId) || [];
+        setAdminUsers(filteredUsers);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    };
+
+    if (open && currentUserId) {
+      fetchAdminUsers();
+    }
+  }, [open, currentUserId]);
+
+  // Handle form input changes
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  // Handle select changes
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle date change
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setFormData((prev) => ({ ...prev, date }));
+    }
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
+  };
+
+  // Get initials from name
+  const getInitials = (firstName: string | null, lastName: string | null) => {
+    const first = firstName ? firstName.charAt(0) : "";
+    const last = lastName ? lastName.charAt(0) : "";
+    return (first + last).toUpperCase();
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Check if current user is super_admin
+      if (currentUserRole !== "super_admin") {
+        toast.error("Permission denied", {
+          description: "Only super admins can create administration notes.",
+        });
+        onOpenChange(false);
+        return;
+      }
+
+      // Get target admin name
+      const targetAdmin = adminUsers.find(
+        (user) => user.id === formData.userId
+      );
+      const targetAdminName = targetAdmin
+        ? getFullName(targetAdmin.first_name, targetAdmin.last_name)
+        : "Unknown Admin";
+
+      // Create the note in Supabase
+      const { data, error } = await supabase
+        .from("admin_notes")
+        .insert({
+          user_id: formData.userId,
+          note: formData.note,
+          priority: formData.priority,
+          created_by: currentUserId,
+          date: formData.date.toISOString(),
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      // Log the activity
+      if (data && data.id) {
+        await logNoteAction(
+          "admin_note_create",
+          currentUserId!,
+          data.id,
+          targetAdminName
+        );
+      }
+
+      toast.success("Note created", {
+        description: "The administration note has been created successfully.",
+      });
+
+      // Call the onNoteCreated function if provided
+      if (onNoteCreated) {
+        await onNoteCreated();
+      }
+
+      // Reset form
+      setFormData({
+        userId: "",
+        priority: "Medium",
+        date: new Date(),
+        note: "",
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      toast.error("Error", {
+        description: "There was an error creating the note.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Get selected user
+  const selectedUser = formData.userId
+    ? adminUsers.find((user) => user.id === formData.userId)
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Administration Note</DialogTitle>
+          <DialogTitle>Create Administration Note</DialogTitle>
           <DialogDescription>
-            Add a new note for administrative purposes. Click save when
-            you&apos;re done.
+            Create a new note for administrative purposes.
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="user"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>User</FormLabel>
-                  <FormControl>
-                    <Input
-                      className="h-10 shadow-none"
-                      placeholder="Enter user name"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-              <FormField
-                control={form.control}
-                name="priority"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Priority</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-10 shadow-none cursor-pointer w-full">
-                          <SelectValue placeholder="Select priority" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal h-10 shadow-none cursor-pointer",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
+        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="userId">User</Label>
+            <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openCombobox}
+                  className="w-full justify-between shadow-none"
+                >
+                  {selectedUser ? (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage
+                          src={
+                            selectedUser.avatar_url ||
+                            "/placeholder.svg?height=24&width=24"
+                          }
+                          alt={getFullName(
+                            selectedUser.first_name,
+                            selectedUser.last_name
+                          )}
                         />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                        <AvatarFallback>
+                          {getInitials(
+                            selectedUser.first_name,
+                            selectedUser.last_name
+                          )}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>
+                        {getFullName(
+                          selectedUser.first_name,
+                          selectedUser.last_name
+                        )}
+                      </span>
+                    </div>
+                  ) : (
+                    "Select user"
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search users..." />
+                  <CommandList>
+                    <CommandEmpty>No user found.</CommandEmpty>
+                    <CommandGroup className="max-h-[300px] overflow-y-auto">
+                      {adminUsers.map((user) => (
+                        <CommandItem
+                          key={user.id}
+                          value={`${user.first_name} ${user.last_name} ${user.email}`}
+                          onSelect={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              userId: user.id,
+                            }));
+                            setOpenCombobox(false);
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage
+                                src={
+                                  user.avatar_url ||
+                                  "/placeholder.svg?height=32&width=32"
+                                }
+                                alt={getFullName(
+                                  user.first_name,
+                                  user.last_name
+                                )}
+                              />
+                              <AvatarFallback>
+                                {getInitials(user.first_name, user.last_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span>
+                                {getFullName(user.first_name, user.last_name)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {user.email}
+                              </span>
+                            </div>
+                          </div>
+                          <Check
+                            className={cn(
+                              "h-4 w-4",
+                              formData.userId === user.id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
 
-            <FormField
-              control={form.control}
-              name="note"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Note</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter note details"
-                      className="min-h-[100px] shadow-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 shadow-none cursor-pointer"
-                onClick={() => onOpenChange(false)}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => handleSelectChange("priority", value)}
               >
-                Cancel
-              </Button>
-              <Button className="h-10 shadow-none cursor-pointer" type="submit">
-                Create Note
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                <SelectTrigger id="priority" className="shadow-none">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal shadow-none",
+                      !formData.date && "text-muted-foreground"
+                    )}
+                  >
+                    {formData.date ? (
+                      format(formData.date, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.date}
+                    onSelect={handleDateChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="note">Note</Label>
+            <Textarea
+              id="note"
+              name="note"
+              placeholder="Enter note details..."
+              value={formData.note}
+              onChange={handleChange}
+              className="min-h-[150px] shadow-none"
+              required
+            />
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="shadow-none cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="shadow-none cursor-pointer"
+              disabled={isLoading}
+            >
+              {isLoading ? "Creating..." : "Create Note"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

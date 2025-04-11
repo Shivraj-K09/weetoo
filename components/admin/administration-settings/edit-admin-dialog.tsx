@@ -136,6 +136,7 @@ export function EditAdminDialog({
                 value={formData.first_name}
                 onChange={handleChange}
                 className="shadow-none"
+                disabled
               />
             </div>
             <div className="space-y-2">
@@ -146,6 +147,7 @@ export function EditAdminDialog({
                 value={formData.last_name}
                 onChange={handleChange}
                 className="shadow-none"
+                disabled
               />
             </div>
           </div>
@@ -159,6 +161,7 @@ export function EditAdminDialog({
               value={formData.email}
               onChange={handleChange}
               className="shadow-none"
+              disabled
             />
           </div>
 

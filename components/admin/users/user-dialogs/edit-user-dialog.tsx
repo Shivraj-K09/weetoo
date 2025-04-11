@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { User } from "../users-table";
+import { logUserAction } from "@/lib/service/activity-logger-client";
 
 interface EditUserDialogProps {
   user: User;
@@ -43,7 +44,7 @@ export function EditUserDialog({
 }: EditUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -167,11 +168,48 @@ export function EditUserDialog({
         if (notesError) console.error("Error saving notes:", notesError);
       }
 
-      // toast({
-      //   title: "User updated",
-      //   description: "The user has been updated successfully.",
-      // })
-      toast.success("The user has been updated successfully.");
+      // Log the activity
+      if (currentUserId) {
+        // Create a summary of changes
+        const changes = [];
+        if (
+          formData.first_name !== user.first_name ||
+          formData.last_name !== user.last_name
+        ) {
+          changes.push("name");
+        }
+        if (formData.email !== user.email) {
+          changes.push("email");
+        }
+        if (formData.status !== user.status) {
+          changes.push("status");
+        }
+        if (Number(formData.kor_coins) !== user.kor_coins) {
+          changes.push("KOR_COIN balance");
+        }
+        if (currentUserRole === "super_admin" && formData.role !== user.role) {
+          changes.push("role");
+        }
+
+        const changesText =
+          changes.length > 0
+            ? `Updated ${changes.join(", ")}`
+            : "No significant changes";
+
+        await logUserAction(
+          "user_update",
+          currentUserId,
+          user.id,
+          getFullName(user.first_name, user.last_name),
+          `Updated user "${getFullName(user.first_name, user.last_name)}". Changes: ${changesText}`,
+          "medium",
+          user.uid // Add the UID parameter
+        );
+      }
+
+      toast.success("User updated", {
+        description: "The user has been updated successfully.",
+      });
 
       // Call the onUserUpdated function if provided
       if (onUserUpdated) {
@@ -181,12 +219,9 @@ export function EditUserDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating user:", error);
-      // toast({
-      //   title: "Error",
-      //   description: "There was an error updating the user.",
-      //   variant: "destructive",
-      // })
-      toast.error("There was an error updating the user.");
+      toast.error("Error", {
+        description: "There was an error updating the user.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -298,6 +333,7 @@ export function EditUserDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
                   <SelectItem value="Suspended">Suspended</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>

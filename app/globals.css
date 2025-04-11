@@ -147,3 +147,62 @@ body,
 .carousel-container {
   overflow: visible !important;
 }
+
+/* Post content styles */
+.post-content p {
+  margin: 0.25rem 0;
+  line-height: 1.5;
+}
+
+.post-content > *:first-child {
+  margin-top: 0;
+}
+
+.post-content ul,
+.post-content ol {
+  padding-left: 1.5rem;
+  margin: 0.25rem 0;
+}
+
+.post-content li {
+  margin: 0.1rem 0;
+}
+
+.post-content li p {
+  margin: 0;
+}
+
+/* TipTap editor styles */
+.ProseMirror {
+  padding: 0.5rem 1rem;
+  min-height: 100%;
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0.25rem 0;
+  line-height: 1.5;
+}
+
+.ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.25rem 0;
+}
+
+.ProseMirror li {
+  margin: 0.1rem 0;
+}
+
+.ProseMirror li p {
+  margin: 0;
+}
+
+/* Fix for copy-paste behavior */
+.tiptap-paragraph + .tiptap-paragraph {
+  margin-top: 0.25rem;
+}

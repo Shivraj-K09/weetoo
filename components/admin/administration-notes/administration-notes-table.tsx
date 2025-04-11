@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
+import { Edit, Eye, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,65 +32,134 @@ import { Badge } from "@/components/ui/badge";
 import { CreateNoteDialog } from "./create-note-dialog";
 import { EditNoteDialog } from "./edit-note-dialog";
 import { DeleteNoteDialog } from "./delete-note-dialog";
+import { ViewNoteDialog } from "./view-note-dialog";
 
-// Mock data for administration notes
-const mockNotes = [
-  {
-    id: "1",
-    user: "John Smith",
-    note: "Follow up on user reports about login issues",
-    priority: "High",
-    createdBy: "Admin User",
-    date: new Date("2023-04-15"),
-  },
-  {
-    id: "2",
-    user: "Sarah Johnson",
-    note: "Review new content guidelines for community posts",
-    priority: "Medium",
-    createdBy: "System Admin",
-    date: new Date("2023-04-12"),
-  },
-  {
-    id: "3",
-    user: "Michael Brown",
-    note: "Schedule maintenance for database optimization",
-    priority: "Low",
-    createdBy: "Tech Admin",
-    date: new Date("2023-04-10"),
-  },
-  {
-    id: "4",
-    user: "Emily Davis",
-    note: "Investigate reports of suspicious activity on user accounts",
-    priority: "High",
-    createdBy: "Security Admin",
-    date: new Date("2023-04-08"),
-  },
-  {
-    id: "5",
-    user: "David Wilson",
-    note: "Update user permission settings for new features",
-    priority: "Medium",
-    createdBy: "Admin User",
-    date: new Date("2023-04-05"),
-  },
-];
+interface AdminNote {
+  id: string;
+  user_id: string;
+  note: string;
+  priority: string;
+  created_by: string;
+  date: string;
+  created_at: string;
+  user?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+  creator?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+}
 
 export function AdministrationNotesTable() {
+  const [notes, setNotes] = useState<AdminNote[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedNote, setSelectedNote] = useState<any>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<AdminNote | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  // Fetch current user role
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!error && userData) {
+          setCurrentUserRole(userData.role);
+        }
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Fetch notes from Supabase
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("admin_notes")
+          .select(
+            `
+            *,
+            user:user_id(first_name, last_name, email),
+            creator:created_by(first_name, last_name, email)
+          `
+          )
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching notes:", error);
+          return;
+        }
+
+        setNotes(data || []);
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotes();
+  }, []);
+
+  // Refresh notes after create, edit, or delete
+  const refreshNotes = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("admin_notes")
+        .select(
+          `
+          *,
+          user:user_id(first_name, last_name, email),
+          creator:created_by(first_name, last_name, email)
+        `
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching notes:", error);
+        return;
+      }
+
+      setNotes(data || []);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter notes based on search query and priority filter
-  const filteredNotes = mockNotes.filter((note) => {
+  const filteredNotes = notes.filter((note) => {
+    const userName = note.user
+      ? `${note.user.first_name || ""} ${note.user.last_name || ""}`.toLowerCase()
+      : "";
+    const creatorName = note.creator
+      ? `${note.creator.first_name || ""} ${note.creator.last_name || ""}`.toLowerCase()
+      : "";
+    const noteText = note.note.toLowerCase();
+
     const matchesSearch =
-      note.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.createdBy.toLowerCase().includes(searchQuery.toLowerCase());
+      userName.includes(searchQuery.toLowerCase()) ||
+      creatorName.includes(searchQuery.toLowerCase()) ||
+      noteText.includes(searchQuery.toLowerCase());
 
     const matchesPriority =
       priorityFilter === "all" || note.priority === priorityFilter;
@@ -97,14 +167,24 @@ export function AdministrationNotesTable() {
     return matchesSearch && matchesPriority;
   });
 
-  const handleEdit = (note: any) => {
+  const handleEdit = (note: AdminNote) => {
     setSelectedNote(note);
     setEditDialogOpen(true);
   };
 
-  const handleDelete = (note: any) => {
+  const handleDelete = (note: AdminNote) => {
     setSelectedNote(note);
     setDeleteDialogOpen(true);
+  };
+
+  const handleView = (note: AdminNote) => {
+    setSelectedNote(note);
+    setViewDialogOpen(true);
+  };
+
+  // Get full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(" ") || "Unknown User";
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -161,13 +241,15 @@ export function AdministrationNotesTable() {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            onClick={() => setCreateDialogOpen(true)}
-            className="h-10 shadow-none cursor-pointer"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Create Note
-          </Button>
+          {currentUserRole === "super_admin" && (
+            <Button
+              onClick={() => setCreateDialogOpen(true)}
+              className="h-10 shadow-none cursor-pointer"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Note
+            </Button>
+          )}
         </div>
 
         <div className="rounded-md border">
@@ -183,7 +265,13 @@ export function AdministrationNotesTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredNotes.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Loading notes...
+                  </TableCell>
+                </TableRow>
+              ) : filteredNotes.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
                     No notes found.
@@ -192,7 +280,11 @@ export function AdministrationNotesTable() {
               ) : (
                 filteredNotes.map((note) => (
                   <TableRow key={note.id}>
-                    <TableCell className="font-medium">{note.user}</TableCell>
+                    <TableCell className="font-medium">
+                      {note.user
+                        ? getFullName(note.user.first_name, note.user.last_name)
+                        : "Unknown User"}
+                    </TableCell>
                     <TableCell
                       className="max-w-[300px] truncate"
                       title={note.note}
@@ -200,8 +292,17 @@ export function AdministrationNotesTable() {
                       {note.note}
                     </TableCell>
                     <TableCell>{getPriorityBadge(note.priority)}</TableCell>
-                    <TableCell>{note.createdBy}</TableCell>
-                    <TableCell>{format(note.date, "MMM dd, yyyy")}</TableCell>
+                    <TableCell>
+                      {note.creator
+                        ? getFullName(
+                            note.creator.first_name,
+                            note.creator.last_name
+                          )
+                        : "Unknown User"}
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(note.date), "MMM dd, yyyy")}
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -214,17 +315,31 @@ export function AdministrationNotesTable() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(note)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDelete(note)}
-                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleView(note)}
+                            className="cursor-pointer"
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
                           </DropdownMenuItem>
+                          {currentUserRole === "super_admin" && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleEdit(note)}
+                                className="cursor-pointer"
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(note)}
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -239,20 +354,29 @@ export function AdministrationNotesTable() {
       <CreateNoteDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+        onNoteCreated={refreshNotes}
       />
 
       {selectedNote && (
         <>
+          <ViewNoteDialog
+            open={viewDialogOpen}
+            onOpenChange={setViewDialogOpen}
+            note={selectedNote}
+          />
+
           <EditNoteDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             note={selectedNote}
+            onNoteUpdated={refreshNotes}
           />
 
           <DeleteNoteDialog
             open={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}
             note={selectedNote}
+            onNoteDeleted={refreshNotes}
           />
         </>
       )}

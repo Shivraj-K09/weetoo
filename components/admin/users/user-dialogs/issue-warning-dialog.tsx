@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "../users-table";
+import { logUserAction } from "@/lib/service/activity-logger-client";
 
 interface IssueWarningDialogProps {
   user: User;
@@ -42,6 +43,7 @@ export function IssueWarningDialog({
   onUserUpdated,
 }: IssueWarningDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -49,6 +51,18 @@ export function IssueWarningDialog({
     reason: "",
     notifyUser: true,
   });
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Get initials from name
   const getInitials = (firstName: string | null, lastName: string | null) => {
@@ -90,12 +104,9 @@ export function IssueWarningDialog({
 
       // Check if this would exceed the maximum warnings (3)
       if (newWarningCount > 3) {
-        // toast({
-        //   title: "Warning limit reached",
-        //   description: "This user already has the maximum number of warnings.",
-        //   variant: "destructive",
-        // });
-        toast.error("This user already has the maximum number of warnings.");
+        toast.error("Warning limit reached", {
+          description: "This user already has the maximum number of warnings.",
+        });
         onOpenChange(false);
         return;
       }
@@ -153,30 +164,34 @@ export function IssueWarningDialog({
           console.error("Error sending warning message:", messageError);
       }
 
-      // toast({
-      //   title: "Warning issued",
-      //   description: `Warning has been issued to ${getFullName(user.first_name, user.last_name)}.`,
-      // });
-      toast.success(
-        `Warning has been issued to ${getFullName(user.first_name, user.last_name)}.`
-      );
+      toast.success("Warning issued", {
+        description: `Warning has been issued to ${getFullName(user.first_name, user.last_name)}.`,
+      });
 
       // If this was the third warning, show an additional notification
       if (newWarningCount >= 3) {
-        // toast({
-        //   title: "Account suspended",
-        //   description:
-        //     "User has reached 3 warnings and their account has been automatically suspended.",
-        //   variant: "destructive",
-        // });
-        toast.error(
-          "User has reached 3 warnings and their account has been automatically suspended."
-        );
+        toast.error("Account suspended", {
+          description:
+            "User has reached 3 warnings and their account has been automatically suspended.",
+        });
       }
 
       // Call the onUserUpdated function if provided
       if (onUserUpdated) {
         await onUserUpdated();
+      }
+
+      // After successful warning issuance
+      if (currentUserId) {
+        await logUserAction(
+          "user_warning",
+          currentUserId,
+          user.id,
+          getFullName(user.first_name, user.last_name),
+          `Issued warning to user "${getFullName(user.first_name, user.last_name)}". Reason: ${formData.reason}`,
+          "medium",
+          user.uid // Add the UID parameter
+        );
       }
 
       // Reset form
@@ -189,11 +204,6 @@ export function IssueWarningDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error issuing warning:", error);
-      // toast({
-      //   title: "Error",
-      //   description: "There was an error issuing the warning.",
-      //   variant: "destructive",
-      // });
       toast.error("There was an error issuing the warning.");
     } finally {
       setIsLoading(false);

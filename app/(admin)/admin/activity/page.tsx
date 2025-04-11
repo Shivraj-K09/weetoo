@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Download, Filter } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +24,96 @@ export default function ActivityPage() {
     severity: "all",
     timeRange: "all",
   });
+  const [adminUsers, setAdminUsers] = useState<{ id: string; name: string }[]>(
+    []
+  );
+  const [actionTypes, setActionTypes] = useState<
+    { value: string; label: string }[]
+  >([{ value: "all", label: "All Actions" }]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Count active filters
   const activeFilterCount = Object.values(filters).filter(
     (value) => value !== "all"
   ).length;
+
+  // Fetch admin users for filtering
+  useEffect(() => {
+    const fetchAdminUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, first_name, last_name")
+          .or("role.eq.admin,role.eq.super_admin");
+
+        if (error) {
+          console.error("Error fetching admin users:", error);
+          return;
+        }
+
+        const formattedAdmins = [
+          { id: "all", name: "All Admins" },
+          ...data.map((user) => ({
+            id: user.id,
+            name:
+              `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+              "Unknown User",
+          })),
+        ];
+
+        setAdminUsers(formattedAdmins);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    };
+
+    fetchAdminUsers();
+  }, []);
+
+  // Fetch action types dynamically from the database
+  useEffect(() => {
+    const fetchActionTypes = async () => {
+      try {
+        setIsLoading(true);
+
+        // Get distinct action types from the database
+        const { data, error } = await supabase
+          .from("admin_activity_log")
+          .select("action, action_label")
+          .order("action_label");
+
+        if (error) {
+          console.error("Error fetching action types:", error);
+          return;
+        }
+
+        // Create a map to deduplicate and get unique action types
+        const actionMap = new Map();
+        data.forEach((item) => {
+          if (!actionMap.has(item.action)) {
+            actionMap.set(item.action, item.action_label);
+          }
+        });
+
+        // Convert map to array of objects
+        const uniqueActions = [
+          { value: "all", label: "All Actions" },
+          ...Array.from(actionMap.entries()).map(([value, label]) => ({
+            value,
+            label,
+          })),
+        ];
+
+        setActionTypes(uniqueActions);
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchActionTypes();
+  }, []);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({
@@ -43,6 +129,76 @@ export default function ActivityPage() {
       severity: "all",
       timeRange: "all",
     });
+  };
+
+  // Handle CSV export
+  const handleExport = async () => {
+    try {
+      // Build query parameters based on current filters
+      const params = new URLSearchParams();
+      if (filters.action !== "all") params.append("action", filters.action);
+      if (filters.admin !== "all") params.append("admin", filters.admin);
+      if (filters.severity !== "all")
+        params.append("severity", filters.severity);
+      if (filters.timeRange !== "all")
+        params.append("timeRange", filters.timeRange);
+      if (searchTerm) params.append("searchTerm", searchTerm);
+
+      const response = await fetch(
+        `/api/admin/activity-log?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Convert data to CSV
+      const headers = [
+        "Timestamp",
+        "Action",
+        "Admin",
+        "Target",
+        "Details",
+        "Severity",
+      ];
+      const csvRows = [
+        headers.join(","),
+        ...data.map((item: any) => {
+          const adminName = item.admin
+            ? `${item.admin.first_name || ""} ${item.admin.last_name || ""}`.trim() ||
+              "Unknown User"
+            : "Unknown Admin";
+
+          return [
+            new Date(item.timestamp).toISOString(),
+            item.action_label,
+            adminName,
+            item.target,
+            `"${item.details.replace(/"/g, '""')}"`, // Escape quotes in CSV
+            item.severity,
+          ].join(",");
+        }),
+      ];
+
+      const csvContent = csvRows.join("\n");
+
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `activity_log_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error exporting activity log:", error);
+    }
   };
 
   return (
@@ -74,19 +230,15 @@ export default function ActivityPage() {
               <SelectValue placeholder="Action Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Actions</SelectItem>
-              <SelectItem value="user_create">User Create</SelectItem>
-              <SelectItem value="user_update">User Update</SelectItem>
-              <SelectItem value="user_delete">User Delete</SelectItem>
-              <SelectItem value="user_suspend">User Suspend</SelectItem>
-              <SelectItem value="user_warning">User Warning</SelectItem>
-              <SelectItem value="transaction_approve">
-                Transaction Approve
-              </SelectItem>
-              <SelectItem value="transaction_reject">
-                Transaction Reject
-              </SelectItem>
-              <SelectItem value="settings_change">Settings Change</SelectItem>
+              {isLoading ? (
+                <SelectItem value="all">Loading...</SelectItem>
+              ) : (
+                actionTypes.map((action) => (
+                  <SelectItem key={action.value} value={action.value}>
+                    {action.label}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
 
@@ -98,11 +250,11 @@ export default function ActivityPage() {
               <SelectValue placeholder="Admin" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Admins</SelectItem>
-              <SelectItem value="Admin 1">Admin 1</SelectItem>
-              <SelectItem value="Admin 2">Admin 2</SelectItem>
-              <SelectItem value="Admin 3">Admin 3</SelectItem>
-              <SelectItem value="Admin 4">Admin 4</SelectItem>
+              {adminUsers.map((admin) => (
+                <SelectItem key={admin.id} value={admin.id}>
+                  {admin.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -151,9 +303,10 @@ export default function ActivityPage() {
           <Button
             variant="outline"
             className="ml-auto shadow-none cursor-pointer h-10"
+            onClick={handleExport}
           >
-            <Download className="h-4 w-4" />
-            <span className="sr-only">Export</span>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
           </Button>
         </div>
 
@@ -169,13 +322,17 @@ export default function ActivityPage() {
 
             {filters.action !== "all" && (
               <Badge variant="secondary" className="text-xs">
-                Action: {filters.action.replace(/_/g, " ")}
+                Action:{" "}
+                {actionTypes.find((a) => a.value === filters.action)?.label ||
+                  filters.action}
               </Badge>
             )}
 
             {filters.admin !== "all" && (
               <Badge variant="secondary" className="text-xs">
-                Admin: {filters.admin}
+                Admin:{" "}
+                {adminUsers.find((a) => a.id === filters.admin)?.name ||
+                  filters.admin}
               </Badge>
             )}
 

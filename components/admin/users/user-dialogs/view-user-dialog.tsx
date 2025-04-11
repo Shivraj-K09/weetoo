@@ -26,10 +26,10 @@ import {
   Phone,
   XCircle,
 } from "lucide-react";
-import type { User } from "../users-table";
+import type { User as UserType } from "../users-table";
 
 interface ViewUserDialogProps {
-  user: User;
+  user: UserType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -133,7 +133,7 @@ export function ViewUserDialog({
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="font-mono">
-                  {user.id}
+                  {user.uid}
                 </Badge>
               </div>
               <div className="text-sm text-muted-foreground">

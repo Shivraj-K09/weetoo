@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Check, AlertCircle, Bell, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "../users-table";
+import { logUserAction } from "@/lib/service/activity-logger-client";
 
 interface SendMessageDialogProps {
   user: User;
@@ -41,6 +42,7 @@ export function SendMessageDialog({
   onOpenChange,
 }: SendMessageDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,6 +52,18 @@ export function SendMessageDialog({
     sendEmail: true,
     sendPush: true,
   });
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Get initials from name
   const getInitials = (firstName: string | null, lastName: string | null) => {
@@ -102,11 +116,22 @@ export function SendMessageDialog({
 
       if (error) throw error;
 
-      // toast({
-      //   title: "Message sent",
-      //   description: "Your message has been sent successfully.",
-      // })
-      toast.success("Your message has been sent successfully.");
+      // Log the activity
+      if (currentUserId) {
+        await logUserAction(
+          "user_message",
+          currentUserId,
+          user.id,
+          getFullName(user.first_name, user.last_name),
+          `Sent message to user "${getFullName(user.first_name, user.last_name)}". Subject: ${formData.subject}`,
+          "low",
+          user.uid // Add the UID parameter
+        );
+      }
+
+      toast.success("Message sent", {
+        description: "Your message has been sent successfully.",
+      });
 
       // Reset form
       setFormData({
@@ -120,12 +145,9 @@ export function SendMessageDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error sending message:", error);
-      // toast({
-      //   title: "Error",
-      //   description: "There was an error sending your message.",
-      //   variant: "destructive",
-      // })
-      toast.error("There was an error sending your message.");
+      toast.error("Error", {
+        description: "There was an error sending your message.",
+      });
     } finally {
       setIsLoading(false);
     }

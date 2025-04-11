@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Download } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PostManagementTable } from "@/components/admin/manage-posts/post-management-table";
@@ -18,17 +17,28 @@ import { DateRangePicker } from "@/components/admin/date-range-picker";
 import { format } from "date-fns";
 import { X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
+import { toast } from "sonner";
+import {
+  getAdminPosts,
+  approvePost,
+  rejectPost,
+  togglePostVisibility,
+  deletePost,
+} from "@/app/actions/post-moderation-action";
+import type { Post } from "@/types";
 
-export default function ManagePostsPage() {
+export default function ManagePostsClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     category: "all",
-    situation: "all",
+    status: "all",
     dateRange: {
       from: undefined as Date | undefined,
       to: undefined as Date | undefined,
     },
   });
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Count active filters
   const activeFilterCount = Object.values(filters).filter((value) => {
@@ -38,6 +48,24 @@ export default function ManagePostsPage() {
     }
     return value !== "all";
   }).length;
+
+  // Fetch posts on component mount
+  useEffect(() => {
+    const fetchPosts = async () => {
+      setLoading(true);
+      try {
+        const data = await getAdminPosts();
+        setPosts(data);
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+        toast.error("Failed to load posts");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []);
 
   const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({
@@ -56,13 +84,116 @@ export default function ManagePostsPage() {
   const clearFilters = () => {
     setFilters({
       category: "all",
-      situation: "all",
+      status: "all",
       dateRange: {
         from: undefined,
         to: undefined,
       },
     });
   };
+
+  // Handle post approval
+  const handleApprovePost = useCallback(async (postId: string) => {
+    try {
+      const result = await approvePost(postId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(result.message);
+        // Update local state
+        setPosts((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id === postId) {
+              return { ...post, status: "approved" };
+            }
+            return post;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error approving post:", error);
+      toast.error("Failed to approve post");
+    }
+  }, []);
+
+  // Handle post rejection
+  const handleRejectPost = useCallback(async (postId: string) => {
+    try {
+      const result = await rejectPost(postId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(result.message);
+        // Update local state
+        setPosts((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id === postId) {
+              return { ...post, status: "rejected" };
+            }
+            return post;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error rejecting post:", error);
+      toast.error("Failed to reject post");
+    }
+  }, []);
+
+  // Handle post visibility toggle
+  const handleToggleVisibility = useCallback(
+    async (postId: string, currentStatus: string) => {
+      const isCurrentlyVisible = currentStatus === "approved";
+      try {
+        const result = await togglePostVisibility(postId, !isCurrentlyVisible);
+        if (result.error) {
+          toast.error(result.error);
+        } else {
+          toast.success(result.message);
+          // Update local state
+          setPosts((currentPosts) =>
+            currentPosts.map((post) => {
+              if (post.id === postId) {
+                return {
+                  ...post,
+                  status: isCurrentlyVisible ? "hidden" : "approved",
+                };
+              }
+              return post;
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error toggling post visibility:", error);
+        toast.error("Failed to update post visibility");
+      }
+    },
+    []
+  );
+
+  // Handle post deletion
+  const handleDeletePost = useCallback(async (postId: string) => {
+    try {
+      const result = await deletePost(postId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(result.message);
+        // Update local state
+        setPosts((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id === postId) {
+              return { ...post, status: "deleted" };
+            }
+            return post;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast.error("Failed to delete post");
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -73,12 +204,12 @@ export default function ManagePostsPage() {
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative w-full">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full md:w-auto md:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search posts..."
-            className="pl-9 shadow-none h-10 "
+            className="pl-9 shadow-none h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -106,15 +237,17 @@ export default function ManagePostsPage() {
           </SelectContent>
         </Select>
         <Select
-          value={filters.situation}
-          onValueChange={(value) => handleFilterChange("situation", value)}
+          value={filters.status}
+          onValueChange={(value) => handleFilterChange("status", value)}
         >
           <SelectTrigger className="w-[150px] h-10 shadow-none cursor-pointer">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="posted">Posted</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="hidden">Hidden</SelectItem>
             <SelectItem value="deleted">Deleted</SelectItem>
           </SelectContent>
@@ -146,12 +279,12 @@ export default function ManagePostsPage() {
               />
             </Badge>
           )}
-          {filters.situation !== "all" && (
+          {filters.status !== "all" && (
             <Badge variant="secondary" className="text-xs">
-              Status: {filters.situation}
+              Status: {filters.status}
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
-                onClick={() => handleFilterChange("situation", "all")}
+                onClick={() => handleFilterChange("status", "all")}
               />
             </Badge>
           )}
@@ -183,7 +316,16 @@ export default function ManagePostsPage() {
         </div>
       )}
 
-      <PostManagementTable searchTerm={searchTerm} filters={filters} />
+      <PostManagementTable
+        searchTerm={searchTerm}
+        filters={filters}
+        posts={posts}
+        loading={loading}
+        onApprovePost={handleApprovePost}
+        onRejectPost={handleRejectPost}
+        onToggleVisibility={handleToggleVisibility}
+        onDeletePost={handleDeletePost}
+      />
     </div>
   );
 }

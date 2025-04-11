@@ -310,16 +310,19 @@ export function Notification({ searchTerm }: NotificationProps) {
   // Filter notifications based on search
   const filteredNotifications = (
     Object.keys(notificationData) as (keyof typeof notificationData)[]
-  ).reduce((acc, key) => {
-    acc[key] = notificationData[key].filter(
-      (notification) =>
-        notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        notification.description
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())
-    );
-    return acc;
-  }, {} as typeof notificationData);
+  ).reduce(
+    (acc, key) => {
+      acc[key] = notificationData[key].filter(
+        (notification) =>
+          notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          notification.description
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+      );
+      return acc;
+    },
+    {} as typeof notificationData
+  );
 
   // Count unread notifications by category
   const unreadCounts = {

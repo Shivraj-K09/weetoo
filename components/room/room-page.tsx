@@ -4,7 +4,7 @@ import { TradingMarketPlace } from "@/components/room/trading-market-place";
 import { TradingTabs } from "@/components/room/trading-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, VideoIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -536,8 +536,8 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
                     ? Number(data.c) > Number(prev.currentPrice)
                       ? "up"
                       : Number(data.c) < Number(prev.currentPrice)
-                      ? "down"
-                      : prev.priceDirection
+                        ? "down"
+                        : prev.priceDirection
                     : prev.priceDirection,
                 priceChange: data.p
                   ? Number.parseFloat(data.p)
@@ -780,22 +780,22 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = `
-      {
-        "autosize": true,
-        "symbol": "${symbol}",
-        "interval": "D",
-        "timezone": "Asia/Seoul",
-        "theme": "dark",
-        "style": "1",
-        "locale": "kr",
-        "withdateranges": true,
-        "hide_side_toolbar": false,
-        "backgroundColor": "rgba(33, 38, 49, 1)",
-        "gridColor": "rgba(33, 38, 49, 1)",
-        "allow_symbol_change": true,
-        "calendar": false,
-        "support_host": "https://www.tradingview.com"
-      }`;
+        {
+          "autosize": true,
+          "symbol": "${symbol}",
+          "interval": "D",
+          "timezone": "Asia/Seoul",
+          "theme": "dark",
+          "style": "1",
+          "locale": "kr",
+          "withdateranges": true,
+          "hide_side_toolbar": false,
+          "backgroundColor": "rgba(33, 38, 49, 1)",
+          "gridColor": "rgba(33, 38, 49, 1)",
+          "allow_symbol_change": true,
+          "calendar": false,
+          "support_host": "https://www.tradingview.com"
+        }`;
 
     container.current.appendChild(script);
 
@@ -833,6 +833,12 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
   // Get room name initial for avatar
   const getRoomInitial = (name: string) => {
     return name ? name.charAt(0).toUpperCase() : "R";
+  };
+
+  const handleStartStreaming = () => {
+    toast.success("Streaming started successfully");
+    // Here you would implement the actual streaming functionality
+    // This could involve WebRTC, socket connections, or other streaming technologies
   };
 
   // Add this function before the return statement
@@ -1100,8 +1106,23 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
                   </div>
                 </div>
 
+                {/* Start Streaming Button - Only visible to room owner */}
+                {user && user.id === roomDetails.owner_id && (
+                  <div className="ml-auto flex items-center mr-4">
+                    <Button
+                      className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 px-4 py-2"
+                      onClick={handleStartStreaming}
+                    >
+                      <VideoIcon className="h-5 w-5" />
+                      Start Broadcasting
+                    </Button>
+                  </div>
+                )}
+
                 {/* Donate KOR Coin */}
-                <div className="ml-auto flex items-center">
+                <div
+                  className={`flex items-center ${!(user && user.id === roomDetails.owner_id) ? "ml-auto" : ""}`}
+                >
                   <div className="flex flex-col items-end mr-3">
                     <div className="text-lg font-bold">Donate Kor coin</div>
                     <div className="text-yellow-500 font-medium">

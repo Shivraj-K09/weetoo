@@ -20,9 +20,10 @@ import { supabase } from "@/lib/supabase/client";
 import bcrypt from "bcryptjs";
 import { EyeIcon, EyeOffIcon, GlobeIcon, LockIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Avatar } from "./ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
 
 type Privacy = "private" | "public";
 
@@ -60,7 +61,7 @@ interface User {
 }
 
 export function TradingRooms() {
-  // const router = useRouter();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -258,55 +259,86 @@ export function TradingRooms() {
       return;
     }
 
-    // Comment out the KOR_COIN check for testing
-    // if (user.kor_coins < 1000) {
-    //   toast.error("You need at least 1,000 KOR_COIN to create a room")
-    //   return
-    // }
+    // Disable form submission while processing
+    const submitButton = e.currentTarget.querySelector(
+      'button[type="submit"]'
+    ) as HTMLButtonElement;
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
 
     try {
+      // Show loading toast
+      const loadingToast = toast.loading("Creating room...");
+
       // Hash password if room is private
       let hashedPassword = null;
       if (formData.privacy === "private" && formData.password) {
         hashedPassword = await bcrypt.hash(formData.password, 10);
       }
 
-      // Insert room into Supabase
-      const { data: roomData, error: roomError } = await supabase
-        .from("trading_rooms")
-        .insert({
-          room_name: formData.title,
-          room_type: formData.privacy,
-          room_password: hashedPassword,
-          trading_pairs: [formData.symbol],
-          owner_id: user.id,
-          participants: [user.id],
-          current_participants: 1,
-        })
-        .select("id")
-        .single();
+      // Prepare room data
+      const roomData = {
+        room_name: formData.title,
+        room_type: formData.privacy,
+        room_password: hashedPassword,
+        trading_pairs: [formData.symbol],
+        owner_id: user.id,
+        participants: [user.id],
+        current_participants: 1,
+        max_participants: 50, // Add a default value for max_participants
+      };
 
-      if (roomError) {
-        console.error("Error creating room:", roomError);
-        toast.error("Failed to create room");
-        return;
+      // Insert room into Supabase with retry logic
+      let retryCount = 0;
+      let roomResult = null;
+
+      while (retryCount < 3 && !roomResult) {
+        try {
+          const { data, error } = await supabase
+            .from("trading_rooms")
+            .insert(roomData)
+            .select("id")
+            .single();
+
+          if (error) {
+            console.error(
+              `Error creating room (attempt ${retryCount + 1}):`,
+              error
+            );
+            retryCount++;
+
+            if (retryCount < 3) {
+              // Wait before retrying
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            } else {
+              throw error;
+            }
+          } else {
+            roomResult = data;
+            break;
+          }
+        } catch (insertError) {
+          console.error(
+            `Exception during room creation (attempt ${retryCount + 1}):`,
+            insertError
+          );
+          retryCount++;
+
+          if (retryCount < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          } else {
+            throw insertError;
+          }
+        }
       }
 
-      // Comment out the KOR_COIN deduction for testing
-      // const { error: updateError } = await supabase
-      //   .from("users")
-      //   .update({ kor_coins: user.kor_coins - 1000 })
-      //   .eq("id", user.id)
+      if (!roomResult) {
+        throw new Error("Failed to create room after multiple attempts");
+      }
 
-      // if (updateError) {
-      //   console.error("Error updating user KOR_COIN:", updateError)
-      // }
-
-      // // Update local user state
-      // setUser({
-      //   ...user,
-      //   kor_coins: user.kor_coins - 1000,
-      // })
+      // Close the loading toast
+      toast.dismiss(loadingToast);
 
       // Close the popover
       setOpen(false);
@@ -321,105 +353,141 @@ export function TradingRooms() {
       setShowPassword(false);
 
       // Generate room slug
-      const roomSlug = `${roomData.id}-${formData.title
+      const roomSlug = `${roomResult.id}-${formData.title
         .toLowerCase()
         .replace(/\s+/g, "-")
         .replace(/[^\w-]+/g, "")}`;
 
-      // Open room in new window with absolute URL
       window.open(
         `${window.location.origin}/rooms/${roomSlug}`,
         "_blank",
         "width=1600,height=900"
       );
 
+      // Show success toast
       toast.success("Room created successfully");
     } catch (error) {
       console.error("Error in room creation:", error);
       toast.error("An error occurred while creating the room");
+    } finally {
+      // Re-enable the submit button
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
     }
   };
 
-  const handleRoomClick = async (room: Room) => {
-    try {
-      // If room is private, check if user is the owner or already a participant
-      if (room.privacy === "private" && user) {
-        const { data, error } = await supabase
-          .from("trading_rooms")
-          .select("owner_id, participants")
-          .eq("id", room.id)
-          .single();
+  const handleRoomClick = useCallback(
+    async (room: Room) => {
+      try {
+        // Show loading toast
+        const loadingToast = toast.loading("Accessing room...");
 
-        if (error) {
-          console.error("Error checking room access:", error);
-          toast.error("Failed to access room");
-          return;
-        }
-
-        const isOwner = data.owner_id === user.id;
-        const isParticipant = data.participants.includes(user.id);
-
-        if (!isOwner && !isParticipant) {
-          // Prompt for password
-          const password = prompt(
-            "This is a private room. Please enter the password:"
-          );
-          if (!password) return;
-
-          // Verify password
-          const { data: roomData, error: roomError } = await supabase
+        // If room is private, check if user is the owner or already a participant
+        if (room.privacy === "private" && user) {
+          const { data, error } = await supabase
             .from("trading_rooms")
-            .select("room_password")
+            .select("owner_id, participants")
             .eq("id", room.id)
             .single();
 
-          if (roomError) {
-            console.error("Error fetching room password:", roomError);
-            toast.error("Failed to verify password");
+          if (error) {
+            console.error("Error checking room access:", error);
+            toast.dismiss(loadingToast);
+            toast.error("Failed to access room");
             return;
           }
 
-          const isPasswordCorrect = await bcrypt.compare(
-            password,
-            roomData.room_password
-          );
-          if (!isPasswordCorrect) {
-            toast.error("Incorrect password");
-            return;
-          }
+          const isOwner = data.owner_id === user.id;
+          const isParticipant = data.participants.includes(user.id);
 
-          // Add user to participants
-          const { error: updateError } = await supabase
-            .from("trading_rooms")
-            .update({
-              participants: [...data.participants, user.id],
-              current_participants: data.participants.length + 1,
-            })
-            .eq("id", room.id);
+          if (!isOwner && !isParticipant) {
+            // Dismiss loading toast before showing prompt
+            toast.dismiss(loadingToast);
 
-          if (updateError) {
-            console.error("Error updating participants:", updateError);
+            // Prompt for password
+            const password = prompt(
+              "This is a private room. Please enter the password:"
+            );
+            if (!password) return;
+
+            // Show loading toast again
+            const verifyingToast = toast.loading("Verifying password...");
+
+            // Verify password
+            try {
+              const { data: roomData, error: roomError } = await supabase
+                .from("trading_rooms")
+                .select("room_password")
+                .eq("id", room.id)
+                .single();
+
+              if (roomError) {
+                console.error("Error fetching room password:", roomError);
+                toast.dismiss(verifyingToast);
+                toast.error("Failed to verify password");
+                return;
+              }
+
+              const isPasswordCorrect = await bcrypt.compare(
+                password,
+                roomData.room_password
+              );
+              if (!isPasswordCorrect) {
+                toast.dismiss(verifyingToast);
+                toast.error("Incorrect password");
+                return;
+              }
+
+              // Add user to participants
+              const { error: updateError } = await supabase
+                .from("trading_rooms")
+                .update({
+                  participants: [...data.participants, user.id],
+                  current_participants: data.participants.length + 1,
+                })
+                .eq("id", room.id);
+
+              if (updateError) {
+                console.error("Error updating participants:", updateError);
+                // Continue anyway, as this is not critical
+              }
+
+              toast.dismiss(verifyingToast);
+            } catch (verifyError) {
+              console.error("Error during password verification:", verifyError);
+              toast.dismiss(verifyingToast);
+              toast.error("Failed to verify password");
+              return;
+            }
+          } else {
+            // User is already a participant or owner, dismiss loading toast
+            toast.dismiss(loadingToast);
           }
+        } else {
+          // Public room, dismiss loading toast
+          toast.dismiss(loadingToast);
         }
+
+        // Navigate to room
+        const roomSlug = `${room.id}-${room.title
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^\w-]+/g, "")}`;
+
+        // Use router.push
+        window.open(
+          `${window.location.origin}/rooms/${roomSlug}`,
+          "_blank",
+          "width=1600,height=900"
+        );
+      } catch (error) {
+        console.error("Error accessing room:", error);
+        toast.error("Failed to access room");
       }
-
-      // Navigate to room
-      const roomSlug = `${room.id}-${room.title
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^\w-]+/g, "")}`;
-
-      // Open room in new window with absolute URL
-      window.open(
-        `${window.location.origin}/rooms/${roomSlug}`,
-        "_blank",
-        "width=1600,height=900"
-      );
-    } catch (error) {
-      console.error("Error accessing room:", error);
-      toast.error("Failed to access room");
-    }
-  };
+    },
+    [router, supabase, user]
+  );
 
   // Format time difference
   const formatTimeDiff = (date: Date) => {
@@ -559,8 +627,11 @@ export function TradingRooms() {
                   <Button
                     type="submit"
                     className="w-full bg-[#E74C3C] mt-2 hover:bg-[#E74C3C]/90 text-white font-medium rounded shadow-none h-12 cursor-pointer"
+                    disabled={formData.title.trim() === ""}
                   >
-                    1,000 KOR_COIN
+                    {formData.title.trim() === ""
+                      ? "Enter Room Title"
+                      : "1,000 KOR_COIN"}
                   </Button>
 
                   {/* {user.kor_coins < 1000 && (
@@ -693,8 +764,8 @@ export function TradingRooms() {
                         index === 1
                           ? "bg-blue-200"
                           : index === 2
-                          ? "bg-gray-200"
-                          : "bg-gray-200"
+                            ? "bg-gray-200"
+                            : "bg-gray-200"
                       }`}
                     />
                     <div className="w-6 h-2 bg-gray-200 rounded animate-pulse mt-1" />

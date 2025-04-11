@@ -1,242 +1,284 @@
 "use client";
 
+import { AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
+import { Separator } from "@/components/ui/separator";
+
+import { Input } from "@/components/ui/input";
+
+import { Label } from "@/components/ui/label";
+
+import { DialogDescription } from "@/components/ui/dialog";
+
+import { DialogTrigger } from "@/components/ui/dialog";
+
+import { useState, memo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import {
-  Calendar,
-  User,
-  Tag,
-  Eye,
-  MessageSquare,
-  ThumbsUp,
-} from "lucide-react";
-import type { Post } from "./post-management-table";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import type { Post } from "@/types";
+import { supabase } from "@/lib/supabase/client";
+import { logPostAction } from "@/lib/service/activity-logger-client";
 
 interface PostDetailsDialogProps {
   post: Post;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onApprove?: (postId: string) => Promise<void>;
+  onReject?: (postId: string) => Promise<void>;
 }
 
-export function PostDetailsDialog({
-  post,
-  open,
-  onOpenChange,
-}: PostDetailsDialogProps) {
-  // Format date to a readable format
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
+export const PostDetailsDialog = memo(
+  ({ post, onApprove, onReject }: PostDetailsDialogProps) => {
+    const [open, setOpen] = useState(false);
+    const [isApproving, setIsApproving] = useState(false);
+    const [isRejecting, setIsRejecting] = useState(false);
+    const [rejectReason, setRejectReason] = useState("");
+    const [, setRejectConfirmOpen] = useState(false);
 
-  // Get initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .toUpperCase();
-  };
+    // Add state to track current user ID
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Format category name
-  const formatCategory = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1);
-  };
+    // Add useEffect to fetch current user ID
+    useEffect(() => {
+      const fetchCurrentUser = async () => {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          setCurrentUserId(data.user.id);
+        }
+      };
 
-  // Get status badge
-  const getStatusBadge = (situation: string) => {
-    if (situation === "posted") {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-green-50 text-green-700 dark:bg-green-900/20"
-        >
-          Posted
-        </Badge>
-      );
-    } else if (situation === "hidden") {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
-        >
-          Hidden
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-red-50 text-red-700 dark:bg-red-900/20"
-        >
-          Deleted
-        </Badge>
-      );
-    }
-  };
+      fetchCurrentUser();
+    }, []);
 
-  // Mock post content
-  const postContent = `
-    <h2>Introduction</h2>
-    <p>The cryptocurrency market has seen significant changes in 2024. This article explores the key trends that are shaping the market this year.</p>
-    
-    <h2>Market Capitalization Growth</h2>
-    <p>Total market capitalization has increased by 25% since January, with major cryptocurrencies leading the charge.</p>
-    
-    <h2>Institutional Adoption</h2>
-    <p>More financial institutions are entering the cryptocurrency space, providing legitimacy and stability to the market.</p>
-    
-    <h2>Regulatory Developments</h2>
-    <p>New regulations are being implemented globally, creating a more structured environment for cryptocurrency trading.</p>
-    
-    <h2>Technological Innovations</h2>
-    <p>Advancements in blockchain technology continue to drive the evolution of cryptocurrencies and their applications.</p>
-    
-    <h2>Conclusion</h2>
-    <p>Understanding these trends is essential for anyone involved in cryptocurrency investments or trading in 2024.</p>
-  `;
+    const handleApprove = async () => {
+      if (!onApprove) return;
+      setIsApproving(true);
+      try {
+        await onApprove(post.id);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="sticky top-0 z-10 pb-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            Post Details
-            {getStatusBadge(post.situation)}
-          </DialogTitle>
-          <DialogDescription>
-            Post ID: <span className="font-mono">{post.id}</span>
-          </DialogDescription>
-        </DialogHeader>
+        // Log the activity after successful approval
+        if (currentUserId) {
+          await logPostAction(
+            "post_approve",
+            currentUserId,
+            post.id,
+            post.title
+          );
+        }
 
-        <div className="space-y-6 py-4 flex-1 overflow-y-auto">
-          {/* Post Title */}
-          <div>
-            <h2 className="text-xl font-semibold">{post.title}</h2>
-          </div>
+        setOpen(false);
+      } finally {
+        setIsApproving(false);
+      }
+    };
 
-          {/* Author Information */}
-          <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12">
-              <AvatarImage src={post.author.avatar} alt={post.author.name} />
-              <AvatarFallback>{getInitials(post.author.name)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="text-lg font-medium">{post.author.name}</h3>
-              <p className="text-sm text-muted-foreground">Author</p>
-            </div>
-          </div>
+    const handleRejectConfirm = async () => {
+      if (!onReject) return;
+      setIsRejecting(true);
+      try {
+        await onReject(post.id);
 
-          <Separator />
+        // Log the activity after successful rejection
+        if (currentUserId) {
+          await logPostAction(
+            "post_reject",
+            currentUserId,
+            post.id,
+            post.title
+          );
+        }
 
-          {/* Post Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-start gap-2">
-              <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Publication Date</p>
-                <p>{formatDate(post.date)}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Tag className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Category</p>
-                <p>{formatCategory(post.category)}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Eye className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Views</p>
-                <p>{post.views.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <MessageSquare className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Comments</p>
-                <p>{post.comments.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <ThumbsUp className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Likes</p>
-                <p>{post.likes.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Status</p>
-                <p className="capitalize">{post.situation}</p>
-              </div>
-            </div>
-          </div>
+        setRejectConfirmOpen(false);
+        setOpen(false);
+      } finally {
+        setIsRejecting(false);
+      }
+    };
 
-          <Separator />
-
-          {/* Post Content */}
-          <div>
-            <h4 className="text-sm font-semibold mb-3">Post Content</h4>
-            <div
-              className="prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: postContent }}
-            />
-          </div>
-
-          {/* Post Metadata */}
-          <div>
-            <h4 className="text-sm font-semibold mb-3">Metadata</h4>
-            <div className="bg-muted/50 p-4 rounded-md">
-              <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                <span className="text-sm font-medium">SEO Title</span>
-                <span className="text-sm">{post.title}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                <span className="text-sm font-medium">SEO Description</span>
-                <span className="text-sm">
-                  Explore the latest cryptocurrency market trends in 2024 and
-                  understand how they impact your investments.
-                </span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-sm font-medium">Tags</span>
-                <span className="text-sm">
-                  cryptocurrency, market trends, 2024, investing, blockchain
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="sticky bottom-0 z-10 bg-background pt-4 border-t mt-auto">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="h-10 cursor-pointer shadow-none"
-          >
-            Close
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            View Details
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Post Details</DialogTitle>
+            <DialogDescription>
+              View all the details of this post.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
+              <Input
+                type="text"
+                id="title"
+                value={post.title}
+                className="col-span-3"
+                disabled
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="slug" className="text-right">
+                Slug
+              </Label>
+              <Input
+                type="text"
+                id="slug"
+                value={"slug" in post ? String(post.slug) : post.id}
+                className="col-span-3"
+                disabled
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <div className="col-span-3">
+                <Badge
+                  variant={
+                    post.status === "pending"
+                      ? "secondary"
+                      : post.status === "approved"
+                        ? "default"
+                        : "destructive"
+                  }
+                >
+                  {post.status}
+                </Badge>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="createdAt" className="text-right">
+                Created At
+              </Label>
+              <Input
+                type="text"
+                id="createdAt"
+                value={format(new Date(post.created_at), "PPP p")}
+                className="col-span-3"
+                disabled
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="updatedAt" className="text-right">
+                Updated At
+              </Label>
+              <Input
+                type="text"
+                id="updatedAt"
+                value={format(new Date(post.updated_at), "PPP p")}
+                className="col-span-3"
+                disabled
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="content" className="text-right">
+                Content
+              </Label>
+              <Input
+                type="text"
+                id="content"
+                value={post.content}
+                className="col-span-3"
+                disabled
+              />
+            </div>
+          </div>
+          <Separator />
+          <div className="flex justify-between">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setOpen(false)}
+            >
+              Close
+            </Button>
+            {post.status === "pending" ? (
+              <div className="flex gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setRejectConfirmOpen(true)}
+                      disabled={isRejecting}
+                    >
+                      Reject
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Are you absolutely sure?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently
+                        reject the post.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="reason" className="text-right">
+                          Reason
+                        </Label>
+                        <Input
+                          type="text"
+                          id="reason"
+                          placeholder="Reason for rejection"
+                          className="col-span-3"
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel
+                        onClick={() => setRejectConfirmOpen(false)}
+                      >
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleRejectConfirm}
+                        disabled={isRejecting}
+                      >
+                        Reject
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={isApproving}
+                >
+                  Approve
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+);
+
+PostDetailsDialog.displayName = "PostDetailsDialog";

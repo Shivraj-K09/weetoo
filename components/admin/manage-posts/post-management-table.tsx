@@ -15,9 +15,10 @@ import {
   ArrowUpDown,
   MoreHorizontal,
   Eye,
-  Edit,
   Trash2,
   AlertTriangle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -45,200 +46,68 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { DateRange } from "react-day-picker";
+import { formatDistanceToNow, format } from "date-fns";
 import { PostDetailsDialog } from "./post-details-dialog";
-import { EditPostDialog } from "./edit-post-dialog";
 import { DeletePostDialog } from "./delete-post-dialog";
-
-// Sample post data
-const postData = [
-  {
-    id: "POST-24060501",
-    title: "Understanding Cryptocurrency Market Trends in 2024",
-    author: {
-      name: "Kim Min-ji",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "cryptocurrency",
-    situation: "posted",
-    views: 1250,
-    comments: 45,
-    likes: 87,
-    date: "2024-06-30T09:15:00",
-  },
-  {
-    id: "POST-24060502",
-    title: "Top 10 Trading Strategies for Beginners",
-    author: {
-      name: "Park Ji-sung",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "trading",
-    situation: "posted",
-    views: 980,
-    comments: 32,
-    likes: 65,
-    date: "2024-06-29T14:22:00",
-  },
-  {
-    id: "POST-24060503",
-    title: "How to Diversify Your Investment Portfolio",
-    author: {
-      name: "Lee Soo-jin",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "investment",
-    situation: "hidden",
-    views: 750,
-    comments: 28,
-    likes: 42,
-    date: "2024-06-29T11:05:00",
-  },
-  {
-    id: "POST-24060504",
-    title: "Blockchain Technology: Beyond Cryptocurrencies",
-    author: {
-      name: "Choi Woo-shik",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "technology",
-    situation: "posted",
-    views: 1120,
-    comments: 38,
-    likes: 76,
-    date: "2024-06-28T16:48:00",
-  },
-  {
-    id: "POST-24060505",
-    title: "Breaking: Major Exchange Announces New Token Listing",
-    author: {
-      name: "Kang Hye-jung",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "news",
-    situation: "deleted",
-    views: 1500,
-    comments: 52,
-    likes: 95,
-    date: "2024-06-28T10:30:00",
-  },
-  {
-    id: "POST-24060506",
-    title: "Technical Analysis: Bitcoin Price Prediction",
-    author: {
-      name: "Jung Ho-yeon",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "analysis",
-    situation: "posted",
-    views: 1350,
-    comments: 48,
-    likes: 82,
-    date: "2024-06-27T15:40:00",
-  },
-  {
-    id: "POST-24060507",
-    title: "Step-by-Step Guide to Setting Up a Crypto Wallet",
-    author: {
-      name: "Bae Suzy",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "tutorial",
-    situation: "posted",
-    views: 890,
-    comments: 35,
-    likes: 68,
-    date: "2024-06-27T13:25:00",
-  },
-  {
-    id: "POST-24060508",
-    title: "The Impact of Regulations on Cryptocurrency Markets",
-    author: {
-      name: "Gong Yoo",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "cryptocurrency",
-    situation: "hidden",
-    views: 780,
-    comments: 30,
-    likes: 55,
-    date: "2024-06-26T10:15:00",
-  },
-  {
-    id: "POST-24060509",
-    title: "Risk Management in Volatile Markets",
-    author: {
-      name: "Son Ye-jin",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "trading",
-    situation: "posted",
-    views: 950,
-    comments: 40,
-    likes: 72,
-    date: "2024-06-25T16:20:00",
-  },
-  {
-    id: "POST-24060510",
-    title: "Long-term vs Short-term Investment Strategies",
-    author: {
-      name: "Hyun Bin",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    category: "investment",
-    situation: "posted",
-    views: 1050,
-    comments: 42,
-    likes: 78,
-    date: "2024-06-25T11:45:00",
-  },
-];
-
-export type Post = (typeof postData)[0];
+import type { Post } from "@/types";
+import { supabase } from "@/lib/supabase/client";
+import { logPostAction } from "@/lib/service/activity-logger-client";
 
 interface PostManagementTableProps {
   searchTerm: string;
   filters: {
     category: string;
-    situation: string;
+    status: string;
     dateRange: DateRange;
   };
+  posts: Post[];
+  loading: boolean;
+  onApprovePost: (postId: string) => Promise<void>;
+  onRejectPost: (postId: string) => Promise<void>;
+  onToggleVisibility: (postId: string, currentStatus: string) => Promise<void>;
+  onDeletePost: (postId: string) => Promise<void>;
 }
 
 export function PostManagementTable({
   searchTerm,
   filters,
+  posts,
+  loading,
+  onApprovePost,
+  onRejectPost,
+  onToggleVisibility,
+  onDeletePost,
 }: PostManagementTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "date", desc: true },
+    { id: "created_at", desc: true },
   ]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pageSize, setPageSize] = useState(10);
-  const [posts, setPosts] = useState(postData);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Fetch current user ID for activity logging
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Format date to a readable format
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date);
-  }, []);
-
-  // Format time to a readable format
-  const formatTime = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
+    return format(date, "MMM d, yyyy");
   }, []);
 
   // Get initials from name
   const getInitials = useCallback((name: string) => {
+    if (!name) return "?";
     return name
       .split(" ")
       .map((part) => part.charAt(0))
@@ -248,49 +117,151 @@ export function PostManagementTable({
 
   // Format category name
   const formatCategory = useCallback((category: string) => {
+    if (!category) return "";
     return category.charAt(0).toUpperCase() + category.slice(1);
   }, []);
 
-  // Handle post visibility toggle
-  const togglePostVisibility = useCallback((postId: string) => {
-    setPosts((currentPosts) =>
-      currentPosts.map((post) => {
-        if (post.id === postId) {
-          const newSituation =
-            post.situation === "posted" ? "hidden" : "posted";
-          return { ...post, situation: newSituation };
-        }
-        return post;
-      })
-    );
-  }, []);
+  // Handle approve with activity logging
+  const handleApprovePost = useCallback(
+    async (postId: string) => {
+      try {
+        await onApprovePost(postId);
 
-  // Handle post deletion
-  const handleDeletePost = useCallback((postId: string) => {
-    setPosts((currentPosts) =>
-      currentPosts.map((post) => {
-        if (post.id === postId) {
-          return { ...post, situation: "deleted" };
+        // Find the post to get its title for logging
+        const post = posts.find((p) => p.id === postId);
+        if (post && currentUserId) {
+          await logPostAction(
+            "post_approve",
+            currentUserId,
+            postId,
+            post.title
+          );
         }
-        return post;
-      })
-    );
-    setDeleteDialogOpen(false);
-  }, []);
+      } catch (error) {
+        console.error("Error approving post:", error);
+      }
+    },
+    [posts, currentUserId, onApprovePost]
+  );
 
-  // Handle post update
-  const handleUpdatePost = useCallback((updatedPost: Post) => {
-    setPosts((currentPosts) =>
-      currentPosts.map((post) => {
-        if (post.id === updatedPost.id) {
-          return updatedPost;
+  // Handle reject with activity logging
+  const handleRejectPost = useCallback(
+    async (postId: string) => {
+      try {
+        await onRejectPost(postId);
+
+        // Find the post to get its title for logging
+        const post = posts.find((p) => p.id === postId);
+        if (post && currentUserId) {
+          await logPostAction("post_reject", currentUserId, postId, post.title);
         }
-        return post;
-      })
-    );
-    setEditDialogOpen(false);
-  }, []);
+      } catch (error) {
+        console.error("Error rejecting post:", error);
+      }
+    },
+    [posts, currentUserId, onRejectPost]
+  );
 
+  // Handle toggle visibility with activity logging
+  const handleToggleVisibility = useCallback(
+    async (postId: string, currentStatus: string) => {
+      try {
+        await onToggleVisibility(postId, currentStatus);
+
+        // Find the post to get its title for logging
+        const post = posts.find((p) => p.id === postId);
+        if (post && currentUserId) {
+          // Log the appropriate action based on current status
+          const action =
+            currentStatus === "approved" ? "post_hide" : "post_show";
+          await logPostAction(action, currentUserId, postId, post.title);
+        }
+      } catch (error) {
+        console.error("Error toggling post visibility:", error);
+      }
+    },
+    [posts, currentUserId, onToggleVisibility]
+  );
+
+  // Add this function after the handleToggleVisibility function
+  const handleDeletePost = useCallback(
+    async (postId: string) => {
+      try {
+        // Find the post to get its title for logging
+        const post = posts.find((p) => p.id === postId);
+        if (!post) return;
+
+        // Call the onDeletePost function
+        await onDeletePost(postId);
+
+        // Log is already handled in the DeletePostDialog component
+
+        // Close the dialog if it's open
+        setDeleteDialogOpen(false);
+        setSelectedPost(null);
+      } catch (error) {
+        console.error("Error deleting post:", error);
+      }
+    },
+    [posts, onDeletePost]
+  );
+
+  // Filter data based on search term and filters - memoized to prevent recalculation
+  const filteredData = useMemo(() => {
+    return posts.filter((post) => {
+      // Search term filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const authorName = post.user
+          ? `${post.user.first_name || ""} ${post.user.last_name || ""}`
+              .trim()
+              .toLowerCase()
+          : "";
+
+        const matchesSearch =
+          post.title.toLowerCase().includes(searchLower) ||
+          authorName.includes(searchLower) ||
+          post.category.toLowerCase().includes(searchLower);
+
+        if (!matchesSearch) return false;
+      }
+
+      // Category filter
+      if (filters.category !== "all" && post.category !== filters.category) {
+        return false;
+      }
+
+      // Status filter
+      if (filters.status !== "all" && post.status !== filters.status) {
+        return false;
+      }
+
+      // Date range filter
+      if (filters.dateRange.from) {
+        const postDate = new Date(post.created_at);
+        const startOfDay = new Date(filters.dateRange.from);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        if (postDate < startOfDay) {
+          return false;
+        }
+      }
+
+      if (filters.dateRange.to) {
+        const postDate = new Date(post.created_at);
+        const endOfDay = new Date(filters.dateRange.to);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        if (postDate > endOfDay) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [posts, searchTerm, filters]);
+
+  // Memoize columns to prevent unnecessary re-renders
   const columns = useMemo<ColumnDef<Post>[]>(
     () => [
       {
@@ -316,7 +287,7 @@ export function PostManagementTable({
         ),
       },
       {
-        accessorKey: "author",
+        accessorKey: "user",
         header: ({ column }) => {
           return (
             <Button
@@ -332,24 +303,40 @@ export function PostManagementTable({
           );
         },
         cell: ({ row }) => {
-          const author = row.getValue("author") as {
-            name: string;
-            avatar: string;
+          const user = row.getValue("user") as {
+            first_name: string;
+            last_name: string;
+            avatar_url: string;
           };
+          const name = user
+            ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
+            : "Anonymous";
           return (
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={author.avatar} alt={author.name} />
-                <AvatarFallback>{getInitials(author.name)}</AvatarFallback>
+                <AvatarImage src={user?.avatar_url || ""} alt={name} />
+                <AvatarFallback>{getInitials(name)}</AvatarFallback>
               </Avatar>
-              <div className="font-medium">{author.name}</div>
+              <div className="font-medium">{name}</div>
             </div>
           );
         },
         sortingFn: (rowA, rowB) => {
-          const authorA = rowA.getValue("author") as { name: string };
-          const authorB = rowB.getValue("author") as { name: string };
-          return authorA.name.localeCompare(authorB.name);
+          const userA = rowA.getValue("user") as {
+            first_name: string;
+            last_name: string;
+          };
+          const userB = rowB.getValue("user") as {
+            first_name: string;
+            last_name: string;
+          };
+          const nameA = userA
+            ? `${userA.first_name || ""} ${userA.last_name || ""}`.trim()
+            : "";
+          const nameB = userB
+            ? `${userB.first_name || ""} ${userB.last_name || ""}`.trim()
+            : "";
+          return nameA.localeCompare(nameB);
         },
       },
       {
@@ -373,7 +360,7 @@ export function PostManagementTable({
         ),
       },
       {
-        accessorKey: "situation",
+        accessorKey: "status",
         header: ({ column }) => {
           return (
             <Button
@@ -389,26 +376,42 @@ export function PostManagementTable({
           );
         },
         cell: ({ row }) => {
-          const situation = row.getValue("situation") as string;
+          const status = row.getValue("status") as string;
           return (
             <>
-              {situation === "posted" && (
+              {status === "approved" && (
                 <Badge
                   variant="outline"
                   className="bg-green-50 text-green-700 dark:bg-green-900/20"
                 >
-                  Posted
+                  Approved
                 </Badge>
               )}
-              {situation === "hidden" && (
+              {status === "pending" && (
                 <Badge
                   variant="outline"
                   className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
                 >
+                  Pending
+                </Badge>
+              )}
+              {status === "rejected" && (
+                <Badge
+                  variant="outline"
+                  className="bg-red-50 text-red-700 dark:bg-red-900/20"
+                >
+                  Rejected
+                </Badge>
+              )}
+              {status === "hidden" && (
+                <Badge
+                  variant="outline"
+                  className="bg-slate-50 text-slate-700 dark:bg-slate-900/20"
+                >
                   Hidden
                 </Badge>
               )}
-              {situation === "deleted" && (
+              {status === "deleted" && (
                 <Badge
                   variant="outline"
                   className="bg-red-50 text-red-700 dark:bg-red-900/20"
@@ -421,7 +424,7 @@ export function PostManagementTable({
         },
       },
       {
-        accessorKey: "views",
+        accessorKey: "view_count",
         header: ({ column }) => {
           return (
             <Button
@@ -437,51 +440,11 @@ export function PostManagementTable({
           );
         },
         cell: ({ row }) => (
-          <div className="text-right">{row.getValue("views")}</div>
+          <div className="text-center">{row.getValue("view_count") || 0}</div>
         ),
       },
       {
-        accessorKey: "comments",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                column.toggleSorting(column.getIsSorted() === "asc")
-              }
-              className="p-0 hover:bg-transparent"
-            >
-              Comments
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
-        cell: ({ row }) => (
-          <div className="text-right">{row.getValue("comments")}</div>
-        ),
-      },
-      {
-        accessorKey: "likes",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                column.toggleSorting(column.getIsSorted() === "asc")
-              }
-              className="p-0 hover:bg-transparent"
-            >
-              Likes
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          );
-        },
-        cell: ({ row }) => (
-          <div className="text-right">{row.getValue("likes")}</div>
-        ),
-      },
-      {
-        accessorKey: "date",
+        accessorKey: "created_at",
         header: ({ column }) => {
           return (
             <Button
@@ -497,12 +460,17 @@ export function PostManagementTable({
           );
         },
         cell: ({ row }) => {
-          const date = formatDate(row.getValue("date"));
-          const time = formatTime(row.getValue("date"));
+          const date = formatDate(row.getValue("created_at"));
+          const relativeTime = formatDistanceToNow(
+            new Date(row.getValue("created_at")),
+            { addSuffix: true }
+          );
           return (
             <div>
               <div>{date}</div>
-              <div className="text-xs text-muted-foreground">{time}</div>
+              <div className="text-xs text-muted-foreground">
+                {relativeTime}
+              </div>
             </div>
           );
         },
@@ -511,7 +479,11 @@ export function PostManagementTable({
         id: "actions",
         cell: ({ row }) => {
           const post = row.original;
-          const isDeleted = post.situation === "deleted";
+          const isDeleted = post.status === "deleted";
+          const isPending = post.status === "pending";
+          const isApproved = post.status === "approved";
+          // const isHidden = post.status === "hidden";
+          const isRejected = post.status === "rejected";
 
           return (
             <div className="flex justify-end">
@@ -536,45 +508,58 @@ export function PostManagementTable({
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
                   </DropdownMenuItem>
-                  {!isDeleted && (
+
+                  {isPending && (
                     <>
                       <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedPost(post);
-                          setEditDialogOpen(true);
-                        }}
-                        className="cursor-pointer"
+                        onClick={() => handleApprovePost(post.id)}
+                        className="cursor-pointer text-green-600"
                       >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Post
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Approve
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => togglePostVisibility(post.id)}
-                        className="cursor-pointer"
-                      >
-                        {post.situation === "posted" ? (
-                          <>
-                            <AlertTriangle className="mr-2 h-4 w-4" />
-                            Hide Post
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Show Post
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedPost(post);
-                          setDeleteDialogOpen(true);
-                        }}
+                        onClick={() => handleRejectPost(post.id)}
                         className="cursor-pointer text-red-600"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Post
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Reject
                       </DropdownMenuItem>
                     </>
+                  )}
+
+                  {!isDeleted && !isPending && !isRejected && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        handleToggleVisibility(post.id, post.status)
+                      }
+                      className="cursor-pointer"
+                    >
+                      {isApproved ? (
+                        <>
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          Hide Post
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Show Post
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  )}
+
+                  {!isDeleted && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedPost(post);
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="cursor-pointer text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Post
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -583,58 +568,17 @@ export function PostManagementTable({
         },
       },
     ],
-    [formatDate, formatTime, getInitials, formatCategory, togglePostVisibility]
+    [
+      formatDate,
+      formatCategory,
+      getInitials,
+      handleApprovePost,
+      handleRejectPost,
+      handleToggleVisibility,
+    ]
   );
 
-  // Filter data based on search term and filters
-  const filteredData = useMemo(() => {
-    return posts.filter((post) => {
-      // Search term filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch =
-          post.title.toLowerCase().includes(searchLower) ||
-          post.author.name.toLowerCase().includes(searchLower) ||
-          post.category.toLowerCase().includes(searchLower);
-
-        if (!matchesSearch) return false;
-      }
-
-      // Category filter
-      if (filters.category !== "all" && post.category !== filters.category) {
-        return false;
-      }
-
-      // Situation filter
-      if (filters.situation !== "all" && post.situation !== filters.situation) {
-        return false;
-      }
-
-      // Date range filter
-      if (filters.dateRange.from) {
-        const postDate = new Date(post.date);
-        const startOfDay = new Date(filters.dateRange.from);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        if (postDate < startOfDay) {
-          return false;
-        }
-      }
-
-      if (filters.dateRange.to) {
-        const postDate = new Date(post.date);
-        const endOfDay = new Date(filters.dateRange.to);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        if (postDate > endOfDay) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [searchTerm, filters, posts]);
-
+  // Create table instance with memoized data
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -659,14 +603,10 @@ export function PostManagementTable({
 
   // Clean up selected post when dialog closes
   useEffect(() => {
-    if (!detailsDialogOpen && !editDialogOpen && !deleteDialogOpen) {
-      // Use a timeout to prevent memory leaks
-      const timer = setTimeout(() => {
-        setSelectedPost(null);
-      }, 300);
-      return () => clearTimeout(timer);
+    if (!detailsDialogOpen && !deleteDialogOpen) {
+      setSelectedPost(null);
     }
-  }, [detailsDialogOpen, editDialogOpen, deleteDialogOpen]);
+  }, [detailsDialogOpen, deleteDialogOpen]);
 
   return (
     <>
@@ -691,7 +631,16 @@ export function PostManagementTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading posts...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -713,7 +662,7 @@ export function PostManagementTable({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  No results found.
                 </TableCell>
               </TableRow>
             )}
@@ -766,26 +715,16 @@ export function PostManagementTable({
       </div>
 
       {/* Post details dialog */}
-      {selectedPost && (
+      {selectedPost && detailsDialogOpen && (
         <PostDetailsDialog
           post={selectedPost}
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-        />
-      )}
-
-      {/* Edit post dialog */}
-      {selectedPost && (
-        <EditPostDialog
-          post={selectedPost}
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          onUpdate={handleUpdatePost}
+          onApprove={onApprovePost}
+          onReject={onRejectPost}
         />
       )}
 
       {/* Delete post dialog */}
-      {selectedPost && (
+      {selectedPost && deleteDialogOpen && (
         <DeletePostDialog
           post={selectedPost}
           open={deleteDialogOpen}

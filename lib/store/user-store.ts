@@ -42,8 +42,10 @@ export const useUserStore = create<UserState>((set, get) => ({
   actions: {
     // Action to fetch the current session and profile
     fetchUserSession: async () => {
-      // Ensure isLoading is true at the start, only set if not already loading
-      if (!get().isLoading) {
+      // Only set loading to true if there is no user or profile data yet.
+      // This prevents the loading flash on background revalidations.
+      const currentState = get();
+      if (!currentState.user && !currentState.profile) {
         set({ isLoading: true });
       }
       set({ error: null }); // Clear previous errors

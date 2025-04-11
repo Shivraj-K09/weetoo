@@ -61,3 +61,35 @@ export interface UserProfile {
   provider_type?: string;
   role?: string;
 }
+
+export interface SupabaseUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  avatar_url: string | null;
+  provider_type: string | null;
+  created_at: string;
+  updated_at: string;
+  kor_coins: number;
+  naver_id: string | null;
+  role: string;
+  status: string;
+  warnings: number;
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  content: string;
+  user_id: string;
+  category: string;
+  tags: string[];
+  featured_images: string[];
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  status: string;
+  // Join with users table
+  user?: SupabaseUser;
+}
