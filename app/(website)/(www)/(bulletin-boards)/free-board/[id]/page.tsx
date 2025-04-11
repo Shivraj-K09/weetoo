@@ -107,9 +107,9 @@ export default async function PostPage({
 
           {isAuthor && (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
+              {/* <Button variant="outline" size="sm" asChild>
                 <Link href={`/free-board/edit/${post.id}`}>Edit</Link>
-              </Button>
+              </Button> */}
               <Button variant="destructive" size="sm">
                 Delete
               </Button>
