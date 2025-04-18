@@ -38,7 +38,6 @@ export function CreatePostForm({
   onSave,
   onImageUpload,
 }: CreatePostFormProps) {
-  console.log(onPreview);
   return (
     <div className="space-y-8 bg-white p-8 rounded-lg shadow-sm">
       {/* Title Section */}
@@ -77,6 +76,8 @@ export function CreatePostForm({
             <SelectItem value="news">News</SelectItem>
             <SelectItem value="analysis">Analysis</SelectItem>
             <SelectItem value="tutorial">Tutorial</SelectItem>
+            <SelectItem value="education">Education</SelectItem>
+            <SelectItem value="profit">Profit</SelectItem>
           </SelectContent>
         </Select>
       </div>

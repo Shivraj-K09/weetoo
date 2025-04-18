@@ -1,187 +1,168 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { UsersIcon } from "lucide-react";
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
+import Image from "next/image";
+import { supabase } from "@/lib/supabase/client";
+import type { Post } from "@/types";
 
 export function Community() {
   const [activeTab, setActiveTab] = useState("free");
+  const [freePosts, setFreePosts] = useState<Post[]>([]);
+  const [profitPosts, setProfitPosts] = useState<Post[]>([]);
+  const [educationPosts, setEducationPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        setLoading(true);
+
+        // Fetch free board posts (all categories)
+        const { data: freeData, error: freeError } = await supabase
+          .from("posts")
+          .select(
+            `
+            id,
+            title,
+            content,
+            category,
+            featured_images,
+            created_at,
+            user:user_id (
+              first_name,
+              last_name
+            )
+          `
+          )
+          .eq("status", "approved")
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (freeError) {
+          console.error("Error fetching free posts:", freeError);
+        } else {
+          setFreePosts(freeData as unknown as Post[]);
+        }
+
+        // Fetch profit board posts (only profit category)
+        const { data: profitData, error: profitError } = await supabase
+          .from("posts")
+          .select(
+            `
+            id,
+            title,
+            content,
+            category,
+            featured_images,
+            created_at,
+            user:user_id (
+              first_name,
+              last_name
+            )
+          `
+          )
+          .eq("status", "approved")
+          .eq("category", "profit")
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (profitError) {
+          console.error("Error fetching profit posts:", profitError);
+        } else {
+          setProfitPosts(profitData as unknown as Post[]);
+        }
+
+        // Fetch education board posts (only education category)
+        const { data: educationData, error: educationError } = await supabase
+          .from("posts")
+          .select(
+            `
+            id,
+            title,
+            content,
+            category,
+            featured_images,
+            created_at,
+            user:user_id (
+              first_name,
+              last_name
+            )
+          `
+          )
+          .eq("status", "approved")
+          .eq("category", "education")
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (educationError) {
+          console.error("Error fetching education posts:", educationError);
+        } else {
+          setEducationPosts(educationData as unknown as Post[]);
+        }
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchPosts();
+  }, []);
+
+  // Format date to a readable format
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Get post URL based on category
+  const getPostUrl = (post: Post) => {
+    switch (post.category) {
+      case "education":
+        return `/free-board/${post.id}`;
+      case "profit":
+        return `/free-board/${post.id}`;
+      default:
+        return `/free-board/${post.id}`;
+    }
+  };
+
+  // Get category label in Korean
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case "education":
+        return "교육";
+      case "profit":
+        return "수익";
+      case "cryptocurrency":
+        return "암호화폐";
+      case "trading":
+        return "거래";
+      case "investment":
+        return "투자";
+      case "technology":
+        return "기술";
+      case "news":
+        return "뉴스";
+      case "analysis":
+        return "분석";
+      case "tutorial":
+        return "튜토리얼";
+      default:
+        return "자유";
+    }
+  };
 
   return (
-    // <div className="flex flex-col gap-3 border rounded-md p-3">
-    //   <div className="flex items-center gap-2">
-    //     <UsersIcon className="w-5 h-5" />
-    //     <h4 className="font-semibold">WEETOO Community</h4>
-    //   </div>
-
-    //   <div className="flex justify-between w-full">
-    //     <div className="flex flex-col gap-2">
-    //       <h5 className="text-sm font-semibold">자유 게시판</h5>
-    //       <div className="flex flex-col gap-1">
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">비트코인 어디까지 내려가는거냐 ㅋ</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">오늘 FOMC 기대됨</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">
-    //             금값 미친거아님? 숏타는 애들 없지..
-    //           </span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">
-    //             거래소 먹튀당했다 ㅅㅂ 너네는 잘보..
-    //           </span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">셀퍼럴 어떻게 받음?</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">ㅎㅂㅈㅇ 짤 모음.jpg</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">휴가 마렵다</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">인플루언서 압도적 1위</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">피부 개사기</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">자유</span>
-    //           <span className="text-xs">인플루언서 압도적 1위</span>
-    //         </div>
-    //       </div>
-    //     </div>
-
-    //     <div className="flex flex-col gap-2">
-    //       <h5 className="text-sm font-semibold">수익 게시판</h5>
-    //       <div className="flex gap-2">
-    //         <div className="flex flex-col">
-    //           <Image
-    //             src="/demo-img-1.png"
-    //             alt="demo-img-1"
-    //             width={83}
-    //             height={75}
-    //           />
-    //           <span className="text-[0.5rem]">300달러로 4700만듬</span>
-    //           <div className="flex justify-between w-full items-center">
-    //             <span className="text-[0.4rem]">나스닥킬러</span>
-    //             <span className="text-[0.4rem]">25.03.06 12:13</span>
-    //           </div>
-    //         </div>
-    //         <div className="flex flex-col">
-    //           <Image
-    //             src="/demo-img-2.png"
-    //             alt="demo-img-2"
-    //             width={83}
-    //             height={75}
-    //           />
-    //           <span className="text-[0.5rem]">시작해본다 스닥이</span>
-    //           <div className="flex justify-between w-full items-center">
-    //             <span className="text-[0.4rem]">우리투자장</span>
-    //             <span className="text-[0.4rem]">25.03.06 14:33</span>
-    //           </div>
-    //         </div>
-    //       </div>
-
-    //       <div className="flex items-center gap-5 w-full">
-    //         <span className="text-xs text-muted-foreground">수익</span>
-    //         <span className="text-xs">
-    //           형들 나 소질있는거같음 한번봐줘 매..
-    //         </span>
-    //       </div>
-
-    //       <div className="flex items-center gap-5 w-full">
-    //         <span className="text-xs text-muted-foreground">수익</span>
-    //         <span className="text-xs">비트폭락에 롱수익 나뿐임?ㅋㅋ</span>
-    //       </div>
-
-    //       <div className="flex items-center gap-5 w-full">
-    //         <span className="text-xs text-muted-foreground">수익</span>
-    //         <span className="text-xs">도지코인 ㄳㄳ</span>
-    //       </div>
-
-    //       <div className="flex items-center gap-5 w-full">
-    //         <span className="text-xs text-muted-foreground">수익</span>
-    //         <span className="text-xs">오늘 3000먹고 마무리</span>
-    //       </div>
-    //     </div>
-
-    //     <div className="flex flex-col gap-2">
-    //       <h5 className="text-sm font-semibold">교육게시판</h5>
-    //       <div className="flex flex-col gap-1">
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">볼린저밴드의 이해</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">RSI 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">하이킨아시 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">MACD 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">패턴 모음</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs"> 캔들 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">외국 100억 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">기영이 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">이동평균선 매매법</span>
-    //         </div>
-
-    //         <div className="flex items-center gap-5 w-full">
-    //           <span className="text-xs text-muted-foreground">교육</span>
-    //           <span className="text-xs">이동평균선 매매법 재밌는거 같음</span>
-    //         </div>
-    //       </div>
-    //     </div>
-    //   </div>
-    // </div>
     <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
       {/* Header with subtle gradient */}
       <div className="flex items-center px-4 py-2 border-b border-gray-200 bg-gradient-to-r from-[#e74c3c] via-[#e74c3c]/90 to-[#e74c3c]/80 text-white">
@@ -193,81 +174,174 @@ export function Community() {
       <div className="hidden lg:grid md:grid-cols-3 divide-x divide-gray-200">
         {/* Free Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
-            자유 게시판
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+            <span>Free Board</span>
+            <Link href="/free-board" className="text-[#e74c3c] hover:underline">
+              More
+            </Link>
           </div>
           <div className="h-[220px] overflow-y-auto">
-            {freeBoard.map((post, index) => (
-              <div
-                key={index}
-                className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-              >
-                <span className="text-[#e74c3c] mr-2">자유</span>
-                <span className="text-gray-700">{post}</span>
+            {loading ? (
+              Array(5)
+                .fill(0)
+                .map((_, index) => (
+                  <div
+                    key={index}
+                    className="px-3 py-1.5 text-xs border-b border-gray-100 animate-pulse"
+                  >
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                  </div>
+                ))
+            ) : freePosts.length > 0 ? (
+              freePosts.map((post) => (
+                <Link href={getPostUrl(post)} key={post.id}>
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                    <span className="text-[#e74c3c] mr-2">
+                      {getCategoryLabel(post.category)}
+                    </span>
+                    <span className="text-gray-700">{post.title}</span>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                No posts available
               </div>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* Memory Board */}
+        {/* Profit Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
-            추억 게시판
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+            <span>Profit Board</span>
+            <Link
+              href="/profit-board"
+              className="text-[#e74c3c] hover:underline"
+            >
+              More
+            </Link>
           </div>
           <div className="h-[220px] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-2 p-2 border-b border-gray-100">
-              <div className="relative rounded overflow-hidden">
-                <div className="aspect-video w-full bg-[#3498db]"></div>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-1">
-                  <p className="text-white text-[10px] truncate">
-                    차트데이터 스크린
-                  </p>
-                  <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
+            {loading ? (
+              <div className="animate-pulse p-2 border-b border-gray-100">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="aspect-video w-full bg-gray-200 rounded"></div>
+                  <div className="aspect-video w-full bg-gray-200 rounded"></div>
                 </div>
               </div>
-              <div className="relative rounded overflow-hidden">
-                <div className="aspect-video w-full bg-[#2ecc71]"></div>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-1">
-                  <p className="text-white text-[10px] truncate">
-                    차트데이터 스크린
-                  </p>
-                  <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
-                </div>
+            ) : profitPosts.length > 0 &&
+              profitPosts.some((post) => post.featured_images?.length > 0) ? (
+              <div className="grid grid-cols-2 gap-2 p-2 border-b border-gray-100">
+                {profitPosts.slice(0, 2).map((post, index) =>
+                  post.featured_images && post.featured_images.length > 0 ? (
+                    <Link href={getPostUrl(post)} key={post.id}>
+                      <div className="relative rounded overflow-hidden">
+                        <div className="aspect-video w-full">
+                          <Image
+                            src={post.featured_images[0] || "/placeholder.svg"}
+                            alt={post.title}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-1">
+                          <p className="text-white text-[10px] truncate">
+                            {post.title}
+                          </p>
+                          <p className="text-white/70 text-[8px]">
+                            {formatDate(post.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div
+                      key={index}
+                      className="relative rounded overflow-hidden"
+                    >
+                      <div className="aspect-video w-full bg-gray-200"></div>
+                    </div>
+                  )
+                )}
               </div>
-            </div>
-            {memoryBoard.map((post, index) => (
-              <div
-                key={index}
-                className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-              >
-                <span className="text-[#e74c3c] mr-2">추억</span>
-                <span className="text-gray-700">{post}</span>
+            ) : null}
+
+            {loading ? (
+              Array(5)
+                .fill(0)
+                .map((_, index) => (
+                  <div
+                    key={index}
+                    className="px-3 py-1.5 text-xs border-b border-gray-100 animate-pulse"
+                  >
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                  </div>
+                ))
+            ) : profitPosts.length > 0 ? (
+              profitPosts.map((post) => (
+                <Link href={getPostUrl(post)} key={post.id}>
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                    <span className="text-[#e74c3c] mr-2">
+                      {getCategoryLabel(post.category)}
+                    </span>
+                    <span className="text-gray-700">{post.title}</span>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                No profit posts available
               </div>
-            ))}
+            )}
           </div>
         </div>
 
         {/* Education Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50">
-            교육게시판
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+            <span>Education Board</span>
+            <Link
+              href="/education-board"
+              className="text-[#e74c3c] hover:underline"
+            >
+              More
+            </Link>
           </div>
           <div className="h-[220px] overflow-y-auto">
-            {educationBoard.map((post, index) => (
-              <div
-                key={index}
-                className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
-              >
-                <span className="text-[#e74c3c] mr-2">교육</span>
-                <span className="text-gray-700">{post}</span>
+            {loading ? (
+              Array(5)
+                .fill(0)
+                .map((_, index) => (
+                  <div
+                    key={index}
+                    className="px-3 py-1.5 text-xs border-b border-gray-100 animate-pulse"
+                  >
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                  </div>
+                ))
+            ) : educationPosts.length > 0 ? (
+              educationPosts.map((post) => (
+                <Link href={getPostUrl(post)} key={post.id}>
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                    <span className="text-[#e74c3c] mr-2">
+                      {getCategoryLabel(post.category)}
+                    </span>
+                    <span className="text-gray-700">{post.title}</span>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                No education posts available
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
 
       {/* Mobile View - Tab-based layout */}
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <Tabs
           defaultValue="free"
           value={activeTab}
@@ -282,10 +356,10 @@ export function Community() {
               <span className="font-medium">자유 게시판</span>
             </TabsTrigger>
             <TabsTrigger
-              value="memory"
+              value="profit"
               className="text-xs py-2 px-3 data-[state=active]:bg-white data-[state=active]:text-[#e74c3c] data-[state=active]:border-b-2 data-[state=active]:border-[#e74c3c] data-[state=active]:shadow-none rounded-none"
             >
-              <span className="font-medium">추억 게시판</span>
+              <span className="font-medium">수익 게시판</span>
             </TabsTrigger>
             <TabsTrigger
               value="education"
@@ -296,72 +370,169 @@ export function Community() {
           </TabsList>
 
           <TabsContent value="free" className="m-0 bg-white border-t-0">
+            <div className="flex justify-end p-2 border-b border-gray-100">
+              <Link
+                href="/free-board"
+                className="text-xs text-[#e74c3c] hover:underline"
+              >
+                더보기
+              </Link>
+            </div>
             <div className="h-[300px] overflow-y-auto">
-              {freeBoard.map((post, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                >
-                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
-                    자유
-                  </span>
-                  <span className="text-gray-700">{post}</span>
+              {loading ? (
+                Array(5)
+                  .fill(0)
+                  .map((_, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-2 text-sm border-b border-gray-100 animate-pulse"
+                    >
+                      <div className="h-5 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  ))
+              ) : freePosts.length > 0 ? (
+                freePosts.map((post) => (
+                  <Link href={getPostUrl(post)} key={post.id}>
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                      <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                        {getCategoryLabel(post.category)}
+                      </span>
+                      <span className="text-gray-700">{post.title}</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-3 py-6 text-sm text-gray-500 text-center">
+                  No posts available
                 </div>
-              ))}
+              )}
             </div>
           </TabsContent>
 
-          <TabsContent value="memory" className="m-0 bg-white border-t-0">
-            <div className="p-3 border-b border-gray-100">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative rounded-md overflow-hidden shadow-sm">
-                  <div className="aspect-video w-full bg-[#3498db]"></div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">
-                    <p className="text-white text-[10px] truncate">
-                      차트데이터 스크린
-                    </p>
-                    <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
-                  </div>
-                </div>
-                <div className="relative rounded-md overflow-hidden shadow-sm">
-                  <div className="aspect-video w-full bg-[#2ecc71]"></div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">
-                    <p className="text-white text-[10px] truncate">
-                      차트데이터 스크린
-                    </p>
-                    <p className="text-white/70 text-[8px]">2023.03.06 12:33</p>
-                  </div>
+          <TabsContent value="profit" className="m-0 bg-white border-t-0">
+            <div className="flex justify-end p-2 border-b border-gray-100">
+              <Link
+                href="/profit-board"
+                className="text-xs text-[#e74c3c] hover:underline"
+              >
+                더보기
+              </Link>
+            </div>
+            {loading ? (
+              <div className="animate-pulse p-3 border-b border-gray-100">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="aspect-video w-full bg-gray-200 rounded-md"></div>
+                  <div className="aspect-video w-full bg-gray-200 rounded-md"></div>
                 </div>
               </div>
-            </div>
-            <div className="h-[220px] overflow-y-auto">
-              {memoryBoard.map((post, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                >
-                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
-                    추억
-                  </span>
-                  <span className="text-gray-700">{post}</span>
+            ) : profitPosts.length > 0 &&
+              profitPosts.some((post) => post.featured_images?.length > 0) ? (
+              <div className="p-3 border-b border-gray-100">
+                <div className="grid grid-cols-2 gap-3">
+                  {profitPosts.slice(0, 2).map((post, index) =>
+                    post.featured_images && post.featured_images.length > 0 ? (
+                      <Link href={getPostUrl(post)} key={post.id}>
+                        <div className="relative rounded-md overflow-hidden shadow-sm">
+                          <div className="aspect-video w-full">
+                            <Image
+                              src={
+                                post.featured_images[0] || "/placeholder.svg"
+                              }
+                              alt={post.title}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">
+                            <p className="text-white text-[10px] truncate">
+                              {post.title}
+                            </p>
+                            <p className="text-white/70 text-[8px]">
+                              {formatDate(post.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div
+                        key={index}
+                        className="relative rounded-md overflow-hidden shadow-sm"
+                      >
+                        <div className="aspect-video w-full bg-gray-200"></div>
+                      </div>
+                    )
+                  )}
                 </div>
-              ))}
+              </div>
+            ) : null}
+            <div className="h-[220px] overflow-y-auto">
+              {loading ? (
+                Array(5)
+                  .fill(0)
+                  .map((_, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-2 text-sm border-b border-gray-100 animate-pulse"
+                    >
+                      <div className="h-5 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  ))
+              ) : profitPosts.length > 0 ? (
+                profitPosts.map((post) => (
+                  <Link href={getPostUrl(post)} key={post.id}>
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                      <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                        {getCategoryLabel(post.category)}
+                      </span>
+                      <span className="text-gray-700">{post.title}</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-3 py-6 text-sm text-gray-500 text-center">
+                  No profit posts available
+                </div>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="education" className="m-0 bg-white border-t-0">
+            <div className="flex justify-end p-2 border-b border-gray-100">
+              <Link
+                href="/education-board"
+                className="text-xs text-[#e74c3c] hover:underline"
+              >
+                더보기
+              </Link>
+            </div>
             <div className="h-[300px] overflow-y-auto">
-              {educationBoard.map((post, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                >
-                  <span className="text-[#e74c3c] mr-2 text-xs font-medium">
-                    교육
-                  </span>
-                  <span className="text-gray-700">{post}</span>
+              {loading ? (
+                Array(5)
+                  .fill(0)
+                  .map((_, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-2 text-sm border-b border-gray-100 animate-pulse"
+                    >
+                      <div className="h-5 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  ))
+              ) : educationPosts.length > 0 ? (
+                educationPosts.map((post) => (
+                  <Link href={getPostUrl(post)} key={post.id}>
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                      <span className="text-[#e74c3c] mr-2 text-xs font-medium">
+                        {getCategoryLabel(post.category)}
+                      </span>
+                      <span className="text-gray-700">{post.title}</span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-3 py-6 text-sm text-gray-500 text-center">
+                  No education posts available
                 </div>
-              ))}
+              )}
             </div>
           </TabsContent>
         </Tabs>
@@ -369,37 +540,3 @@ export function Community() {
     </div>
   );
 }
-
-// Sample data
-const freeBoard = [
-  "비트코인 어디까지 내려가는거냐 ㅋ",
-  "오늘 FOMC 기대됨",
-  "금값 마진거래? 손타는 예를 올려..",
-  "거래소 목표달성했다 ㅋ 너네는 잘봐..",
-  "셀파돈 어떻게 받음?",
-  "후보조ㅇ 활 모음.jpg",
-  "휴가 막담다",
-  "인룸투자식 업도적 1위",
-  "파부 개사기",
-  "인룸투자식 업도적 1위",
-];
-
-const memoryBoard = [
-  "종목 난 소형있는거같을 한번바꿔 때..",
-  "비트록하에 홀수익 나봤임?ㅋㅋㅋ",
-  "도지코인 ㅋㅋ",
-  "오늘 3000맞고 마무리",
-];
-
-const educationBoard = [
-  "볼린저밴드의 이해",
-  "RSI 매매법",
-  "하이킨아시 매매법",
-  "MACD 매매법",
-  "패턴 모음",
-  "캔들 매매법",
-  "외국 100명 매매법",
-  "기술이 매매법",
-  "이동평균선 매매법",
-  "이동평균선 매매법 저항눈거 같음",
-];

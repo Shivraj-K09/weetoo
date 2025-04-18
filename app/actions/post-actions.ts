@@ -6,6 +6,8 @@ import { cookies } from "next/headers";
 import type { Post } from "@/types";
 import { checkDailyLimit } from "./point-system-actions";
 
+// Import the createPostNotification function
+
 // Fetch all posts
 export async function getPosts(): Promise<Post[]> {
   try {
@@ -448,5 +450,36 @@ export async function deletePost(postId: string) {
   } catch (error: any) {
     console.error("Unexpected error deleting post:", error);
     return { error: error.message || "An unexpected error occurred" };
+  }
+}
+
+// Add this new function to fetch posts by category
+export async function getPostsByCategory(category: string): Promise<Post[]> {
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select(
+        `
+        *,
+        user:user_id (
+          first_name
+        )
+      `
+      )
+      .eq("status", "approved") // Only fetch approved posts
+      .eq("category", category) // Filter by category
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(`Error fetching ${category} posts:`, error);
+      return [];
+    }
+
+    return data as Post[];
+  } catch (error) {
+    console.error(`Unexpected error fetching ${category} posts:`, error);
+    return [];
   }
 }

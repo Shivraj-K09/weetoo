@@ -233,6 +233,8 @@ export default function ManagePostsClient() {
             <SelectItem value="technology">Technology</SelectItem>
             <SelectItem value="news">News</SelectItem>
             <SelectItem value="analysis">Analysis</SelectItem>
+            <SelectItem value="profit">Profit</SelectItem>
+            <SelectItem value="education">Education</SelectItem>
             <SelectItem value="tutorial">Tutorial</SelectItem>
           </SelectContent>
         </Select>
