@@ -28,7 +28,7 @@ export function Ranking() {
     "Top-5 Virtual Money Holding",
     "Top-5 Activity Ranking (XP)",
     "Top-5 Top Sponsored Users (Kor_coins)",
-    "Top-5 Most Followed Users",
+    // "Top-5 Most Followed Users",
   ];
 
   // Open message dialog
@@ -175,8 +175,8 @@ export function Ranking() {
   return (
     <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
       {/* Desktop View - Five column layout */}
-      <div className="hidden lg:grid lg:grid-cols-5 divide-x divide-gray-200">
-        {[0, 1, 2, 3, 4].map((index) => (
+      <div className="hidden lg:grid lg:grid-cols-4 divide-x divide-gray-200">
+        {[0, 1, 2, 3].map((index) => (
           <div key={index}>
             {renderRankingColumn(rankingTitles[index], index)}
           </div>
