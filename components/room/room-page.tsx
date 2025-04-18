@@ -4,7 +4,7 @@ import { TradingMarketPlace } from "@/components/room/trading-market-place";
 import { TradingTabs } from "@/components/room/trading-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowUp, VideoIcon } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -12,7 +12,9 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PriceInfoBar } from "@/components/room/price-info-bar";
-import { WarningDialog } from "@/components/room/warning-dialog";
+import { WarningDialog } from "./warning-dialog";
+import { deleteRoom } from "@/app/actions/delete-room";
+import { CloseRoomDialog } from "./close-room-dialog";
 
 // Define privacy type as a union type for better type safety
 type Privacy = "private" | "public";
@@ -76,6 +78,10 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
 
+  // Add state for warning dialog
+  const [showWarning, setShowWarning] = useState(false);
+  const [showCloseRoomDialog, setShowCloseRoomDialog] = useState(false);
+
   // Extract room ID from the URL - properly handle UUID format
   // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
   const roomId =
@@ -91,8 +97,6 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
   const [ownerName, setOwnerName] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
   const [priceDataLoaded, setPriceDataLoaded] = useState(false);
-
-  const [showWarning, setShowWarning] = useState(false);
 
   // Add this near the other state declarations
   // Update the initial state to include volume
@@ -148,11 +152,7 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
 
-    return `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
   // Extract base and quote currency from symbol
@@ -763,7 +763,7 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
         wsFunding.current.close();
       }
     };
-  }, [selectedSymbol, fundingData.nextFundingTime]);
+  }, [selectedSymbol]);
 
   // Set up TradingView widget
   useEffect(() => {
@@ -780,29 +780,28 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
     script.type = "text/javascript";
     script.async = true;
     script.innerHTML = `
-        {
-          "autosize": true,
-          "symbol": "${symbol}",
-          "interval": "D",
-          "timezone": "Asia/Seoul",
-          "theme": "dark",
-          "style": "1",
-          "locale": "kr",
-          "withdateranges": true,
-          "hide_side_toolbar": false,
-          "backgroundColor": "rgba(33, 38, 49, 1)",
-          "gridColor": "rgba(33, 38, 49, 1)",
-          "allow_symbol_change": true,
-          "calendar": false,
-          "support_host": "https://www.tradingview.com"
-        }`;
+      {
+        "autosize": true,
+        "symbol": "${symbol}",
+        "interval": "D",
+        "timezone": "Asia/Seoul",
+        "theme": "dark",
+        "style": "1",
+        "locale": "kr",
+        "withdateranges": true,
+        "hide_side_toolbar": false,
+        "backgroundColor": "rgba(33, 38, 49, 1)",
+        "gridColor": "rgba(33, 38, 49, 1)",
+        "allow_symbol_change": true,
+        "calendar": false,
+        "support_host": "https://www.tradingview.com"
+      }`;
 
     container.current.appendChild(script);
 
     return () => {
-      const currentContainer = container.current;
-      if (currentContainer) {
-        currentContainer.innerHTML = "";
+      if (container.current) {
+        container.current.innerHTML = "";
       }
     };
   }, [roomDetails]);
@@ -833,12 +832,6 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
   // Get room name initial for avatar
   const getRoomInitial = (name: string) => {
     return name ? name.charAt(0).toUpperCase() : "R";
-  };
-
-  const handleStartStreaming = () => {
-    toast.success("Streaming started successfully");
-    // Here you would implement the actual streaming functionality
-    // This could involve WebRTC, socket connections, or other streaming technologies
   };
 
   // Add this function before the return statement
@@ -992,6 +985,36 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
     setShowWarning(false);
   };
 
+  // Handle room closure
+  const handleCloseRoom = async () => {
+    try {
+      // Add null check for roomDetails
+      if (!roomDetails) {
+        toast.error("Room details not available");
+        return;
+      }
+
+      // Call the server action to delete the room
+      const result = await deleteRoom(roomDetails.id);
+
+      if (result.success) {
+        // Close the window
+        window.close();
+
+        // As a fallback, redirect to home page if window.close() doesn't work
+        // (some browsers block window.close() for windows not opened by script)
+        setTimeout(() => {
+          router.push("/");
+        }, 500);
+      } else {
+        toast.error(`Failed to close room: ${result.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error closing room:", error);
+      toast.error("An error occurred while closing the room");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1015,8 +1038,17 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
+      {/* Warning Dialog */}
       <WarningDialog isOpen={showWarning} onConfirm={handleWarningConfirm} />
 
+      {/* Close Room Dialog */}
+      <CloseRoomDialog
+        isOpen={showCloseRoomDialog}
+        onConfirm={handleCloseRoom}
+        onCancel={() => setShowCloseRoomDialog(false)}
+      />
+
+      {/* Rest of the component remains the same */}
       <div className="p-4 w-full flex gap-1.5 bg-[#181a20]">
         <div className="h-full text-white rounded-md shadow-sm flex-1 w-full">
           <div className="flex flex-col gap-1.5">
@@ -1106,15 +1138,30 @@ export default function TradingRoomPage({ roomData }: { roomData: RoomData }) {
                   </div>
                 </div>
 
-                {/* Start Streaming Button - Only visible to room owner */}
+                {/* Replace the Start Broadcasting Button with Close Room Button - Only visible to room owner */}
                 {user && user.id === roomDetails.owner_id && (
                   <div className="ml-auto flex items-center mr-4">
                     <Button
                       className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 px-4 py-2"
-                      onClick={handleStartStreaming}
+                      onClick={() => setShowCloseRoomDialog(true)}
                     >
-                      <VideoIcon className="h-5 w-5" />
-                      Start Broadcasting
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="lucide lucide-x-circle"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="m15 9-6 6" />
+                        <path d="m9 9 6 6" />
+                      </svg>
+                      Close Room
                     </Button>
                   </div>
                 )}

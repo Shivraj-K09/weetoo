@@ -4,8 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import type { Post } from "@/types";
-
-// Import the createPostNotification function
+import { checkDailyLimit } from "./point-system-actions";
 
 // Fetch all posts
 export async function getPosts(): Promise<Post[]> {
@@ -172,6 +171,13 @@ export async function createPost(formData: FormData) {
     const user = userData.user;
     console.log("User authenticated:", user.id);
 
+    // Check if user has reached daily post limit
+    const canPost = await checkDailyLimit("posts_created");
+
+    if (!canPost) {
+      return { error: "You've reached your daily limit of 20 posts" };
+    }
+
     // Extract form data
     const title = formData.get("title") as string;
     const content = formData.get("content") as string;
@@ -210,6 +216,7 @@ export async function createPost(formData: FormData) {
         featured_images,
         status: "pending", // Set status to pending for moderation
         view_count: 0,
+        points_awarded: false, // Initialize points_awarded flag
       })
       .select()
       .single();
@@ -220,6 +227,51 @@ export async function createPost(formData: FormData) {
     }
 
     console.log("Post created successfully:", post.id);
+
+    // Update daily activity count
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Try to update existing record first
+    const { data: existingRecord, error: checkError } = await supabase
+      .from("daily_activity_limits")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("activity_date", today)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking daily activity record:", checkError);
+    }
+
+    if (existingRecord) {
+      // Update existing record
+      const { error: activityError } = await supabase
+        .from("daily_activity_limits")
+        .update({
+          posts_created: supabase.rpc("increment", {
+            x: 1,
+            column_name: "posts_created",
+          }),
+        })
+        .eq("id", existingRecord.id);
+
+      if (activityError) {
+        console.error("Error updating daily activity:", activityError);
+      }
+    } else {
+      // Create new record
+      const { error: insertError } = await supabase
+        .from("daily_activity_limits")
+        .insert({
+          user_id: user.id,
+          activity_date: today,
+          posts_created: 1,
+        });
+
+      if (insertError) {
+        console.error("Error creating daily activity record:", insertError);
+      }
+    }
 
     // Revalidate the free board page
     revalidatePath("/free-board");
@@ -286,7 +338,7 @@ export async function updatePost(formData: FormData) {
     // Get the post to check ownership
     const { data: existingPost, error: fetchError } = await supabase
       .from("posts")
-      .select("user_id, status")
+      .select("user_id, status, points_awarded")
       .eq("id", id)
       .single();
 
@@ -314,6 +366,8 @@ export async function updatePost(formData: FormData) {
         // If post was already approved, keep it approved
         // If it was pending or rejected, set it back to pending for re-review
         status: existingPost.status === "approved" ? "approved" : "pending",
+        // Keep the points_awarded status
+        points_awarded: existingPost.points_awarded,
       })
       .eq("id", id)
       .select()
@@ -338,6 +392,61 @@ export async function updatePost(formData: FormData) {
     };
   } catch (error: any) {
     console.error("Unexpected error updating post:", error);
+    return { error: error.message || "An unexpected error occurred" };
+  }
+}
+
+// Delete a post
+export async function deletePost(postId: string) {
+  try {
+    const supabase = await createClient();
+
+    // Get the current user
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      return { error: "You must be logged in to delete a post" };
+    }
+
+    const userId = userData.user.id;
+
+    // Check if the user is the author of the post
+    const { data: post, error: fetchError } = await supabase
+      .from("posts")
+      .select("user_id")
+      .eq("id", postId)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching post:", fetchError);
+      return { error: "Post not found" };
+    }
+
+    if (post.user_id !== userId) {
+      return { error: "You can only delete your own posts" };
+    }
+
+    // Update post status to deleted
+    const { error } = await supabase
+      .from("posts")
+      .update({
+        status: "deleted",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", postId);
+
+    if (error) {
+      console.error("Error deleting post:", error);
+      return { error: error.message };
+    }
+
+    // Revalidate paths
+    revalidatePath("/free-board");
+    revalidatePath(`/free-board/${postId}`);
+
+    return { success: true, message: "Post deleted successfully" };
+  } catch (error: any) {
+    console.error("Unexpected error deleting post:", error);
     return { error: error.message || "An unexpected error occurred" };
   }
 }

@@ -24,7 +24,7 @@ import {
   rejectPost,
   togglePostVisibility,
   deletePost,
-} from "@/app/actions/post-moderation-action";
+} from "@/app/actions/admin-content-actions";
 import type { Post } from "@/types";
 
 export default function ManagePostsClient() {

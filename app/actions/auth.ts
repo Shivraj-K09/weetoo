@@ -8,6 +8,7 @@ import {
   type NaverUserResponse,
 } from "@/lib/auth/naver";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
 const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET!;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!;
@@ -219,6 +220,31 @@ export async function handleNaverCallback(
 
     if (!responseData) {
       throw new Error("Failed to complete authentication with API");
+    }
+
+    // Check if this is a new user and award welcome bonus if needed
+    if (responseData.userId) {
+      try {
+        // Get user creation time
+        const supabase = await createClient();
+        const { data: userData } = await supabase
+          .from("users")
+          .select("created_at, last_sign_in_at")
+          .eq("id", responseData.userId)
+          .single();
+
+        console.log("User data:", userData);
+
+        // if (userData) {
+        //   const createdAt = new Date(userData.created_at).getTime();
+        //   const lastSignIn = new Date(
+        //     userData.last_sign_in_at || userData.created_at
+        //   ).getTime();
+        // }
+      } catch (bonusError) {
+        console.error("Error checking/awarding welcome bonus:", bonusError);
+        // Continue with authentication even if bonus award fails
+      }
     }
 
     // Return success with the email and password for client-side login

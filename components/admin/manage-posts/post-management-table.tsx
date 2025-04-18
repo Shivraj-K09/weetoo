@@ -718,6 +718,8 @@ export function PostManagementTable({
       {selectedPost && detailsDialogOpen && (
         <PostDetailsDialog
           post={selectedPost}
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
           onApprove={onApprovePost}
           onReject={onRejectPost}
         />

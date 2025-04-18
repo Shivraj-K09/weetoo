@@ -56,10 +56,13 @@ export interface UserProfile {
   avatar_url?: string;
   kor_coins?: number;
   level?: number;
+  exp?: number;
   levelProgress?: number;
   notifications?: number;
   provider_type?: string;
   role?: string;
+  nickname?: string;
+  provider?: string;
 }
 
 export interface SupabaseUser {
@@ -92,4 +95,45 @@ export interface Post {
   status: string;
   // Join with users table
   user?: SupabaseUser;
+}
+
+export type Privacy = "private" | "public";
+export type RoomCategory = "regular" | "voice";
+
+export interface Room {
+  id: string;
+  title: string;
+  symbol: string;
+  privacy: Privacy;
+  createdAt: Date;
+  username: string;
+  roomCategory?: RoomCategory;
+  owner_id: string;
+}
+
+export interface RoomData {
+  id: string;
+  room_name: string;
+  room_type: Privacy;
+  trading_pairs: string[];
+  current_participants: number;
+  owner_id: string;
+  created_at: string;
+  users: UserData | UserData[];
+  room_category?: RoomCategory;
+}
+
+export interface UserData {
+  first_name: string;
+  last_name: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  user_id: string;
+  user_name: string;
+  is_host: boolean;
+  message: string;
+  timestamp: number;
 }

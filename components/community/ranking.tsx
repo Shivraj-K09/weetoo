@@ -1,5 +1,7 @@
 "use client";
 
+import type React from "react";
+
 import { useState, useEffect, useRef } from "react";
 import { User, MessageSquare, Bell, Ban, Flag, X, Send } from "lucide-react";
 import {
@@ -20,6 +22,14 @@ export function Ranking() {
   const [activeTab, setActiveTab] = useState("ranking1");
   const dialogRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const rankingTitles = [
+    "Top-5 Return Rate Ranking",
+    "Top-5 Virtual Money Holding",
+    "Top-5 Activity Ranking (XP)",
+    "Top-5 Top Sponsored Users (Kor_coins)",
+    "Top-5 Most Followed Users",
+  ];
 
   // Open message dialog
   const openMessageDialog = (username: string) => {
@@ -84,15 +94,14 @@ export function Ranking() {
     };
   }, [messageDialog.visible]);
 
-  // Render a single ranking column - remove the unused parameter
-  const renderRankingColumn = () => (
+  // Render a single ranking column with a specific title
+  const renderRankingColumn = (title: string, index: number) => (
     <div className="overflow-hidden">
       {/* Ranking Header */}
       <div className="flex items-center px-3 py-2 border-b border-gray-200 bg-gradient-to-r from-[#f39c12]/20 to-white">
         <span className="text-[#f39c12] mr-1.5">👑</span>
-        <h3 className="text-xs font-medium text-gray-700">
-          일간 수익률 순위 TOP5
-        </h3>
+        <h3 className="text-xs font-medium text-gray-700">{title}</h3>
+        <span className="hidden">{index}</span>
       </div>
 
       {/* Ranking List with shadcn Context Menu */}
@@ -146,12 +155,12 @@ export function Ranking() {
               <ContextMenuSeparator />
 
               <div className="bg-gray-50 py-1">
-                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-100">
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50">
                   <Ban className="h-3.5 w-3.5 mr-2 text-gray-500" />
                   <span>차단하기</span>
                 </ContextMenuItem>
 
-                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-100">
+                <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50">
                   <Flag className="h-3.5 w-3.5 mr-2 text-gray-500" />
                   <span>신고하기</span>
                 </ContextMenuItem>
@@ -165,10 +174,12 @@ export function Ranking() {
 
   return (
     <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
-      {/* Desktop View - Four column layout */}
-      <div className="hidden lg:grid lg:grid-cols-4 divide-x divide-gray-200">
-        {[1, 2, 3, 4].map((section) => (
-          <div key={section}>{renderRankingColumn()}</div>
+      {/* Desktop View - Five column layout */}
+      <div className="hidden lg:grid lg:grid-cols-5 divide-x divide-gray-200">
+        {[0, 1, 2, 3, 4].map((index) => (
+          <div key={index}>
+            {renderRankingColumn(rankingTitles[index], index)}
+          </div>
         ))}
       </div>
 
@@ -180,35 +191,39 @@ export function Ranking() {
           onValueChange={setActiveTab}
           className="bg-gray-50"
         >
-          <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-gray-200">
-            {[1, 2, 3, 4].map((index) => (
+          <TabsList className="grid grid-cols-5 w-full rounded-none border-b border-gray-200">
+            {[0, 1, 2, 3, 4].map((index) => (
               <TabsTrigger
                 key={index}
-                value={`ranking${index}`}
+                value={`ranking${index + 1}`}
                 className="text-xs py-2 px-1 data-[state=active]:bg-white data-[state=active]:text-[#f39c12] data-[state=active]:border-b-2 data-[state=active]:border-[#f39c12] data-[state=active]:shadow-none rounded-none"
               >
                 <div className="flex items-center justify-center">
                   <span className="text-[#f39c12] mr-1 text-xs">👑</span>
-                  <span className="font-medium">순위 {index}</span>
+                  <span className="font-medium truncate">Rank {index + 1}</span>
                 </div>
               </TabsTrigger>
             ))}
           </TabsList>
 
           <TabsContent value="ranking1" className="m-0 bg-white border-t-0">
-            {renderRankingColumn()}
+            {renderRankingColumn(rankingTitles[0], 0)}
           </TabsContent>
 
           <TabsContent value="ranking2" className="m-0 bg-white border-t-0">
-            {renderRankingColumn()}
+            {renderRankingColumn(rankingTitles[1], 1)}
           </TabsContent>
 
           <TabsContent value="ranking3" className="m-0 bg-white border-t-0">
-            {renderRankingColumn()}
+            {renderRankingColumn(rankingTitles[2], 2)}
           </TabsContent>
 
           <TabsContent value="ranking4" className="m-0 bg-white border-t-0">
-            {renderRankingColumn()}
+            {renderRankingColumn(rankingTitles[3], 3)}
+          </TabsContent>
+
+          <TabsContent value="ranking5" className="m-0 bg-white border-t-0">
+            {renderRankingColumn(rankingTitles[4], 4)}
           </TabsContent>
         </Tabs>
       </div>

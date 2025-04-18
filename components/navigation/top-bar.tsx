@@ -14,6 +14,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Icons } from "../icons";
+import { ModeToggle } from "../mode-toggle";
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
@@ -458,6 +459,8 @@ export function TopBar() {
               </div>
             </PopoverContent>
           </Popover>
+
+          <ModeToggle />
         </div>
       </div>
     </div>

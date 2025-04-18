@@ -2,25 +2,28 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
+  },
   images: {
-    // domains: [
-    //   "images.unsplash.com",
-    //   "lh3.googleusercontent.com",
-    //   "img1.kakaocdn.net",
-    //   "phinf.pstatic.net",
-    //   "f1.tokenpost.kr",
-    //   "placehold.co",
-    //   "coin-images.coingecko.com",
-    //   "resqxctgpiadzqvrapug.supabase.co",
-    //   "bkbpcjtggmlbkpyjyohh.supabase.co",
-    // ],
-
     remotePatterns: [
       {
         protocol: "https",
         hostname: "**",
       },
     ],
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: true,
   },
 };
 

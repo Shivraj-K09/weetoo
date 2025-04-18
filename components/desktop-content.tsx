@@ -5,8 +5,36 @@ import { TickerTape } from "react-ts-tradingview-widgets";
 import { Community } from "./community/community";
 import { Ranking } from "./community/ranking";
 import { Trading } from "./trading";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 export function DesktopContent() {
+  // Check for welcome bonus notification
+  useEffect(() => {
+    // Check both possible keys for backward compatibility
+    const showWelcomeBonus = sessionStorage.getItem("showWelcomeBonus");
+    const checkWelcomeBonus = sessionStorage.getItem("checkWelcomeBonus");
+
+    if (showWelcomeBonus === "true" || checkWelcomeBonus === "true") {
+      // Display the toast with higher duration and priority
+      toast.success(
+        "Welcome! You've received 5,000 Kor_coins as a welcome bonus!",
+        {
+          duration: 6000,
+          position: "top-center",
+          id: "welcome-bonus-toast", // Unique ID to prevent duplicates
+        }
+      );
+
+      // Clear both flags
+      sessionStorage.removeItem("showWelcomeBonus");
+      sessionStorage.removeItem("checkWelcomeBonus");
+
+      // Log for debugging
+      console.log("Welcome bonus toast displayed from DesktopContent");
+    }
+  }, []);
+
   return (
     <div className="font-[family-name:var(--font-geist-sans)] w-full h-full lg:block hidden">
       <div className="h-full">

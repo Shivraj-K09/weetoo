@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Search, Download } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ActivityPointsTable } from "@/components/admin/activity-points/activity-points-table";
@@ -48,9 +47,7 @@ export default function ActivityPointsPage() {
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setFilters((prev) => ({
       ...prev,
-      dateRange: range
-        ? { from: range.from, to: range.to }
-        : { from: undefined, to: undefined },
+      dateRange: { from: range?.from, to: range?.to },
     }));
   };
 
@@ -67,20 +64,17 @@ export default function ActivityPointsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-2">
-          Activity Points Management
-        </h1>
+        <h1 className="text-2xl font-semibold mb-2">Activity Points</h1>
         <p className="text-muted-foreground">
-          View and manage user activity points earned through platform
-          engagement
+          View all activity points transactions on the platform
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative w-full">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full md:w-auto md:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search activity points..."
+            placeholder="Search activities..."
             className="pl-9 shadow-none h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -94,19 +88,16 @@ export default function ActivityPointsPage() {
           value={filters.activityType}
           onValueChange={(value) => handleFilterChange("activityType", value)}
         >
-          <SelectTrigger className="w-[180px] shadow-none h-10 cursor-pointer">
+          <SelectTrigger className="w-[180px] h-10 shadow-none cursor-pointer">
             <SelectValue placeholder="Activity Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All activity types</SelectItem>
+            <SelectItem value="all">All activities</SelectItem>
             <SelectItem value="post">Post Creation</SelectItem>
-            <SelectItem value="comment">Comment</SelectItem>
-            <SelectItem value="like">Like</SelectItem>
-            <SelectItem value="share">Share</SelectItem>
-            <SelectItem value="login">Login Bonus</SelectItem>
-            <SelectItem value="referral">Referral</SelectItem>
-            <SelectItem value="content">Content Creation</SelectItem>
-            <SelectItem value="checkin">Daily Check-in</SelectItem>
+            <SelectItem value="comment">Comments</SelectItem>
+            <SelectItem value="like">Likes</SelectItem>
+            <SelectItem value="share">Shares</SelectItem>
+            <SelectItem value="bonus">Bonuses</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -114,15 +105,11 @@ export default function ActivityPointsPage() {
           size="default"
           onClick={clearFilters}
           disabled={activeFilterCount === 0}
-          className="h-10 px-4 font-normal cursor-pointer shadow-none"
+          className="h-10 px-4 font-normal shadow-none cursor-pointer"
         >
           Clear Filters
         </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          className="shadow-none h-10 cursor-pointer"
-        >
+        <Button variant="outline" className="h-10 cursor-pointer shadow-none">
           <Download className="h-4 w-4" />
           <span className="sr-only">Export</span>
         </Button>
@@ -133,7 +120,7 @@ export default function ActivityPointsPage() {
         <div className="flex flex-wrap gap-2">
           {filters.activityType !== "all" && (
             <Badge variant="secondary" className="text-xs">
-              Activity Type: {filters.activityType}
+              Activity: {filters.activityType}
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
                 onClick={() => handleFilterChange("activityType", "all")}

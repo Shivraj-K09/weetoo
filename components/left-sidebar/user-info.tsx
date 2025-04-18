@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 // Removed supabase client import, toast import (handled by store)
 import Image from "next/image";
 import { useUserStore, useUserActions } from "@/lib/store/user-store"; // Import store and actions
-import { Hint } from "../hint";
+import { Hint } from "@/components/hint";
 
 // Removed UserData type, now using UserProfile from store
 
@@ -118,15 +118,39 @@ export function UserInfo() {
     );
   }
 
+  // Calculate level progress based on exp
+  const calculateLevelProgress = (level: number, exp: number): number => {
+    // Fixed amount of 10,000 exp needed for each level
+    const expNeededForNextLevel = 10000;
+
+    // Calculate total exp needed to reach the current level
+    const totalExpForCurrentLevel = level * expNeededForNextLevel;
+
+    // Calculate how much exp has been earned towards the next level
+    const expTowardsNextLevel = exp - totalExpForCurrentLevel;
+
+    // Calculate progress percentage (capped at 100%)
+    return Math.min(
+      Math.floor((expTowardsNextLevel / expNeededForNextLevel) * 100),
+      100
+    );
+  };
+
   // Logged in state (using profile and user from store)
-  // Add default values for level, progress, notifications, accountType if not in profile
   const userData = profile
     ? {
         ...profile,
-        level: 1, // Example default
-        levelProgress: 50, // Example default
-        notifications: 0, // Example default
-        accountType: profile.provider_type === "email" ? "Standard" : "Social", // Example logic
+        // Use actual level from database or default to 0
+        level: profile.level ?? 0,
+        // Calculate level progress based on exp
+        levelProgress: calculateLevelProgress(
+          profile.level ?? 0,
+          profile.exp || 0
+        ),
+        // Use actual notifications count or default to 0
+        notifications: profile.notifications || 0,
+        // Determine account type based on provider
+        // accountType: profile.provider_type === "email" ? "Standard" : "Social",
       }
     : null; // Handle case where profile might still be null briefly
 
@@ -239,8 +263,11 @@ export function UserInfo() {
             {userData?.levelProgress}% Complete
           </span>
           <span className="text-xs font-medium text-[#c74135]">
-            {userData?.accountType}
+            {userData?.exp} EXP
           </span>
+          {/* <span className="text-xs font-medium text-[#c74135]">
+            {userData?.accountType}
+          </span> */}
         </div>
       </div>
 
@@ -314,18 +341,6 @@ export function UserInfo() {
           </Link>
         )}
       </div>
-
-      {/* Debug info (only in development, using error from store) */}
-      {/* {process.env.NODE_ENV === "development" && storeError && (
-        <details className="border-t border-gray-100 p-4 text-xs">
-          <summary className="cursor-pointer text-gray-500">
-            Debug Info (Store Error)
-          </summary>
-          <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-2 rounded text-gray-700 overflow-auto max-h-60">
-            {storeError}
-          </pre>
-        </details>
-      )} */}
     </section>
   );
 }

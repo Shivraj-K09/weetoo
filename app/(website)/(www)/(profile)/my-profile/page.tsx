@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   MessageCircle,
@@ -37,6 +37,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import Image from "next/image";
+import { toast } from "sonner";
+
+// Import the user store at the top of the file
+import { useUserStore, useUserActions } from "@/lib/store/user-store";
 
 export default function MyProfile() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -47,6 +51,39 @@ export default function MyProfile() {
   const [uidDialogOpen, setUidDialogOpen] = useState(false);
   const [currentPlatform, setCurrentPlatform] = useState("");
   const [uidInput, setUidInput] = useState("");
+
+  // Get user data and actions from the store
+  const { user, profile, isLoading } = useUserStore();
+  const { updateProfile } = useUserActions();
+
+  // Add these state variables near the top with other useState hooks
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedNickname, setEditedNickname] = useState("");
+  const [editedFirstName, setEditedFirstName] = useState("");
+  const [editedLastName, setEditedLastName] = useState("");
+
+  // Add this useEffect to initialize the edit fields when profile data loads
+  useEffect(() => {
+    if (profile) {
+      setEditedNickname(
+        profile.nickname || profile?.email?.split("@")[0] || "user"
+      );
+      setEditedFirstName(profile.first_name || "");
+      setEditedLastName(profile.last_name || "");
+    }
+  }, [profile]);
+
+  // Helper function to check if user is using social login
+  const isSocialLogin = () => {
+    return (
+      user?.app_metadata?.provider ||
+      (user?.identities &&
+        user.identities.length > 0 &&
+        ["google", "kakao", "naver"].includes(
+          user.identities[0].provider.toLowerCase()
+        ))
+    );
+  };
 
   // Sample message data
   const messages = [
@@ -267,6 +304,41 @@ export default function MyProfile() {
     setUidDialogOpen(true);
   };
 
+  // Function to handle saving profile updates
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("You must be logged in to update your profile");
+      return;
+    }
+
+    try {
+      // Use the updateProfile action from the store
+      await updateProfile({
+        nickname: editedNickname,
+        first_name: editedFirstName,
+        last_name: editedLastName,
+      });
+
+      // Exit edit mode
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.error(`Error updating profile: ${error.message}`);
+    }
+  };
+
+  // Function to handle canceling edits
+  const handleCancelEdit = () => {
+    if (profile) {
+      // Reset to original values
+      setEditedNickname(
+        profile.nickname || profile?.email?.split("@")[0] || "user"
+      );
+      setEditedFirstName(profile.first_name || "");
+      setEditedLastName(profile.last_name || "");
+    }
+    setIsEditing(false);
+  };
+
   return (
     <div className="flex flex-col w-full">
       <div className="flex flex-col w-full">
@@ -316,15 +388,24 @@ export default function MyProfile() {
                 {/* Profile Photo Section */}
                 <div className="flex flex-col items-center">
                   <div className="relative group mb-3 cursor-pointer">
-                    <Avatar className="h-24 w-24 border-2 border-white shadow-md">
-                      <AvatarImage
-                        src="/placeholder.svg?height=96&width=96"
-                        alt="Profile"
-                      />
-                      <AvatarFallback className="bg-[#F8F9FA] text-[#495057] text-xl font-medium">
-                        TS
-                      </AvatarFallback>
-                    </Avatar>
+                    {isLoading ? (
+                      <div className="h-24 w-24 rounded-full bg-gray-200 animate-pulse"></div>
+                    ) : (
+                      <Avatar className="h-24 w-24 border-2 border-white shadow-md">
+                        <AvatarImage
+                          src={
+                            profile?.avatar_url ||
+                            "/placeholder.svg?height=96&width=96"
+                          }
+                          alt={`${profile?.first_name || "User"}'s Profile`}
+                        />
+                        <AvatarFallback className="bg-[#F8F9FA] text-[#495057] text-xl font-medium">
+                          {profile
+                            ? `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`
+                            : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                     <button
                       className="absolute bottom-0 right-0 bg-white text-[#E63946] rounded-full p-1.5 shadow-sm
                                 opacity-0 group-hover:opacity-100 transition-opacity border border-gray-100 cursor-pointer"
@@ -370,47 +451,56 @@ export default function MyProfile() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-semibold text-gray-800">
-                          테스트
-                        </h2>
+                        {isLoading ? (
+                          <div className="h-7 w-32 bg-gray-200 rounded animate-pulse"></div>
+                        ) : (
+                          <h2 className="text-lg font-semibold text-gray-800">
+                            {profile?.first_name} {profile?.last_name}
+                          </h2>
+                        )}
                       </div>
-                      <p className="text-gray-600 text-sm">@testmaster</p>
+                      {isLoading ? (
+                        <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mt-1"></div>
+                      ) : (
+                        <p className="text-gray-600 text-sm">
+                          @
+                          {profile?.nickname ||
+                            profile?.email?.split("@")[0] ||
+                            "user"}
+                        </p>
+                      )}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex items-center gap-1 text-[#E63946] border-[#E63946]/20 hover:bg-[#E63946]/5 hover:text-[#E63946] hover:border-[#E63946]/30"
+                      className="cursor-pointer flex items-center gap-1 text-[#E63946] border-[#E63946]/20 hover:bg-[#E63946]/5 hover:text-[#E63946] hover:border-[#E63946]/30"
+                      onClick={() => setIsEditing(!isEditing)}
                     >
                       <Edit className="h-3 w-3" />
-                      편집
+                      {isEditing ? "취소" : "편집"}
                     </Button>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-200/70">
+                  <div className="flex flex-col sm:flex-row sm:items-center py-2">
                     <div className="text-sm font-medium text-gray-500 w-32 mb-1 sm:mb-0">
-                      아이디
-                    </div>
-                    <div className="font-medium text-gray-800">test01</div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-200/70">
-                    <div className="text-sm font-medium text-gray-500 w-32 mb-2 sm:mb-0">
-                      비밀번호
+                      닉네임
                     </div>
                     <div className="flex items-center gap-3">
-                      <Input
-                        type="password"
-                        value="********"
-                        className="max-w-[200px] h-9 bg-white border-gray-200"
-                        readOnly
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 text-[#E63946] hover:text-[#E63946] hover:bg-[#E63946]/5 px-3"
-                      >
-                        변경
-                      </Button>
+                      {isLoading ? (
+                        <div className="h-5 w-28 bg-gray-200 rounded animate-pulse"></div>
+                      ) : isEditing ? (
+                        <Input
+                          value={editedNickname}
+                          onChange={(e) => setEditedNickname(e.target.value)}
+                          className="max-w-[200px] h-9 bg-white border-gray-200"
+                        />
+                      ) : (
+                        <div className="font-medium text-gray-800">
+                          {profile?.nickname ||
+                            profile?.email?.split("@")[0] ||
+                            "user"}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -418,23 +508,79 @@ export default function MyProfile() {
                     <div className="text-sm font-medium text-gray-500 w-32 mb-1 sm:mb-0">
                       이름
                     </div>
-                    <div className="font-medium text-gray-800">테스트</div>
+                    <div className="flex items-center gap-3">
+                      {isLoading ? (
+                        <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+                      ) : isEditing ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={editedFirstName}
+                            onChange={(e) => setEditedFirstName(e.target.value)}
+                            placeholder="First name"
+                            className="max-w-[150px] h-9 bg-white border-gray-200"
+                          />
+                          <Input
+                            value={editedLastName}
+                            onChange={(e) => setEditedLastName(e.target.value)}
+                            placeholder="Last name"
+                            className="max-w-[150px] h-9 bg-white border-gray-200"
+                          />
+                        </div>
+                      ) : (
+                        <div className="font-medium text-gray-800">
+                          {profile?.first_name} {profile?.last_name}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-200/70">
                     <div className="text-sm font-medium text-gray-500 w-32 mb-1 sm:mb-0">
                       e-mail
                     </div>
-                    <div className="font-medium text-gray-800">
-                      test01@test.com
+                    <div className="flex items-center gap-3">
+                      {isLoading ? (
+                        <div className="h-5 w-40 bg-gray-200 rounded animate-pulse"></div>
+                      ) : (
+                        <div className="font-medium text-gray-800 flex items-center gap-2">
+                          {profile?.email || user?.email || ""}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center py-2">
-                    <div className="text-sm font-medium text-gray-500 w-32 mb-1 sm:mb-0">
-                      닉네임
+                  <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-200/70">
+                    <div className="text-sm font-medium text-gray-500 w-32 mb-2 sm:mb-0">
+                      비밀번호
                     </div>
-                    <div className="font-medium text-gray-800">testmaster</div>
+                    {isLoading ? (
+                      <div className="h-9 w-40 bg-gray-200 rounded animate-pulse"></div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        {isSocialLogin() ? (
+                          <div className="text-sm text-gray-600">
+                            You are logged in with a social account. Password
+                            management is not available.
+                          </div>
+                        ) : (
+                          <>
+                            <Input
+                              type="password"
+                              value="********"
+                              className="max-w-[200px] h-9 bg-white border-gray-200"
+                              readOnly
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 text-[#E63946] hover:text-[#E63946] hover:bg-[#E63946]/5 px-3"
+                            >
+                              변경
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -455,7 +601,8 @@ export default function MyProfile() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="px-5 py-2 h-10 text-gray-700 border-gray-300 font-medium"
+                  className="px-5 py-2 h-10 text-gray-700 border-gray-300 font-medium cursor-pointer"
+                  onClick={handleCancelEdit}
                 >
                   취소
                 </Button>
@@ -468,21 +615,34 @@ export default function MyProfile() {
               >
                 <Button
                   size="sm"
-                  className="px-5 py-2 h-10 bg-[#E63946] hover:bg-[#D62C39] flex items-center gap-1 font-medium"
+                  className="px-5 py-2 h-10 bg-[#E63946] hover:bg-[#D62C39] flex items-center gap-1 font-medium cursor-pointer"
+                  disabled={isLoading}
+                  onClick={
+                    isEditing ? handleSaveProfile : () => setIsEditing(true)
+                  }
                 >
-                  저장
-                  <motion.div
-                    animate={{ x: [0, 3, 0] }}
-                    transition={{
-                      repeat: Number.POSITIVE_INFINITY,
-                      repeatType: "loop",
-                      duration: 1.5,
-                      ease: "easeInOut",
-                      repeatDelay: 0.5,
-                    }}
-                  >
-                    <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                  </motion.div>
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                      로딩중...
+                    </div>
+                  ) : (
+                    <>
+                      {isEditing ? "저장" : "편집"}
+                      <motion.div
+                        animate={{ x: [0, 3, 0] }}
+                        transition={{
+                          repeat: Number.POSITIVE_INFINITY,
+                          repeatType: "loop",
+                          duration: 1.5,
+                          ease: "easeInOut",
+                          repeatDelay: 0.5,
+                        }}
+                      >
+                        <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </motion.div>
+                    </>
+                  )}
                 </Button>
               </motion.div>
             </motion.div>

@@ -1,10 +1,8 @@
-"use client";
-
 import { UserSidebar } from "@/components/left-sidebar/user-sidebar";
 import { Navigation } from "@/components/navigation/navigation";
 import { TopBar } from "@/components/navigation/top-bar";
 
-export default function MainLayout({
+export default async function MainLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -16,6 +14,9 @@ export default function MainLayout({
   // const shouldHideRightSidebar = hideRightSidebarOn.some(
   //   (path) => pathname === path || pathname.startsWith(`${path}/`)
   // );
+  // const supabase = await createClient();
+  // const { data } = await supabase.auth.getUser();
+  // const userId = data.user?.id;
 
   return (
     <div className="flex flex-col h-full">

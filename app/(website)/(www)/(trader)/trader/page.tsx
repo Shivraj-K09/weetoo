@@ -1,7 +1,7 @@
 "use client";
 
 import { Trading } from "@/components/trading";
-import { TradingRooms } from "@/components/trading-rooms";
+import { TradingRooms } from "@/components/trading/trading-rooms";
 import { TickerTape } from "react-ts-tradingview-widgets";
 
 export default function Trader() {

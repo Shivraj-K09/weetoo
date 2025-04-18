@@ -33,10 +33,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={`antialiased`}>
-        <AuthProvider>
-          {/* Wrap children with AuthProvider */}
-          {children}
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
         <Analytics />
 
         <Toaster position="top-center" richColors />

@@ -39,142 +39,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import type { DateRange } from "react-day-picker";
+import {
+  getPointTransactions,
+  type PointTransaction,
+} from "@/app/actions/admin-content-actions";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Sample activity points data
-const activityPointsData = [
-  {
-    id: "ACT-24060501",
-    user: {
-      name: "Kim Min-ji",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060501",
-    },
-    points: 50,
-    activityType: "post",
-    activityTypeLabel: "Post Creation",
-    content: "Created a new post about cryptocurrency trends",
-    date: "2024-06-30T09:15:00",
-  },
-  {
-    id: "ACT-24060502",
-    user: {
-      name: "Park Ji-sung",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060502",
-    },
-    points: 10,
-    activityType: "comment",
-    activityTypeLabel: "Comment",
-    content: "Commented on a trending post about market analysis",
-    date: "2024-06-29T14:22:00",
-  },
-  {
-    id: "ACT-24060503",
-    user: {
-      name: "Lee Soo-jin",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060503",
-    },
-    points: 5,
-    activityType: "like",
-    activityTypeLabel: "Like",
-    content: "Liked a post about investment strategies",
-    date: "2024-06-29T11:05:00",
-  },
-  {
-    id: "ACT-24060504",
-    user: {
-      name: "Choi Woo-shik",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060504",
-    },
-    points: 20,
-    activityType: "share",
-    activityTypeLabel: "Share",
-    content: "Shared a post about blockchain technology",
-    date: "2024-06-28T16:48:00",
-  },
-  {
-    id: "ACT-24060505",
-    user: {
-      name: "Kang Hye-jung",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060505",
-    },
-    points: 15,
-    activityType: "login",
-    activityTypeLabel: "Login Bonus",
-    content: "Daily login bonus",
-    date: "2024-06-28T10:30:00",
-  },
-  {
-    id: "ACT-24060506",
-    user: {
-      name: "Jung Ho-yeon",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060506",
-    },
-    points: 100,
-    activityType: "referral",
-    activityTypeLabel: "Referral",
-    content: "Referred a new user: Bae Suzy",
-    date: "2024-06-27T15:40:00",
-  },
-  {
-    id: "ACT-24060507",
-    user: {
-      name: "Bae Suzy",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060507",
-    },
-    points: 75,
-    activityType: "content",
-    activityTypeLabel: "Content Creation",
-    content: "Created a detailed analysis article on market trends",
-    date: "2024-06-27T13:25:00",
-  },
-  {
-    id: "ACT-24060508",
-    user: {
-      name: "Gong Yoo",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060508",
-    },
-    points: 5,
-    activityType: "checkin",
-    activityTypeLabel: "Daily Check-in",
-    content: "Checked in to the platform",
-    date: "2024-06-26T10:15:00",
-  },
-  {
-    id: "ACT-24060509",
-    user: {
-      name: "Son Ye-jin",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060509",
-    },
-    points: 30,
-    activityType: "post",
-    activityTypeLabel: "Post Creation",
-    content: "Created a new post about trading strategies",
-    date: "2024-06-25T16:20:00",
-  },
-  {
-    id: "ACT-24060510",
-    user: {
-      name: "Hyun Bin",
-      avatar: "/placeholder.svg?height=40&width=40",
-      uid: "UID-24060510",
-    },
-    points: 25,
-    activityType: "comment",
-    activityTypeLabel: "Comment",
-    content: "Provided detailed feedback on a technical analysis post",
-    date: "2024-06-25T11:45:00",
-  },
-];
-
-export type ActivityPoint = (typeof activityPointsData)[0];
+export type ActivityPoint = PointTransaction;
 
 interface ActivityPointsTableProps {
   searchTerm: string;
@@ -189,12 +60,31 @@ export function ActivityPointsTable({
   filters,
 }: ActivityPointsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "date", desc: true },
+    { id: "created_at", desc: true },
   ]);
   const [selectedActivity, setSelectedActivity] =
     useState<ActivityPoint | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [pageSize, setPageSize] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<ActivityPoint[]>([]);
+
+  // Fetch activities on component mount
+  useEffect(() => {
+    const fetchActivities = async () => {
+      setLoading(true);
+      try {
+        const data = await getPointTransactions();
+        setActivities(data);
+      } catch (error) {
+        console.error("Error fetching activities:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivities();
+  }, []);
 
   // Format date to a readable format
   const formatDate = useCallback((dateString: string) => {
@@ -217,6 +107,7 @@ export function ActivityPointsTable({
 
   // Get initials from name
   const getInitials = useCallback((name: string) => {
+    if (!name) return "?";
     return name
       .split(" ")
       .map((part) => part.charAt(0))
@@ -227,31 +118,85 @@ export function ActivityPointsTable({
   // Get activity type badge color
   const getActivityTypeBadgeClass = useCallback((activityType: string) => {
     switch (activityType) {
-      case "post":
+      case "post_create":
         return "bg-blue-50 text-blue-700 dark:bg-blue-900/20";
-      case "comment":
+      case "comment_add":
         return "bg-green-50 text-green-700 dark:bg-green-900/20";
-      case "like":
+      case "post_like":
         return "bg-pink-50 text-pink-700 dark:bg-pink-900/20";
-      case "share":
+      case "post_share":
         return "bg-purple-50 text-purple-700 dark:bg-purple-900/20";
-      case "login":
-        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20";
-      case "referral":
-        return "bg-orange-50 text-orange-700 dark:bg-orange-900/20";
-      case "content":
+      case "welcome_bonus":
+        return "bg-amber-50 text-amber-700 dark:bg-amber-900/20";
+      case "daily_login":
         return "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20";
-      case "checkin":
-        return "bg-teal-50 text-teal-700 dark:bg-teal-900/20";
       default:
         return "bg-gray-50 text-gray-700 dark:bg-gray-900/20";
+    }
+  }, []);
+
+  // Get activity type label
+  const getActivityTypeLabel = useCallback((activityType: string) => {
+    switch (activityType) {
+      case "post_create":
+        return "Post Creation";
+      case "comment_add":
+        return "Comment";
+      case "post_like":
+        return "Like";
+      case "post_share":
+        return "Share";
+      case "welcome_bonus":
+        return "Welcome Bonus";
+      case "daily_login":
+        return "Daily Login";
+      default:
+        return activityType;
+    }
+  }, []);
+
+  // Map transaction type to filter type
+  const mapTransactionTypeToFilter = useCallback((transactionType: string) => {
+    switch (transactionType) {
+      case "post_create":
+        return "post";
+      case "comment_add":
+        return "comment";
+      case "post_like":
+        return "like";
+      case "post_share":
+        return "share";
+      default:
+        return transactionType;
+    }
+  }, []);
+
+  // Get content description from metadata
+  const getContentDescription = useCallback((transaction: PointTransaction) => {
+    const metadata = transaction.metadata || {};
+
+    switch (transaction.transaction_type) {
+      case "post_create":
+        return `Created a post: ${metadata.post_title || "Untitled Post"}`;
+      case "comment_add":
+        return `Commented on: ${metadata.post_title || "Unknown Post"}`;
+      case "post_like":
+        return `Liked a post: ${metadata.post_title || "Unknown Post"}`;
+      case "post_share":
+        return `Shared a post: ${metadata.post_title || "Unknown Post"}${metadata.share_platform ? ` on ${metadata.share_platform}` : ""}`;
+      case "welcome_bonus":
+        return "Received welcome bonus for joining";
+      case "daily_login":
+        return `Daily login bonus on ${new Date(metadata.login_date).toLocaleDateString()}`;
+      default:
+        return "Performed an activity";
     }
   }, []);
 
   const columns = useMemo<ColumnDef<ActivityPoint>[]>(
     () => [
       {
-        accessorKey: "id",
+        accessorKey: "act_id",
         header: ({ column }) => {
           return (
             <Button
@@ -267,7 +212,9 @@ export function ActivityPointsTable({
           );
         },
         cell: ({ row }) => (
-          <div className="font-mono text-sm">{row.getValue("id")}</div>
+          <div className="font-mono text-sm">
+            {row.getValue("act_id") || "N/A"}
+          </div>
         ),
       },
       {
@@ -287,32 +234,47 @@ export function ActivityPointsTable({
           );
         },
         cell: ({ row }) => {
-          const user = row.getValue("user") as {
-            name: string;
-            avatar: string;
-            uid: string;
+          const transaction = row.original;
+          const user = transaction.user || {
+            first_name: "Unknown",
+            last_name: "User",
+            avatar_url: null,
+            uid: "N/A",
           };
+
+          const name =
+            `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+            "Unknown User";
+
           return (
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                <AvatarImage src={user.avatar_url || ""} alt={name} />
+                <AvatarFallback>{getInitials(name)}</AvatarFallback>
               </Avatar>
               <div>
-                <div className="font-medium">{user.name}</div>
-                <div className="text-xs text-muted-foreground">{user.uid}</div>
+                <div className="font-medium">{name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {user.uid || "N/A"}
+                </div>
               </div>
             </div>
           );
         },
         sortingFn: (rowA, rowB) => {
-          const userA = rowA.getValue("user") as { name: string };
-          const userB = rowB.getValue("user") as { name: string };
-          return userA.name.localeCompare(userB.name);
+          const userA = rowA.original.user;
+          const userB = rowB.original.user;
+          const nameA = userA
+            ? `${userA.first_name || ""} ${userA.last_name || ""}`.trim()
+            : "";
+          const nameB = userB
+            ? `${userB.first_name || ""} ${userB.last_name || ""}`.trim()
+            : "";
+          return nameA.localeCompare(nameB);
         },
       },
       {
-        accessorKey: "points",
+        accessorKey: "exp_earned",
         header: ({ column }) => {
           return (
             <Button
@@ -322,18 +284,39 @@ export function ActivityPointsTable({
               }
               className="p-0 hover:bg-transparent"
             >
-              Earned Points
+              Earned EXP
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           );
         },
         cell: ({ row }) => {
-          const points = row.getValue("points") as number;
-          return <div className="font-medium">{points} points</div>;
+          const value = row.getValue("exp_earned") as number;
+          return <div className="font-medium">{value} EXP</div>;
         },
       },
       {
-        accessorKey: "activityType",
+        accessorKey: "coins_earned",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+              className="p-0 hover:bg-transparent"
+            >
+              Earned KOR Coins
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          );
+        },
+        cell: ({ row }) => {
+          const value = row.getValue("coins_earned") as number;
+          return <div className="font-medium">{value} KOR</div>;
+        },
+      },
+      {
+        accessorKey: "transaction_type",
         header: ({ column }) => {
           return (
             <Button
@@ -349,8 +332,9 @@ export function ActivityPointsTable({
           );
         },
         cell: ({ row }) => {
-          const activityType = row.getValue("activityType") as string;
-          const activityTypeLabel = row.original.activityTypeLabel;
+          const transaction = row.original;
+          const activityType = transaction.transaction_type;
+          const activityTypeLabel = getActivityTypeLabel(activityType);
           return (
             <Badge
               variant="outline"
@@ -365,12 +349,13 @@ export function ActivityPointsTable({
         accessorKey: "content",
         header: "Content",
         cell: ({ row }) => {
-          const content = row.getValue("content") as string;
+          const transaction = row.original;
+          const content = getContentDescription(transaction);
           return <div className="max-w-xs truncate">{content}</div>;
         },
       },
       {
-        accessorKey: "date",
+        accessorKey: "created_at",
         header: ({ column }) => {
           return (
             <Button
@@ -386,8 +371,8 @@ export function ActivityPointsTable({
           );
         },
         cell: ({ row }) => {
-          const date = formatDate(row.getValue("date"));
-          const time = formatTime(row.getValue("date"));
+          const date = formatDate(row.getValue("created_at"));
+          const time = formatTime(row.getValue("created_at"));
           return (
             <div>
               <div>{date}</div>
@@ -427,36 +412,56 @@ export function ActivityPointsTable({
         },
       },
     ],
-    [formatDate, formatTime, getInitials, getActivityTypeBadgeClass]
+    [
+      formatDate,
+      formatTime,
+      getInitials,
+      getActivityTypeBadgeClass,
+      getActivityTypeLabel,
+      getContentDescription,
+    ]
   );
 
   // Filter data based on search term and filters
   const filteredData = useMemo(() => {
-    return activityPointsData.filter((activity) => {
+    return activities.filter((activity) => {
       // Search term filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
+        const userName = activity.user
+          ? `${activity.user.first_name || ""} ${activity.user.last_name || ""}`
+              .trim()
+              .toLowerCase()
+          : "";
+        const userUid = activity.user?.uid?.toLowerCase() || "";
+        const activityTypeLabel = getActivityTypeLabel(
+          activity.transaction_type
+        ).toLowerCase();
+        const content = getContentDescription(activity).toLowerCase();
+
         const matchesSearch =
-          activity.id.toLowerCase().includes(searchLower) ||
-          activity.user.name.toLowerCase().includes(searchLower) ||
-          activity.user.uid.toLowerCase().includes(searchLower) ||
-          activity.activityTypeLabel.toLowerCase().includes(searchLower) ||
-          activity.content.toLowerCase().includes(searchLower);
+          (activity.act_id?.toLowerCase() || "").includes(searchLower) ||
+          userName.includes(searchLower) ||
+          userUid.includes(searchLower) ||
+          activityTypeLabel.includes(searchLower) ||
+          content.includes(searchLower);
 
         if (!matchesSearch) return false;
       }
 
       // Activity type filter
-      if (
-        filters.activityType !== "all" &&
-        activity.activityType !== filters.activityType
-      ) {
-        return false;
+      if (filters.activityType !== "all") {
+        const mappedType = mapTransactionTypeToFilter(
+          activity.transaction_type
+        );
+        if (mappedType !== filters.activityType) {
+          return false;
+        }
       }
 
       // Date range filter
       if (filters.dateRange.from) {
-        const activityDate = new Date(activity.date);
+        const activityDate = new Date(activity.created_at);
         const startOfDay = new Date(filters.dateRange.from);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -466,7 +471,7 @@ export function ActivityPointsTable({
       }
 
       if (filters.dateRange.to) {
-        const activityDate = new Date(activity.date);
+        const activityDate = new Date(activity.created_at);
         const endOfDay = new Date(filters.dateRange.to);
         endOfDay.setHours(23, 59, 59, 999);
 
@@ -477,7 +482,14 @@ export function ActivityPointsTable({
 
       return true;
     });
-  }, [searchTerm, filters]);
+  }, [
+    activities,
+    searchTerm,
+    filters,
+    getActivityTypeLabel,
+    getContentDescription,
+    mapTransactionTypeToFilter,
+  ]);
 
   const table = useReactTable({
     data: filteredData,
@@ -511,6 +523,39 @@ export function ActivityPointsTable({
       return () => clearTimeout(timer);
     }
   }, [detailsDialogOpen]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((column, index) => (
+                  <TableHead key={index}>
+                    {typeof column.header === "string"
+                      ? column.header
+                      : "Column"}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  {columns.map((_, colIndex) => (
+                    <TableCell key={colIndex}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

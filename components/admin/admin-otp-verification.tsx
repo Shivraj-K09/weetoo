@@ -2,20 +2,20 @@
 
 import type React from "react";
 
-import { useEffect, useState, useRef, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { sendAdminOtp, verifyAdminOtp } from "@/app/actions/admin-actions";
+import { Button } from "@/components/ui/button";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { ThemeProvider } from "@/providers/theme-provider";
-import { toast } from "sonner";
 import { useUserStore } from "@/lib/store/user-store";
-import { sendAdminOtp, verifyAdminOtp } from "@/app/actions/admin-actions";
-import { Button } from "@/components/ui/button";
-import { Mail, Shield, Loader2 } from "lucide-react";
+import { ThemeProvider } from "@/providers/theme-provider";
+import { Loader2, Mail, Shield } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // Add this new component after the imports and before the AdminOtpVerification component
 function OtpFromUrl({

@@ -12,10 +12,10 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { navigationData, secondaryItems } from "@/lib/navigation-data";
-import { NavMain } from "../nav-main";
-import { NavUser } from "../nav-user";
 import Link from "next/link";
+import { NavMain } from "../nav-main";
 import { NavSecondary } from "../nav-secondary";
+import { NavUser } from "../nav-user";
 
 export function AdminSidebar({
   ...props

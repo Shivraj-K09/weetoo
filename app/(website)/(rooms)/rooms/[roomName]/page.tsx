@@ -1,5 +1,5 @@
 import TradingRoomPage from "@/components/room/room-page";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
