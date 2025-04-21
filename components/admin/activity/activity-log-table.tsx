@@ -18,6 +18,7 @@ import {
   Info,
   AlertCircle,
   ClipboardList,
+  Cpu,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -32,13 +33,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ActivityLog {
   id: string;
   timestamp: string;
   action: string;
   action_label: string;
-  admin_id: string;
+  admin_id: string | null;
   target: string;
   details: string;
   severity: string;
@@ -50,7 +52,7 @@ interface ActivityLog {
     last_name: string | null;
     email: string;
     avatar_url: string | null;
-  };
+  } | null;
 }
 
 interface ActivityLogTableProps {
@@ -127,6 +129,7 @@ export function ActivityLogTable({
     const fetchActivityLog = async () => {
       try {
         setLoading(true);
+        console.log("Fetching activity log with filters:", filters);
 
         // Build query parameters
         const params = new URLSearchParams();
@@ -147,6 +150,7 @@ export function ActivityLogTable({
         }
 
         const data = await response.json();
+        console.log("Fetched activity log data:", data);
         setActivityData(data);
         setFilteredData(data);
       } catch (error) {
@@ -224,7 +228,9 @@ export function ActivityLogTable({
 
   // Get action badge class
   const getActionBadgeClass = (action: string) => {
-    if (
+    if (action === "post_auto_approve") {
+      return "bg-purple-50 text-purple-700 dark:bg-purple-900/20";
+    } else if (
       action.includes("user_create") ||
       action.includes("post_approve") ||
       action.includes("post_show")
@@ -324,6 +330,25 @@ export function ActivityLogTable({
       },
       cell: ({ row }) => {
         const admin = row.original.admin;
+        const adminId = row.original.admin_id;
+
+        // Check if this is a system action (null admin_id)
+        if (adminId === null) {
+          return (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6 bg-slate-200 dark:bg-slate-700">
+                <AvatarImage src="/abstract-network.png" alt="System" />
+                <AvatarFallback>
+                  <Cpu className="h-3 w-3" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="font-medium text-slate-600 dark:text-slate-300">
+                System
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
@@ -364,25 +389,6 @@ export function ActivityLogTable({
       },
       cell: ({ row }) => {
         const target = row.getValue("target") as string;
-
-        // For existing logs, try to display the target with UID highlighted if it's a user target
-        if (target && target.startsWith("User:")) {
-          // Extract the ID/UID part which is in parentheses
-          const match = target.match(/$$(.*?)$$/);
-          if (match && match[1]) {
-            const idOrUid = match[1];
-            // Highlight the UID part
-            return (
-              <div>
-                {target.replace(/$$.*?$$/, "")}
-                <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">
-                  ({idOrUid})
-                </span>
-              </div>
-            );
-          }
-        }
-
         return <div>{target}</div>;
       },
     },
@@ -443,7 +449,10 @@ export function ActivityLogTable({
       return (
         <TableRow>
           <TableCell colSpan={columns.length} className="h-24 text-center">
-            Loading activity log...
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-[250px]" />
+            </div>
           </TableCell>
         </TableRow>
       );

@@ -98,9 +98,11 @@ export function Ranking() {
   const renderRankingColumn = (title: string, index: number) => (
     <div className="overflow-hidden">
       {/* Ranking Header */}
-      <div className="flex items-center px-3 py-2 border-b border-gray-200 bg-gradient-to-r from-[#f39c12]/20 to-white">
+      <div className="flex items-center px-3 py-2 border-b border-gray-200 bg-gradient-to-r dark:border-border from-[#f39c12]/20 to-white dark:bg-gradient-to-r dark:from-[#f39c12]/20 dark:to-background ">
         <span className="text-[#f39c12] mr-1.5">👑</span>
-        <h3 className="text-xs font-medium text-gray-700">{title}</h3>
+        <h3 className="text-xs font-medium text-gray-700 dark:text-white">
+          {title}
+        </h3>
         <span className="hidden">{index}</span>
       </div>
 
@@ -109,17 +111,17 @@ export function Ranking() {
         {[1, 2, 3, 4, 5].map((rank) => (
           <ContextMenu key={rank}>
             <ContextMenuTrigger>
-              <div className="flex items-center px-3 py-2 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+              <div className="flex items-center px-3 py-2 text-xs border-b border-gray-100 dark: last:border-0 hover:bg-gray-50 dark:hover:bg-accent cursor-pointer transition-colors duration-150">
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center mr-2.5">
                   <span className="text-white text-[10px] font-medium">
                     {rank}
                   </span>
                 </div>
                 <div className="flex-1 flex items-center">
-                  <span className="text-gray-700 font-medium text-[0.6rem]">
+                  <span className="text-gray-700 font-medium text-[0.6rem] dark:text-white">
                     나스닥 탑천
                   </span>
-                  <span className="text-gray-400 text-[10px] ml-1.5">
+                  <span className="text-gray-400 text-[10px] ml-1.5 dark:text-muted-foreground">
                     NASDAQ
                   </span>
                 </div>
@@ -173,9 +175,9 @@ export function Ranking() {
   );
 
   return (
-    <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
+    <div className="w-full max-w-[1168px] border border-gray-200 dark:border-border rounded-md overflow-hidden bg-white dark:bg-background">
       {/* Desktop View - Five column layout */}
-      <div className="hidden lg:grid lg:grid-cols-4 divide-x divide-gray-200">
+      <div className="hidden lg:grid lg:grid-cols-4 divide-x divide-gray-200 dark:divide-border">
         {[0, 1, 2, 3].map((index) => (
           <div key={index}>
             {renderRankingColumn(rankingTitles[index], index)}

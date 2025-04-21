@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreatePostForm } from "@/components/post/create-post-form";
+import CreatePostForm from "@/components/post/create-post-form";
 import { PostPreview } from "@/components/post/post-preview";
 import { PageHeader } from "@/components/post/page-header";
 import { createPost } from "@/app/actions/post-actions";
@@ -31,6 +31,20 @@ export default function EducationPostClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Add captcha state
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+    setIsCaptchaVerified(true);
+  };
+
+  const handleCaptchaExpire = () => {
+    setCaptchaToken(null);
+    setIsCaptchaVerified(false);
+  };
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
@@ -72,9 +86,14 @@ export default function EducationPostClient() {
       return;
     }
 
+    if (!captchaToken) {
+      toast.error("Please complete the CAPTCHA verification");
+      return;
+    }
+
     try {
       setIsSaving(true);
-      toast.info("Submitting your post for review...");
+      toast.info("Publishing your post...");
       console.log("Submitting post data:", postData);
 
       // Create FormData object
@@ -87,6 +106,7 @@ export default function EducationPostClient() {
         "featuredImages",
         JSON.stringify(postData.featuredImages)
       );
+      formData.append("captchaToken", captchaToken);
 
       // Submit the form
       console.log("Calling createPost server action");
@@ -99,7 +119,7 @@ export default function EducationPostClient() {
 
       if (result?.success) {
         toast.success(
-          "Your post has been submitted for review and will be published after approval."
+          result.message || "Your post has been published successfully!"
         );
         setSuccess(result.message);
 
@@ -156,6 +176,9 @@ export default function EducationPostClient() {
             onPreview={togglePreview}
             onSave={() => Promise.resolve()}
             onImageUpload={handleImageUpload}
+            captchaVerified={isCaptchaVerified}
+            onCaptchaVerify={handleCaptchaVerify}
+            onCaptchaExpire={handleCaptchaExpire}
           />
         )}
       </div>

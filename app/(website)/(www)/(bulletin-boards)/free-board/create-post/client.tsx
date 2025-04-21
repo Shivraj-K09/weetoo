@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/post/page-header";
 import { PostPreview } from "@/components/post/post-preview";
-import { CreatePostForm } from "@/components/post/create-post-form";
+import CreatePostForm from "@/components/post/create-post-form";
 
 // Define the PostData type to fix TypeScript errors
 interface PostData {
@@ -32,6 +32,20 @@ export function CreatePostClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Add captcha state
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+
+  // Add captcha handlers
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+    setIsCaptchaVerified(true);
+  };
+
+  const handleCaptchaExpire = () => {
+    setCaptchaToken(null);
+    setIsCaptchaVerified(false);
+  };
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
@@ -78,9 +92,14 @@ export function CreatePostClient() {
       return;
     }
 
+    if (!captchaToken) {
+      toast.error("Please complete the CAPTCHA verification");
+      return;
+    }
+
     try {
       setIsSaving(true);
-      toast.info("Submitting your post for review...");
+      toast.info("Publishing your post...");
       console.log("Submitting post data:", postData);
 
       // Create FormData object
@@ -93,6 +112,7 @@ export function CreatePostClient() {
         "featuredImages",
         JSON.stringify(postData.featuredImages)
       );
+      formData.append("captchaToken", captchaToken);
 
       // Submit the form
       console.log("Calling createPost server action");
@@ -105,7 +125,7 @@ export function CreatePostClient() {
 
       if (result?.success) {
         toast.success(
-          "Your post has been submitted for review and will be published after approval."
+          result.message || "Your post has been published successfully!"
         );
         setSuccess(result.message);
 
@@ -162,6 +182,9 @@ export function CreatePostClient() {
             onPreview={togglePreview}
             onSave={() => Promise.resolve()}
             onImageUpload={handleImageUpload}
+            captchaVerified={isCaptchaVerified}
+            onCaptchaVerify={handleCaptchaVerify}
+            onCaptchaExpire={handleCaptchaExpire}
           />
         )}
       </div>

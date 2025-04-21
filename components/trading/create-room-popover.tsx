@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
 import bcrypt from "bcryptjs";
@@ -32,6 +31,12 @@ import {
 } from "lucide-react";
 import type { Privacy, RoomCategory, UserProfile } from "@/types/index";
 
+// Room creation costs
+const ROOM_COSTS = {
+  regular: 5000, // Regular Room: 5,000 KOR_COIN
+  voice: 8000, // Voice Room: 8,000 KOR_COIN
+};
+
 interface CreateRoomPopoverProps {
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -44,6 +49,7 @@ export function CreateRoomPopover({
   user,
 }: CreateRoomPopoverProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     symbol: "BTCUSDT",
@@ -81,6 +87,55 @@ export function CreateRoomPopover({
     setShowPassword(!showPassword);
   };
 
+  const createRoom = useCallback(async () => {
+    if (!user) {
+      toast.error("You must be logged in to create a room");
+      return null;
+    }
+
+    // Prepare room data for insertion
+    const roomData = {
+      owner_id: user.id, // Changed from created_by to owner_id
+      room_name: formData.title, // Changed from title to room_name to match schema
+      room_type: formData.privacy, // Changed from privacy to room_type to match schema
+      room_password: formData.password
+        ? await bcrypt.hash(formData.password, 10)
+        : null,
+      trading_pairs: [formData.symbol], // Make sure it's an array
+      room_category: formData.room_category,
+      participants: [user.id], // Initialize with the creator as a participant
+      current_participants: 1, // Start with 1 participant (the creator)
+    };
+
+    // Insert room into Supabase with timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Request timed out")), 10000); // 10 second timeout
+    });
+
+    try {
+      // Create the room
+      const { data, error } = (await Promise.race([
+        supabase.from("trading_rooms").insert(roomData).select("id").single(),
+        timeoutPromise,
+      ])) as any;
+
+      if (error) {
+        console.error("Error creating room:", error);
+        throw error;
+      }
+
+      // No KOR_COIN deduction - completely removed
+      console.log(
+        `Room created without deducting ${ROOM_COSTS[formData.room_category].toLocaleString()} KOR_COIN from user balance`
+      );
+
+      return data;
+    } catch (error) {
+      console.error("Failed to create room:", error);
+      throw error;
+    }
+  }, [formData, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,92 +144,60 @@ export function CreateRoomPopover({
       return;
     }
 
-    // Disable form submission while processing
-    const submitButton = e.currentTarget.querySelector(
-      'button[type="submit"]'
-    ) as HTMLButtonElement;
-    if (submitButton) {
-      submitButton.disabled = true;
+    if (isSubmitting) {
+      return; // Prevent multiple submissions
     }
 
+    // Validate form
+    if (!formData.title.trim()) {
+      toast.error("Room title is required");
+      return;
+    }
+
+    if (formData.privacy === "private" && !formData.password) {
+      toast.error("Password is required for private rooms");
+      return;
+    }
+
+    // No KOR_COIN balance check - completely removed
+    const roomCost = ROOM_COSTS[formData.room_category];
+
+    setIsSubmitting(true);
+    const loadingToast = toast.loading("Creating room...");
+
     try {
-      // Show loading toast
-      const loadingToast = toast.loading("Creating room...");
-
-      // Hash password if room is private
-      let hashedPassword = null;
-      if (formData.privacy === "private" && formData.password) {
-        hashedPassword = await bcrypt.hash(formData.password, 10);
-      }
-
-      // Prepare room data
-      const roomData = {
-        room_name: formData.title,
-        room_type: formData.privacy,
-        room_password: hashedPassword,
-        trading_pairs: [formData.symbol],
-        owner_id: user.id,
-        participants: [user.id],
-        current_participants: 1,
-        max_participants: 100,
-        room_category: formData.room_category,
-      };
-
-      // Insert room into Supabase with retry logic
-      let retryCount = 0;
+      // Try to create the room with up to 2 retries
       let roomResult = null;
+      let attempts = 0;
+      const maxAttempts = 3;
 
-      while (retryCount < 3 && !roomResult) {
+      while (!roomResult && attempts < maxAttempts) {
         try {
-          const { data, error } = await supabase
-            .from("trading_rooms")
-            .insert(roomData)
-            .select("id")
-            .single();
+          attempts++;
+          roomResult = await createRoom();
 
-          if (error) {
-            console.error(
-              `Error creating room (attempt ${retryCount + 1}):`,
-              error
-            );
-            retryCount++;
-
-            if (retryCount < 3) {
-              // Wait before retrying
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            } else {
-              throw error;
-            }
-          } else {
-            roomResult = data;
-            break;
+          if (!roomResult) {
+            throw new Error("Failed to create room - no data returned");
           }
-        } catch (insertError) {
-          console.error(
-            `Exception during room creation (attempt ${retryCount + 1}):`,
-            insertError
-          );
-          retryCount++;
+        } catch (error) {
+          console.error(`Room creation attempt ${attempts} failed:`, error);
 
-          if (retryCount < 3) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          } else {
-            throw insertError;
+          if (attempts >= maxAttempts) {
+            throw error;
           }
+
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
-      if (!roomResult) {
-        throw new Error("Failed to create room after multiple attempts");
-      }
+      // Generate room slug
+      const roomSlug = `${roomResult.id}-${formData.title
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w-]+/g, "")}`;
 
-      // Close the loading toast
-      toast.dismiss(loadingToast);
-
-      // Close the popover
-      setOpen(false);
-
-      // Reset form
+      // Reset form and close popover
       setFormData({
         title: "",
         symbol: "BTCUSDT",
@@ -183,42 +206,48 @@ export function CreateRoomPopover({
         room_category: "regular",
       });
       setShowPassword(false);
+      setOpen(false);
 
-      // Generate room slug
-      const roomSlug = `${roomResult.id}-${formData.title
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^\w-]+/g, "")}`;
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      toast.success("Room created successfully");
 
+      // Conditional redirection based on room category
       if (formData.room_category === "voice") {
+        // For voice rooms, redirect to the voice-rooms route
         window.open(
-          `${window.location.origin}/voice-rooms/${roomSlug}?host=true`,
+          `${window.location.origin}/voice-room/${roomSlug}`,
           "_blank",
           "width=1600,height=900"
         );
       } else {
+        // For regular rooms, use the existing rooms route
         window.open(
           `${window.location.origin}/rooms/${roomSlug}`,
           "_blank",
           "width=1600,height=900"
         );
       }
-
-      // Show success toast
-      toast.success("Room created successfully");
     } catch (error) {
       console.error("Error in room creation:", error);
-      toast.error("An error occurred while creating the room");
+      toast.dismiss(loadingToast);
+      toast.error("Failed to create room. Please try again.");
     } finally {
-      // Re-enable the submit button
-      if (submitButton) {
-        submitButton.disabled = false;
-      }
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(newOpen) => {
+        // Prevent closing the popover while submitting
+        if (isSubmitting && !newOpen) {
+          return;
+        }
+        setOpen(newOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button className="font-semibold bg-[#E74C3C] hover:bg-[#E74C3C]/90 rounded text-white cursor-pointer h-10">
           Create a Trading Room
@@ -233,7 +262,8 @@ export function CreateRoomPopover({
               variant="ghost"
               size="icon"
               className="h-8 w-8 cursor-pointer"
-              onClick={() => setOpen(false)}
+              onClick={() => !isSubmitting && setOpen(false)}
+              disabled={isSubmitting}
             >
               <XIcon className="h-4 w-4" />
             </Button>
@@ -250,11 +280,13 @@ export function CreateRoomPopover({
                 placeholder="방제목을 입력해 주세요."
                 className="rounded w-full shadow-none h-10"
                 required
+                disabled={isSubmitting}
               />
 
               <Select
                 value={formData.symbol}
                 onValueChange={(value) => handleSelectChange("symbol", value)}
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="rounded w-full shadow-none h-10 cursor-pointer">
                   <SelectValue placeholder="BTCUSDT" />
@@ -272,6 +304,7 @@ export function CreateRoomPopover({
                 onValueChange={(value) =>
                   handleSelectChange("room_category", value)
                 }
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="rounded w-full shadow-none h-10 cursor-pointer">
                   <SelectValue placeholder="방 유형 선택" />
@@ -280,13 +313,13 @@ export function CreateRoomPopover({
                   <SelectItem value="regular">
                     <div className="flex items-center">
                       <MessageSquareIcon className="h-4 w-4 mr-2" />
-                      채팅방 (Regular Room)
+                      Regular Room
                     </div>
                   </SelectItem>
                   <SelectItem value="voice">
                     <div className="flex items-center">
                       <MicIcon className="h-4 w-4 mr-2" />
-                      음성방 (Voice Room)
+                      Voice Room
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -296,17 +329,18 @@ export function CreateRoomPopover({
               <Select
                 value={formData.privacy}
                 onValueChange={(value) => handleSelectChange("privacy", value)}
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="rounded w-full shadow-none h-10 cursor-pointer">
                   <SelectValue placeholder="비공개방" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* <SelectItem value="private">
+                  <SelectItem value="private">
                     <div className="flex items-center">
                       <LockIcon className="h-4 w-4 mr-2" />
                       비공개방 (Private Room)
                     </div>
-                  </SelectItem> */}
+                  </SelectItem>
                   <SelectItem value="public">
                     <div className="flex items-center">
                       <GlobeIcon className="h-4 w-4 mr-2" />
@@ -326,6 +360,7 @@ export function CreateRoomPopover({
                     type={showPassword ? "text" : "password"}
                     className="rounded w-full shadow-none h-10"
                     required
+                    disabled={isSubmitting}
                   />
                   <Button
                     type="button"
@@ -334,6 +369,7 @@ export function CreateRoomPopover({
                     onClick={togglePasswordVisibility}
                     className="absolute right-0 top-0 h-10 w-10 text-gray-500"
                     aria-label="Toggle password visibility"
+                    disabled={isSubmitting}
                   >
                     {showPassword ? (
                       <EyeIcon className="h-4 w-4" />
@@ -349,18 +385,20 @@ export function CreateRoomPopover({
 
               {/* Price Info */}
               <div className="text-right text-xs text-[#E74C3C] font-medium pt-5">
-                6,900,000 KOR_COIN
+                {user?.kor_coins?.toLocaleString() || "0"} KOR_COIN
               </div>
 
               {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full bg-[#E74C3C] mt-2 hover:bg-[#E74C3C]/90 text-white font-medium rounded shadow-none h-12 cursor-pointer"
-                disabled={formData.title.trim() === ""}
+                disabled={isSubmitting || formData.title.trim() === ""}
               >
-                {formData.title.trim() === ""
-                  ? "Enter Room Title"
-                  : "1,000 KOR_COIN"}
+                {isSubmitting
+                  ? "Creating Room..."
+                  : formData.title.trim() === ""
+                    ? "Enter Room Title"
+                    : `${ROOM_COSTS[formData.room_category].toLocaleString()} KOR_COIN`}
               </Button>
             </form>
           ) : (

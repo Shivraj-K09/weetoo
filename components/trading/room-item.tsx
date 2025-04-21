@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar } from "@/components/ui/avatar";
-import { GlobeIcon, LockIcon } from "lucide-react";
+import { GlobeIcon, LockIcon, MessageSquareIcon, MicIcon } from "lucide-react";
 import type { Room } from "@/types/index";
 
 interface RoomItemProps {
@@ -52,9 +52,23 @@ export function RoomItem({ room, index, onClick }: RoomItemProps) {
           </div>
           {/* Display room category */}
           <div
-            className={`px-2 py-0.5 ${room.roomCategory === "voice" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"} rounded-sm text-xs font-medium`}
+            className={`px-2 py-0.5 ${
+              room.roomCategory === "voice"
+                ? "bg-blue-100 text-blue-800"
+                : "bg-green-100 text-green-800"
+            } rounded-sm text-xs font-medium flex items-center`}
           >
-            {room.roomCategory === "voice" ? "음성방" : "채팅방"}
+            {room.roomCategory === "voice" ? (
+              <>
+                <MicIcon className="h-3 w-3 mr-1" />
+                Voice
+              </>
+            ) : (
+              <>
+                <MessageSquareIcon className="h-3 w-3 mr-1" />
+                Regular
+              </>
+            )}
           </div>
         </div>
 

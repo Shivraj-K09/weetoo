@@ -1,10 +1,23 @@
 import { createBrowserClient } from "@supabase/ssr";
 
+// Enhanced createClient function with error handling
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error(
+        "Supabase URL or API key is missing. Please check your environment variables."
+      );
+      throw new Error("Supabase configuration missing");
+    }
+
+    return createBrowserClient(supabaseUrl, supabaseKey);
+  } catch (error) {
+    console.error("Failed to create Supabase client:", error);
+    throw new Error("Failed to initialize Supabase client");
+  }
 }
 
 // Create a singleton instance

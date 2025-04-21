@@ -296,7 +296,7 @@ export default function KoreanDataTable() {
       <div className="w-full overflow-x-auto">
         <div className="flex gap-5 items-center w-full justify-center">
           <Image
-            src="/trader-banner.png"
+            src="/banner2.png"
             alt="trader-banner"
             width={1000}
             height={250}

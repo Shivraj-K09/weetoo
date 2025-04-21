@@ -57,7 +57,7 @@ export default function KorCoinRank() {
     <div className="w-full h-full py-5">
       <div className="flex flex-col w-full">
         <Image
-          src="/trader-banner.png"
+          src="/banner2`.png"
           alt="trader-banner"
           width={1000}
           height={250}

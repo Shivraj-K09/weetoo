@@ -50,8 +50,12 @@ import { formatDistanceToNow, format } from "date-fns";
 import { PostDetailsDialog } from "./post-details-dialog";
 import { DeletePostDialog } from "./delete-post-dialog";
 import type { Post } from "@/types";
-import { supabase } from "@/lib/supabase/client";
-import { logPostAction } from "@/lib/service/activity-logger-client";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PostManagementTableProps {
   searchTerm: string;
@@ -85,24 +89,19 @@ export function PostManagementTable({
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pageSize, setPageSize] = useState(10);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // Fetch current user ID for activity logging
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
-      }
-    };
-
-    fetchCurrentUser();
-  }, []);
 
   // Format date to a readable format
   const formatDate = useCallback((dateString: string) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return format(date, "MMM d, yyyy");
+  }, []);
+
+  // Format time to a readable format
+  const formatTime = useCallback((dateString: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return format(date, "h:mm a");
   }, []);
 
   // Get initials from name
@@ -120,91 +119,6 @@ export function PostManagementTable({
     if (!category) return "";
     return category.charAt(0).toUpperCase() + category.slice(1);
   }, []);
-
-  // Handle approve with activity logging
-  const handleApprovePost = useCallback(
-    async (postId: string) => {
-      try {
-        await onApprovePost(postId);
-
-        // Find the post to get its title for logging
-        const post = posts.find((p) => p.id === postId);
-        if (post && currentUserId) {
-          await logPostAction(
-            "post_approve",
-            currentUserId,
-            postId,
-            post.title
-          );
-        }
-      } catch (error) {
-        console.error("Error approving post:", error);
-      }
-    },
-    [posts, currentUserId, onApprovePost]
-  );
-
-  // Handle reject with activity logging
-  const handleRejectPost = useCallback(
-    async (postId: string) => {
-      try {
-        await onRejectPost(postId);
-
-        // Find the post to get its title for logging
-        const post = posts.find((p) => p.id === postId);
-        if (post && currentUserId) {
-          await logPostAction("post_reject", currentUserId, postId, post.title);
-        }
-      } catch (error) {
-        console.error("Error rejecting post:", error);
-      }
-    },
-    [posts, currentUserId, onRejectPost]
-  );
-
-  // Handle toggle visibility with activity logging
-  const handleToggleVisibility = useCallback(
-    async (postId: string, currentStatus: string) => {
-      try {
-        await onToggleVisibility(postId, currentStatus);
-
-        // Find the post to get its title for logging
-        const post = posts.find((p) => p.id === postId);
-        if (post && currentUserId) {
-          // Log the appropriate action based on current status
-          const action =
-            currentStatus === "approved" ? "post_hide" : "post_show";
-          await logPostAction(action, currentUserId, postId, post.title);
-        }
-      } catch (error) {
-        console.error("Error toggling post visibility:", error);
-      }
-    },
-    [posts, currentUserId, onToggleVisibility]
-  );
-
-  // Add this function after the handleToggleVisibility function
-  const handleDeletePost = useCallback(
-    async (postId: string) => {
-      try {
-        // Find the post to get its title for logging
-        const post = posts.find((p) => p.id === postId);
-        if (!post) return;
-
-        // Call the onDeletePost function
-        await onDeletePost(postId);
-
-        // Log is already handled in the DeletePostDialog component
-
-        // Close the dialog if it's open
-        setDeleteDialogOpen(false);
-        setSelectedPost(null);
-      } catch (error) {
-        console.error("Error deleting post:", error);
-      }
-    },
-    [posts, onDeletePost]
-  );
 
   // Filter data based on search term and filters - memoized to prevent recalculation
   const filteredData = useMemo(() => {
@@ -377,49 +291,88 @@ export function PostManagementTable({
         },
         cell: ({ row }) => {
           const status = row.getValue("status") as string;
+          const post = row.original;
+          const moderatedById = post.moderated_by;
+          const moderatedAt = post.moderated_at
+            ? formatDate(post.moderated_at)
+            : "";
+          const isAutoApproved =
+            status === "approved" && !moderatedById && post.moderated_at;
+
           return (
-            <>
-              {status === "approved" && (
-                <Badge
-                  variant="outline"
-                  className="bg-green-50 text-green-700 dark:bg-green-900/20"
-                >
-                  Approved
-                </Badge>
-              )}
-              {status === "pending" && (
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
-                >
-                  Pending
-                </Badge>
-              )}
-              {status === "rejected" && (
-                <Badge
-                  variant="outline"
-                  className="bg-red-50 text-red-700 dark:bg-red-900/20"
-                >
-                  Rejected
-                </Badge>
-              )}
-              {status === "hidden" && (
-                <Badge
-                  variant="outline"
-                  className="bg-slate-50 text-slate-700 dark:bg-slate-900/20"
-                >
-                  Hidden
-                </Badge>
-              )}
-              {status === "deleted" && (
-                <Badge
-                  variant="outline"
-                  className="bg-red-50 text-red-700 dark:bg-red-900/20"
-                >
-                  Deleted
-                </Badge>
-              )}
-            </>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    {status === "approved" && !isAutoApproved && (
+                      <Badge
+                        variant="outline"
+                        className="bg-green-50 text-green-700 dark:bg-green-900/20"
+                      >
+                        Approved
+                      </Badge>
+                    )}
+                    {status === "approved" && isAutoApproved && (
+                      <Badge
+                        variant="outline"
+                        className="bg-purple-50 text-purple-700 dark:bg-purple-900/20"
+                      >
+                        Auto-Approved
+                      </Badge>
+                    )}
+                    {status === "pending" && (
+                      <Badge
+                        variant="outline"
+                        className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
+                      >
+                        Pending
+                      </Badge>
+                    )}
+                    {status === "rejected" && (
+                      <Badge
+                        variant="outline"
+                        className="bg-red-50 text-red-700 dark:bg-red-900/20"
+                      >
+                        Rejected
+                      </Badge>
+                    )}
+                    {status === "hidden" && (
+                      <Badge
+                        variant="outline"
+                        className="bg-slate-50 text-slate-700 dark:bg-slate-900/20"
+                      >
+                        Hidden
+                      </Badge>
+                    )}
+                    {status === "deleted" && (
+                      <Badge
+                        variant="outline"
+                        className="bg-red-50 text-red-700 dark:bg-red-900/20"
+                      >
+                        Deleted
+                      </Badge>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                {status === "approved" && isAutoApproved && (
+                  <TooltipContent>
+                    <p>Auto-approved by system</p>
+                    <p>Date: {moderatedAt}</p>
+                  </TooltipContent>
+                )}
+                {(status === "approved" ||
+                  status === "rejected" ||
+                  status === "hidden" ||
+                  status === "deleted") &&
+                  moderatedById &&
+                  moderatedAt && (
+                    <TooltipContent>
+                      <p>Moderated by: {moderatedById}</p>
+                      <p>Date: {moderatedAt}</p>
+                    </TooltipContent>
+                  )}
+              </Tooltip>
+            </TooltipProvider>
           );
         },
       },
@@ -440,7 +393,7 @@ export function PostManagementTable({
           );
         },
         cell: ({ row }) => (
-          <div className="text-center">{row.getValue("view_count") || 0}</div>
+          <div className="text-right">{row.getValue("view_count") || 0}</div>
         ),
       },
       {
@@ -482,7 +435,7 @@ export function PostManagementTable({
           const isDeleted = post.status === "deleted";
           const isPending = post.status === "pending";
           const isApproved = post.status === "approved";
-          // const isHidden = post.status === "hidden";
+          const isHidden = post.status === "hidden";
           const isRejected = post.status === "rejected";
 
           return (
@@ -512,14 +465,14 @@ export function PostManagementTable({
                   {isPending && (
                     <>
                       <DropdownMenuItem
-                        onClick={() => handleApprovePost(post.id)}
+                        onClick={() => onApprovePost(post.id)}
                         className="cursor-pointer text-green-600"
                       >
                         <CheckCircle className="mr-2 h-4 w-4" />
                         Approve
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => handleRejectPost(post.id)}
+                        onClick={() => onRejectPost(post.id)}
                         className="cursor-pointer text-red-600"
                       >
                         <XCircle className="mr-2 h-4 w-4" />
@@ -530,9 +483,7 @@ export function PostManagementTable({
 
                   {!isDeleted && !isPending && !isRejected && (
                     <DropdownMenuItem
-                      onClick={() =>
-                        handleToggleVisibility(post.id, post.status)
-                      }
+                      onClick={() => onToggleVisibility(post.id, post.status)}
                       className="cursor-pointer"
                     >
                       {isApproved ? (
@@ -572,9 +523,9 @@ export function PostManagementTable({
       formatDate,
       formatCategory,
       getInitials,
-      handleApprovePost,
-      handleRejectPost,
-      handleToggleVisibility,
+      onApprovePost,
+      onRejectPost,
+      onToggleVisibility,
     ]
   );
 
@@ -715,7 +666,7 @@ export function PostManagementTable({
       </div>
 
       {/* Post details dialog */}
-      {selectedPost && detailsDialogOpen && (
+      {selectedPost && (
         <PostDetailsDialog
           post={selectedPost}
           open={detailsDialogOpen}
@@ -726,12 +677,12 @@ export function PostManagementTable({
       )}
 
       {/* Delete post dialog */}
-      {selectedPost && deleteDialogOpen && (
+      {selectedPost && (
         <DeletePostDialog
           post={selectedPost}
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
-          onDelete={() => handleDeletePost(selectedPost.id)}
+          onDelete={() => onDeletePost(selectedPost.id)}
         />
       )}
     </>

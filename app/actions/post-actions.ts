@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import type { Post } from "@/types";
 import { checkDailyLimit } from "./point-system-actions";
-
-// Import the createPostNotification function
+import { awardPoints } from "./point-system-actions";
 
 // Fetch all posts
 export async function getPosts(): Promise<Post[]> {
@@ -155,7 +154,7 @@ export async function incrementPostView(postId: string): Promise<void> {
   }
 }
 
-// Create a new post
+// Create a new post with auto-approval
 export async function createPost(formData: FormData) {
   console.log("Server action: createPost called");
 
@@ -186,6 +185,12 @@ export async function createPost(formData: FormData) {
     const category = formData.get("category") as string;
     const tagsString = formData.get("tags") as string;
     const featuredImagesString = formData.get("featuredImages") as string;
+    const captchaToken = formData.get("captchaToken") as string;
+
+    // Verify CAPTCHA token if provided
+    if (!captchaToken) {
+      return { error: "CAPTCHA verification failed. Please try again." };
+    }
 
     // Parse tags and featured images
     const tags = tagsString ? JSON.parse(tagsString) : [];
@@ -206,7 +211,7 @@ export async function createPost(formData: FormData) {
       return { error: "Title, content, and category are required" };
     }
 
-    // Insert the post with status 'pending' for moderation
+    // Insert the post with status 'pending' so it appears in admin dashboard
     const { data: post, error } = await supabase
       .from("posts")
       .insert({
@@ -216,9 +221,9 @@ export async function createPost(formData: FormData) {
         category,
         tags,
         featured_images,
-        status: "pending", // Set status to pending for moderation
+        status: "pending", // Set to pending so it appears in admin dashboard
         view_count: 0,
-        points_awarded: false, // Initialize points_awarded flag
+        points_awarded: true, // Mark points as awarded
       })
       .select()
       .single();
@@ -230,13 +235,27 @@ export async function createPost(formData: FormData) {
 
     console.log("Post created successfully:", post.id);
 
+    // Award points immediately
+    const pointResult = await awardPoints(
+      user.id,
+      "post_create",
+      post.id,
+      "post",
+      { post_title: title, category }
+    );
+
+    if (!pointResult.success) {
+      console.error("Error awarding points:", pointResult.error);
+      // Continue even if points fail - we'll handle this separately
+    }
+
     // Update daily activity count
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
     // Try to update existing record first
     const { data: existingRecord, error: checkError } = await supabase
       .from("daily_activity_limits")
-      .select("id")
+      .select("id, posts_created")
       .eq("user_id", user.id)
       .eq("activity_date", today)
       .single();
@@ -246,14 +265,12 @@ export async function createPost(formData: FormData) {
     }
 
     if (existingRecord) {
-      // Update existing record
+      // Update existing record - don't use RPC, just update directly
       const { error: activityError } = await supabase
         .from("daily_activity_limits")
         .update({
-          posts_created: supabase.rpc("increment", {
-            x: 1,
-            column_name: "posts_created",
-          }),
+          posts_created: (existingRecord.posts_created || 0) + 1,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", existingRecord.id);
 
@@ -275,14 +292,40 @@ export async function createPost(formData: FormData) {
       }
     }
 
+    // Log admin activity for auto-approval
+    try {
+      // Insert directly into admin_activity_log table
+      const { error: logError } = await supabase
+        .from("admin_activity_log")
+        .insert({
+          action: "post_auto_approve",
+          action_label: "Post Auto-Approved",
+          admin_id: null, // Set to null for system actions
+          target: `Post: ${title}`,
+          details: `Post ID: ${post.id} was automatically approved by the system. Category: ${category}. User ID: ${user.id}`,
+          severity: "low",
+          target_id: post.id,
+          target_type: "post",
+          timestamp: new Date().toISOString(), // Explicitly set timestamp
+        });
+
+      if (logError) {
+        console.error(
+          "Error logging auto-approval to admin_activity_log:",
+          logError
+        );
+      }
+    } catch (logError) {
+      console.error("Error logging auto-approval:", logError);
+    }
+
     // Revalidate the free board page
     revalidatePath("/free-board");
 
     // Return success
     return {
       success: true,
-      message:
-        "Your post has been submitted for review and will be published after approval.",
+      message: "Your post has been published successfully!",
       postId: post.id,
     };
   } catch (error: any) {

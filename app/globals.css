@@ -206,3 +206,99 @@ body,
 .tiptap-paragraph + .tiptap-paragraph {
   margin-top: 0.25rem;
 }
+
+/* Custom LiveKit styles instead of importing from the package */
+
+/* Base styles for LiveKit components */
+.lk-room {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.lk-participant {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lk-participant-metadata {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  color: white;
+  font-size: 14px;
+}
+
+/* Audio controls */
+.lk-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lk-button {
+  background: #1a1e27;
+  border: 1px solid #3f445c;
+  color: white;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lk-button:hover {
+  background: #2a2e39;
+}
+
+.lk-button-primary {
+  background: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.lk-button-primary:hover {
+  background: #d44235;
+}
+
+.lk-participant-name {
+  font-size: 0.875rem;
+}
+
+.lk-video-conference {
+  background: transparent;
+}
+
+/* Status indicators */
+.lk-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lk-status-indicator-live {
+  color: #e74c3c;
+}
+
+.lk-status-indicator-offline {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Audio visualization */
+.lk-audio-visualizer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.lk-audio-visualizer-bar {
+  width: 3px;
+  background-color: #e74c3c;
+  border-radius: 1px;
+}

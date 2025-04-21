@@ -24,12 +24,19 @@ export default function ActivityPage() {
     severity: "all",
     timeRange: "all",
   });
-  const [adminUsers, setAdminUsers] = useState<{ id: string; name: string }[]>(
-    []
-  );
+  const [adminUsers, setAdminUsers] = useState<{ id: string; name: string }[]>([
+    { id: "all", name: "All Admins" },
+    { id: "system", name: "System" }, // Add System as an option
+  ]);
   const [actionTypes, setActionTypes] = useState<
     { value: string; label: string }[]
-  >([{ value: "all", label: "All Actions" }]);
+  >([
+    { value: "all", label: "All Actions" },
+    { value: "post_auto_approve", label: "Post Auto-Approved" }, // Ensure this is always available
+    { value: "post_approve", label: "Post Approved" },
+    { value: "post_delete", label: "Post Deleted" },
+    { value: "user_update", label: "User Updated" },
+  ]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Count active filters
@@ -53,6 +60,7 @@ export default function ActivityPage() {
 
         const formattedAdmins = [
           { id: "all", name: "All Admins" },
+          { id: "system", name: "System" }, // Keep System option
           ...data.map((user) => ({
             id: user.id,
             name:
@@ -89,6 +97,12 @@ export default function ActivityPage() {
 
         // Create a map to deduplicate and get unique action types
         const actionMap = new Map();
+        actionMap.set("all", "All Actions");
+        actionMap.set("post_auto_approve", "Post Auto-Approved"); // Ensure this is always available
+        actionMap.set("post_approve", "Post Approved");
+        actionMap.set("post_delete", "Post Deleted");
+        actionMap.set("user_update", "User Updated");
+
         data.forEach((item) => {
           if (!actionMap.has(item.action)) {
             actionMap.set(item.action, item.action_label);
@@ -96,13 +110,12 @@ export default function ActivityPage() {
         });
 
         // Convert map to array of objects
-        const uniqueActions = [
-          { value: "all", label: "All Actions" },
-          ...Array.from(actionMap.entries()).map(([value, label]) => ({
+        const uniqueActions = Array.from(actionMap.entries()).map(
+          ([value, label]) => ({
             value,
             label,
-          })),
-        ];
+          })
+        );
 
         setActionTypes(uniqueActions);
       } catch (error) {
@@ -169,7 +182,7 @@ export default function ActivityPage() {
           const adminName = item.admin
             ? `${item.admin.first_name || ""} ${item.admin.last_name || ""}`.trim() ||
               "Unknown User"
-            : "Unknown Admin";
+            : "System";
 
           return [
             new Date(item.timestamp).toISOString(),

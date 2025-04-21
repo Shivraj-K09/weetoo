@@ -26,6 +26,8 @@ import {
   deletePost,
 } from "@/app/actions/admin-content-actions";
 import type { Post } from "@/types";
+// Import the AutoApproveHandler component at the top of the file
+import { AutoApproveHandler } from "@/components/admin/auto-approve-handler";
 
 export default function ManagePostsClient() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,6 +102,7 @@ export default function ManagePostsClient() {
         toast.error(result.error);
       } else {
         toast.success(result.message);
+
         // Update local state
         setPosts((currentPosts) =>
           currentPosts.map((post) => {
@@ -197,6 +200,7 @@ export default function ManagePostsClient() {
 
   return (
     <div className="space-y-6">
+      <AutoApproveHandler />
       <div>
         <h1 className="text-2xl font-semibold mb-2">Post Management</h1>
         <p className="text-muted-foreground">
@@ -233,8 +237,6 @@ export default function ManagePostsClient() {
             <SelectItem value="technology">Technology</SelectItem>
             <SelectItem value="news">News</SelectItem>
             <SelectItem value="analysis">Analysis</SelectItem>
-            <SelectItem value="profit">Profit</SelectItem>
-            <SelectItem value="education">Education</SelectItem>
             <SelectItem value="tutorial">Tutorial</SelectItem>
           </SelectContent>
         </Select>

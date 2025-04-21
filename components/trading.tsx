@@ -89,7 +89,7 @@ export function Trading() {
           }}
         >
           <SelectTrigger
-            className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+            className={`h-8 w-32 shadow-none bg-[#D9D9D9] dark:bg-background cursor-pointer ${
               cryptoValue ? "text-red-500 font-semibold" : "text-white"
             }`}
             aria-label="암호화폐"
@@ -131,7 +131,7 @@ export function Trading() {
           }}
         >
           <SelectTrigger
-            className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+            className={`h-8 w-32 shadow-none bg-[#D9D9D9] dark:bg-background cursor-pointer ${
               currencyValue ? "text-red-500 font-semibold" : "text-white"
             }`}
             aria-label="통화"
@@ -171,7 +171,7 @@ export function Trading() {
           }}
         >
           <SelectTrigger
-            className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+            className={`h-8 w-32 shadow-none bg-[#D9D9D9] dark:bg-background cursor-pointer ${
               indexValue ? "text-red-500 font-semibold" : "text-white"
             }`}
             aria-label="지수"
@@ -215,7 +215,7 @@ export function Trading() {
           }}
         >
           <SelectTrigger
-            className={`h-8 w-32 shadow-none bg-[#D9D9D9] cursor-pointer ${
+            className={`h-8 w-32 shadow-none bg-[#D9D9D9] dark:bg-background cursor-pointer ${
               commodityValue ? "text-red-500 font-semibold" : "text-white"
             }`}
             aria-label="원자재"

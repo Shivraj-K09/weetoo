@@ -8,7 +8,7 @@ export function RefundFee() {
   const [isHovering, setIsHovering] = useState(false);
 
   return (
-    <section className="w-full rounded-xl overflow-hidden border border-gray-200 bg-white">
+    <section className="w-full rounded-xl overflow-hidden border border-gray-200 bg-background dark:border-border">
       {/* Simple professional header with site theme color */}
       <div className="bg-[#c74135] px-4 py-3 flex items-center justify-between">
         <h3 className="text-sm font-medium text-white">환급 수수료</h3>

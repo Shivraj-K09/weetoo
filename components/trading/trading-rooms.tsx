@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { RoomsList } from "./rooms-list";
 import { CreateRoomPopover } from "./create-room-popover";
 import { useUser } from "@/hooks/use-user";
-import type { Room } from "@/types/index";
+import type { Room } from "@/types";
 
 export function TradingRooms() {
   const router = useRouter();

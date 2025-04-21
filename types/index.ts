@@ -83,6 +83,7 @@ export interface SupabaseUser {
 
 export interface Post {
   id: string;
+  created_at: string;
   title: string;
   content: string;
   user_id: string;
@@ -90,11 +91,18 @@ export interface Post {
   tags: string[];
   featured_images: string[];
   view_count: number;
-  created_at: string;
   updated_at: string;
   status: string;
+  moderated_by?: string | null;
+  moderated_at?: string | null;
+  points_awarded?: boolean;
   // Join with users table
   user?: SupabaseUser;
+  // Join with moderator user
+  moderator?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
 }
 
 export type Privacy = "private" | "public";

@@ -729,7 +729,7 @@ export function UserChat() {
   return (
     <section
       aria-label="Global Chat"
-      className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden"
+      className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-border"
     >
       {/* Chat header */}
       <header className="bg-[#c74135] px-4 py-3 flex items-center justify-between">
@@ -743,7 +743,9 @@ export function UserChat() {
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
               <p className="text-xs text-white/80">
                 Users Online:{" "}
-                {isConnecting ? "Connecting..." : onlineUsers.toLocaleString()}{" "}
+                {isConnecting
+                  ? "Connecting..."
+                  : onlineUsers.toLocaleString()}{" "}
               </p>
             </div>
           </div>
@@ -758,7 +760,7 @@ export function UserChat() {
         {/* Chat messages area */}
         <div
           ref={messagesContainerRef}
-          className="h-[400px] overflow-y-auto pb-16 scroll-smooth"
+          className="h-[400px] overflow-y-auto pb-16 scroll-smooth bg-background"
         >
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -773,7 +775,7 @@ export function UserChat() {
                 <div
                   key={message.id}
                   className={`px-4 py-2 ${
-                    message.isSystem ? "bg-emerald-600 text-white" : ""
+                    message.isSystem ? "bg-emerald-600" : ""
                   }`}
                 >
                   {!message.isSystem ? (
@@ -837,8 +839,8 @@ export function UserChat() {
                           {pendingMsg.status === "sending"
                             ? "Sending..."
                             : pendingMsg.status === "failed"
-                            ? "Failed to send"
-                            : "Pending..."}
+                              ? "Failed to send"
+                              : "Pending..."}
                         </p>
                         {pendingMsg.status === "failed" && (
                           <div className="flex items-center gap-1">
@@ -871,7 +873,7 @@ export function UserChat() {
         </div>
 
         {/* Input field or login button based on auth state */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white via-white to-transparent pt-8">
+        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white via-white to-transparent pt-8 dark:bg-gradient-to-t dark:from-gray-900 dark:via-gray-900 dark:to-transparent">
           {isLoggedIn ? (
             <form
               onSubmit={handleSendMessage}
@@ -880,7 +882,7 @@ export function UserChat() {
               <input
                 type="text"
                 placeholder="Type a message..."
-                className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c74135]/20"
+                className="flex-1 rounded-full bg-gray-100 dark:bg-background border dark:border-border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c74135]/20 dark:placeholder:text-white"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 disabled={isSending}
@@ -913,7 +915,7 @@ export function UserChat() {
 
               <button
                 type="submit"
-                className="text-white p-1.5 rounded-full bg-[#c74135] hover:bg-[#b33a2f] transition-colors cursor-pointer disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-full bg-[#c74135] hover:bg-[#b33a2f] transition-colors cursor-pointer disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={!message.trim() || isSending}
               >
                 {isSending ? (

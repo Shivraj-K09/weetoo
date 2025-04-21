@@ -54,7 +54,7 @@ export function UserInfo() {
   // Show loading state (using isLoading from store)
   if (isLoading) {
     return (
-      <section className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300">
+      <section className="w-full overflow-hidden rounded-xl border border-gray-200 dark:border-border bg-background transition-all duration-300">
         <div className="h-1 w-full bg-gradient-to-r from-[#c74135] to-[#d15a4f]"></div>
         <div className="p-5 flex flex-col items-center justify-center">
           <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
@@ -73,7 +73,7 @@ export function UserInfo() {
     return (
       <section
         aria-label="User Profile - Not Logged In"
-        className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 group"
+        className="w-full overflow-hidden rounded-xl border border-gray-200 dark:border-border bg-background transition-all duration-300 group"
       >
         {/* Accent border at top */}
         <div className="h-1 w-full bg-gradient-to-r from-[#c74135] to-[#d15a4f]"></div>
@@ -159,7 +159,7 @@ export function UserInfo() {
     // You might want a slightly different loading/skeleton state here
     // Or return null, or a basic message
     return (
-      <section className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300">
+      <section className="w-full overflow-hidden rounded-xl border border-gray-200 dark:border-border bg-background transition-all duration-300">
         <div className="h-1 w-full bg-gradient-to-r from-[#c74135] to-[#d15a4f]"></div>
         <div className="p-5 flex flex-col items-center justify-center">
           <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
@@ -178,7 +178,7 @@ export function UserInfo() {
   return (
     <section
       aria-label="User Profile"
-      className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300"
+      className="w-full overflow-hidden rounded-xl border border-gray-200 dark:border-border bg-background transition-all duration-300"
     >
       {/* Accent border at top */}
       <div className="h-1 w-full bg-gradient-to-r from-[#c74135] to-[#d15a4f]"></div>
@@ -205,7 +205,7 @@ export function UserInfo() {
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-base font-medium text-gray-800">
+                <span className="text-base font-medium">
                   {userData?.first_name} {userData?.last_name}
                 </span>
                 <BadgeCheck className="h-4 w-4 text-[#c74135]" />
@@ -220,7 +220,7 @@ export function UserInfo() {
           </div>
 
           <button
-            className="group flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 transition-all hover:bg-[#f8e9e8] hover:text-[#c74135] cursor-pointer"
+            className="group flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-medium transition-all hover:bg-[#f8e9e8] hover:text-[#c74135] cursor-pointer border"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onClick={handleSignOut}
@@ -234,7 +234,7 @@ export function UserInfo() {
       </header>
 
       {/* Level progress */}
-      <div className="mx-5 mb-4 rounded-lg bg-gray-50 p-3">
+      <div className="mx-5 mb-4 rounded-lg bg-background border border-border p-3">
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e9c3c0]">
@@ -242,13 +242,11 @@ export function UserInfo() {
                 {userData?.level}
               </span>
             </div>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-muted-foreground">
               Level {userData?.level}
             </span>
           </div>
-          <span className="text-xs text-gray-500">
-            Level {(userData?.level || 0) + 1}
-          </span>
+          <span className="text-xs">Level {(userData?.level || 0) + 1}</span>
         </div>
 
         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
@@ -259,7 +257,7 @@ export function UserInfo() {
         </div>
 
         <div className="mt-1.5 flex justify-between">
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             {userData?.levelProgress}% Complete
           </span>
           <span className="text-xs font-medium text-[#c74135]">
@@ -273,8 +271,8 @@ export function UserInfo() {
 
       {/* Stats section */}
       <div className="grid grid-cols-2 gap-4 px-5 pb-5">
-        <div className="group flex items-center gap-3 rounded-lg bg-gray-50 p-3.5 transition-all duration-200 hover:bg-[#f8e9e8]">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white transition-all duration-200">
+        <div className="group flex items-center gap-3 rounded-lg bg-gray-50 dark:bg-background border border-border p-3.5 transition-all duration-200 hover:bg-[#f8e9e8]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-background transition-all border border-border duration-200">
             <Wallet className="h-4.5 w-4.5 text-[#c74135]" />
           </div>
           <div className="flex flex-col cursor-pointer">
@@ -296,15 +294,15 @@ export function UserInfo() {
           </div>
         </div>
 
-        <div className="group flex items-center gap-3 rounded-lg bg-gray-50 p-3.5 transition-all duration-200 hover:bg-[#f8e9e8]">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white transition-all duration-200">
+        <div className="group flex items-center gap-3 rounded-lg bg-gray-50 dark:bg-background border p-3.5 transition-all duration-200 hover:bg-[#f8e9e8]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-background border border-border transition-all duration-200">
             <Bell className="h-4.5 w-4.5 text-[#c74135]" />
           </div>
           <div className="flex flex-col">
             <span className="text-xs font-medium text-gray-500 group-hover:text-[#c74135]">
               in box
             </span>
-            <span className="font-medium text-gray-700">
+            <span className="font-medium text-muted-foreground">
               {userData?.notifications || "0"}
             </span>
           </div>
@@ -312,14 +310,14 @@ export function UserInfo() {
       </div>
 
       {/* Settings link */}
-      <div className="border-t border-gray-100">
+      <div className="border-t border-gray-100 dark:border-border">
         <Link
           href="/my-profile"
-          className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8] border-b border-gray-100"
+          className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8] dark:hover:bg-accent border-b border-gray-100 dark:border-border"
         >
           <div className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">
+            <span className="text-sm font-medium text-gray-600 dark:text-white">
               Account Settings
             </span>
           </div>
@@ -330,11 +328,11 @@ export function UserInfo() {
           <Link
             href="/admin"
             target="_blank"
-            className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8]"
+            className="flex items-center justify-between px-5 py-4 transition-all duration-200 hover:bg-[#f8e9e8] dark:hover:bg-accent"
           >
             <div className="flex items-center gap-2">
               <ShieldUserIcon className="h-4 w-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">
+              <span className="text-sm font-medium text-gray-600 dark:text-white">
                 Go to Admin Page
               </span>
             </div>

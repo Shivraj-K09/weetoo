@@ -1,19 +1,17 @@
+import { createClient } from "@/lib/supabase/server";
 import TradingRoomPage from "@/components/room/room-page";
-import { createClient } from "@/lib/supabase/client";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { autoJoinRoom } from "@/app/actions/auto-join-room";
 
-// Update Props to match Next.js expected PageProps types
 type Props = {
   params: Promise<{ roomName: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  searchParams: { [key: string]: string | string[] | undefined };
 };
 
-export default async function Page({ params }: Props) {
+export default async function Page({ params, searchParams }: Props) {
   try {
-    // Wait for both promises
+    // Await the params object before using it
     const resolvedParams = await params;
-    // const resolvedSearchParams = await searchParams;
     const { roomName } = resolvedParams;
 
     // Extract the UUID properly - UUIDs have a specific format
@@ -23,33 +21,58 @@ export default async function Page({ params }: Props) {
     const supabase = await createClient();
 
     console.log("Fetching room with ID:", roomId);
-    // Fetch room details
-    const { data: room, error } = await supabase
-      .from("trading_rooms")
-      .select("*")
-      .eq("id", roomId)
-      .single();
-
-    // If room doesn't exist, redirect to home
-    if (error || !room) {
-      console.error("Room not found or error:", error);
-      return redirect("/");
-    }
 
     // Check if user is authenticated
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    // If room is private, check if user is authenticated and has access
-    if (room.room_type === "private" && !session) {
-      // For testing purposes, we'll allow access even without authentication
-      console.log(
-        "Private room accessed without authentication - allowing for testing"
-      );
-      // In production, you would redirect to login:
-      // return redirect("/login?redirect=/rooms/" + roomName);
+    let room;
+
+    if (session) {
+      // If authenticated, try to fetch the room with the user's session
+      const { data, error } = await supabase
+        .from("trading_rooms")
+        .select("*")
+        .eq("id", roomId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching room with auth:", error);
+        // Don't redirect yet, try the public access method
+      } else {
+        room = data;
+
+        // Auto-join the room if it's public
+        if (room && room.room_type === "public") {
+          await autoJoinRoom(roomId);
+        }
+      }
     }
+
+    // If not authenticated or couldn't fetch with auth, try public access
+    if (!room) {
+      // For public rooms or testing, try without RLS
+      const { data, error } = await supabase
+        .from("trading_rooms")
+        .select("*")
+        .eq("id", roomId)
+        .single();
+
+      if (error) {
+        console.error("Room not found or error:", error);
+        return redirect("/");
+      }
+
+      room = data;
+    }
+
+    if (!room) {
+      console.error("Room data is null or undefined");
+      return redirect("/");
+    }
+
+    console.log("Room found:", room.id, room.room_name);
 
     return <TradingRoomPage roomData={room} />;
   } catch (error) {
@@ -58,12 +81,12 @@ export default async function Page({ params }: Props) {
       <div className="h-full flex flex-col items-center justify-center text-white">
         <h2 className="text-xl mb-4">Error loading room</h2>
         <p className="mb-6">There was a problem loading this trading room.</p>
-        <Link
+        <a
           href="/"
           className="bg-[#E74C3C] hover:bg-[#E74C3C]/90 px-4 py-2 rounded"
         >
           Return to Home
-        </Link>
+        </a>
       </div>
     );
   }

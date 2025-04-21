@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { TiptapEditor } from "./tiptap-editor";
 import { TagInput } from "./tag-input";
 import { ImageUpload } from "./image-upload";
+import { CaptchaWrapper } from "../captcha-wrapper";
+import { useState } from "react";
 
 interface PostData {
   title: string;
@@ -29,15 +31,32 @@ interface CreatePostFormProps {
   onPreview: () => void;
   onSave?: (content: string) => Promise<void>;
   onImageUpload?: (file: File) => Promise<string | null>;
+  captchaVerified?: boolean;
+  onCaptchaVerify?: (token: string) => void;
+  onCaptchaExpire?: () => void;
 }
 
-export function CreatePostForm({
+export default function CreatePostForm({
   postData,
   updatePostData,
   onPreview,
   onSave,
   onImageUpload,
+  onCaptchaVerify,
+  onCaptchaExpire,
 }: CreatePostFormProps) {
+  const [captchaToken, setCaptchaToken] = useState<string>("");
+
+  // Add a function to handle CAPTCHA verification
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+  };
+
+  // Add a function to handle CAPTCHA expiration
+  const handleCaptchaExpire = () => {
+    setCaptchaToken("");
+  };
+
   return (
     <div className="space-y-8 bg-white p-8 rounded-lg shadow-sm">
       {/* Title Section */}
@@ -120,6 +139,14 @@ export function CreatePostForm({
           content={postData.content}
           onChange={(content) => updatePostData({ content })}
           onSave={onSave}
+        />
+      </div>
+
+      {/* Captcha Section */}
+      <div className="mt-6">
+        <CaptchaWrapper
+          onVerify={(token) => onCaptchaVerify?.(token)}
+          onExpire={() => onCaptchaExpire?.()}
         />
       </div>
 

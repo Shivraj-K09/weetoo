@@ -163,24 +163,24 @@ export function Community() {
   };
 
   return (
-    <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
+    <div className="w-full max-w-[1168px] border border-gray-200 dark:border-border rounded-md overflow-hidden bg-white">
       {/* Header with subtle gradient */}
-      <div className="flex items-center px-4 py-2 border-b border-gray-200 bg-gradient-to-r from-[#e74c3c] via-[#e74c3c]/90 to-[#e74c3c]/80 text-white">
+      <div className="flex items-center px-4 py-2 dark:border-border border-b border-gray-200 bg-gradient-to-r from-[#e74c3c] via-[#e74c3c]/90 to-[#e74c3c]/80 text-white">
         <UsersIcon className="h-4 w-4 mr-2" />
         <h2 className="text-sm font-medium">WEETOO Community</h2>
       </div>
 
       {/* Desktop View - Three column layout */}
-      <div className="hidden lg:grid md:grid-cols-3 divide-x divide-gray-200">
+      <div className="hidden lg:grid md:grid-cols-3 divide-x divide-gray-200 dark:divide-border">
         {/* Free Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 dark:bg-background dark:border-border flex justify-between">
             <span>Free Board</span>
             <Link href="/free-board" className="text-[#e74c3c] hover:underline">
               More
             </Link>
           </div>
-          <div className="h-[220px] overflow-y-auto">
+          <div className="h-[220px] overflow-y-auto bg-background dark:bg-background">
             {loading ? (
               Array(5)
                 .fill(0)
@@ -195,11 +195,13 @@ export function Community() {
             ) : freePosts.length > 0 ? (
               freePosts.map((post) => (
                 <Link href={getPostUrl(post)} key={post.id}>
-                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:hover:bg-accent cursor-pointer">
                     <span className="text-[#e74c3c] mr-2">
                       {getCategoryLabel(post.category)}
                     </span>
-                    <span className="text-gray-700">{post.title}</span>
+                    <span className="text-gray-700 dark:text-white">
+                      {post.title}
+                    </span>
                   </div>
                 </Link>
               ))
@@ -213,7 +215,7 @@ export function Community() {
 
         {/* Profit Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 dark:bg-background dark:border-border flex justify-between">
             <span>Profit Board</span>
             <Link
               href="/profit-board"
@@ -222,7 +224,7 @@ export function Community() {
               More
             </Link>
           </div>
-          <div className="h-[220px] overflow-y-auto">
+          <div className="h-[220px] overflow-y-auto bg-background dark:bg-background">
             {loading ? (
               <div className="animate-pulse p-2 border-b border-gray-100">
                 <div className="grid grid-cols-2 gap-2">
@@ -281,7 +283,7 @@ export function Community() {
             ) : profitPosts.length > 0 ? (
               profitPosts.map((post) => (
                 <Link href={getPostUrl(post)} key={post.id}>
-                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:hover:bg-accent cursor-pointer">
                     <span className="text-[#e74c3c] mr-2">
                       {getCategoryLabel(post.category)}
                     </span>
@@ -299,7 +301,7 @@ export function Community() {
 
         {/* Education Board */}
         <div>
-          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 flex justify-between">
+          <div className="px-3 py-1.5 text-xs font-medium border-b border-gray-200 bg-gray-50 dark:bg-background dark:border-border flex justify-between">
             <span>Education Board</span>
             <Link
               href="/education-board"
@@ -308,7 +310,7 @@ export function Community() {
               More
             </Link>
           </div>
-          <div className="h-[220px] overflow-y-auto">
+          <div className="h-[220px] overflow-y-auto bg-background dark:bg-background">
             {loading ? (
               Array(5)
                 .fill(0)
@@ -323,11 +325,13 @@ export function Community() {
             ) : educationPosts.length > 0 ? (
               educationPosts.map((post) => (
                 <Link href={getPostUrl(post)} key={post.id}>
-                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                  <div className="px-3 py-1.5 text-xs border-b border-gray-100 last:border-0 hover:bg-gray-50  dark:hover:bg-accent cursor-pointer">
                     <span className="text-[#e74c3c] mr-2">
                       {getCategoryLabel(post.category)}
                     </span>
-                    <span className="text-gray-700">{post.title}</span>
+                    <span className="text-gray-700 dark:text-white">
+                      {post.title}
+                    </span>
                   </div>
                 </Link>
               ))
@@ -393,7 +397,7 @@ export function Community() {
               ) : freePosts.length > 0 ? (
                 freePosts.map((post) => (
                   <Link href={getPostUrl(post)} key={post.id}>
-                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:hover:bg-accent cursor-pointer transition-colors duration-150">
                       <span className="text-[#e74c3c] mr-2 text-xs font-medium">
                         {getCategoryLabel(post.category)}
                       </span>
@@ -480,7 +484,7 @@ export function Community() {
               ) : profitPosts.length > 0 ? (
                 profitPosts.map((post) => (
                   <Link href={getPostUrl(post)} key={post.id}>
-                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50  dark:hover:bg-accent cursor-pointer transition-colors duration-150">
                       <span className="text-[#e74c3c] mr-2 text-xs font-medium">
                         {getCategoryLabel(post.category)}
                       </span>
@@ -520,7 +524,7 @@ export function Community() {
               ) : educationPosts.length > 0 ? (
                 educationPosts.map((post) => (
                   <Link href={getPostUrl(post)} key={post.id}>
-                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                    <div className="px-3 py-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:hover:bg-accent cursor-pointer transition-colors duration-150">
                       <span className="text-[#e74c3c] mr-2 text-xs font-medium">
                         {getCategoryLabel(post.category)}
                       </span>

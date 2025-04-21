@@ -1,6 +1,6 @@
 import { KorcoinChart } from "./chart/kor-coin-chart";
 import { UserSignupChart } from "./chart/user-signup-chart";
-import { SectionCards } from "./section-cards";
+import { SectionCards } from "../dashboard/section-cards";
 import { KorCoinTable } from "./tables/kor-coin-table";
 import { UserSignUpTable } from "./tables/user-signup-table";
 

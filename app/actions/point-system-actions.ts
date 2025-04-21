@@ -539,3 +539,106 @@ export async function checkAndAwardAllBonuses(userId: string): Promise<{
     };
   }
 }
+
+// Add this new function to revoke points
+export async function revokePoints(
+  userId: string,
+  transactionType: string,
+  referenceId: string,
+  reason = "Admin action"
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const supabase = await createClient();
+
+    // Find the original transaction
+    const { data: transactions, error: fetchError } = await supabase
+      .from("point_transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("transaction_type", transactionType)
+      .eq("reference_id", referenceId);
+
+    if (fetchError) {
+      console.error("Error fetching point transactions:", fetchError);
+      return { success: false, error: "Failed to find original transaction" };
+    }
+
+    if (!transactions || transactions.length === 0) {
+      console.warn("No transactions found to revoke");
+      return { success: true }; // Nothing to revoke
+    }
+
+    // Get the total points awarded in these transactions
+    let totalExp = 0;
+    let totalCoins = 0;
+
+    transactions.forEach((transaction) => {
+      totalExp += transaction.exp_earned || 0;
+      totalCoins += transaction.coins_earned || 0;
+    });
+
+    // Create a reversal transaction
+    const { error: transactionError } = await supabase
+      .from("point_transactions")
+      .insert({
+        user_id: userId,
+        transaction_type: `${transactionType}_revoke`,
+        exp_earned: -totalExp, // Negative to indicate reversal
+        coins_earned: -totalCoins, // Negative to indicate reversal
+        reference_id: referenceId,
+        reference_type: "revoke",
+        metadata: {
+          reason,
+          original_transactions: transactions.map((t) => t.id),
+          revoked_at: new Date().toISOString(),
+        },
+      });
+
+    if (transactionError) {
+      console.error("Error logging point revocation:", transactionError);
+      return { success: false, error: "Failed to log transaction" };
+    }
+
+    // Update user's totals
+    // Get current user values first
+    const { data: userData, error: getUserError } = await supabase
+      .from("users")
+      .select("kor_coins, exp")
+      .eq("id", userId)
+      .single();
+
+    if (getUserError) {
+      console.error("Error getting user data:", getUserError);
+      return { success: false, error: "Failed to get user data" };
+    }
+
+    // Calculate new values (ensure they don't go below 0)
+    const newExp = Math.max(0, (userData?.exp || 0) - totalExp);
+    const newKorCoins = Math.max(0, (userData?.kor_coins || 0) - totalCoins);
+
+    // Update with new values
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        exp: newExp,
+        kor_coins: newKorCoins,
+      })
+      .eq("id", userId);
+
+    if (updateError) {
+      console.error("Error updating user points:", updateError);
+      return { success: false, error: "Failed to update user points" };
+    }
+
+    // Revalidate the user profile page
+    revalidatePath(`/profile/${userId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Unexpected error revoking points:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}

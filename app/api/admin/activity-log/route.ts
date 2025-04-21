@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+// Define a constant for the system user ID - same as in auto-approve.ts
+const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"; // Replace with a real admin ID
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
@@ -12,6 +15,14 @@ export async function GET(request: Request) {
   const supabase = await createClient();
 
   try {
+    console.log("Fetching activity logs with params:", {
+      action,
+      admin,
+      severity,
+      timeRange,
+      searchTerm,
+    });
+
     let query = supabase
       .from("admin_activity_log")
       .select(
@@ -28,7 +39,12 @@ export async function GET(request: Request) {
     }
 
     if (admin && admin !== "all") {
-      query = query.eq("admin_id", admin);
+      if (admin === "system") {
+        // Special case for system actions - look for null admin_id
+        query = query.is("admin_id", null);
+      } else {
+        query = query.eq("admin_id", admin);
+      }
     }
 
     if (severity && severity !== "all") {
@@ -37,7 +53,6 @@ export async function GET(request: Request) {
 
     // Apply time range filter
     if (timeRange && timeRange !== "all") {
-      // const now = new Date();
       const startDate = new Date();
 
       if (timeRange === "today") {
@@ -67,8 +82,16 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
+      console.error("Database error fetching activity logs:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    console.log(`Found ${data?.length || 0} activity logs`);
+
+    // Check if there are any auto-approve actions
+    const autoApproveActions =
+      data?.filter((log) => log.action === "post_auto_approve") || [];
+    console.log(`Found ${autoApproveActions.length} auto-approve actions`);
 
     // If no data, return empty array
     return NextResponse.json(data || []);
@@ -96,14 +119,7 @@ export async function POST(request: Request) {
     } = await request.json();
 
     // Validate required fields
-    if (
-      !action ||
-      !actionLabel ||
-      !adminId ||
-      !target ||
-      !details ||
-      !severity
-    ) {
+    if (!action || !actionLabel || !target || !details || !severity) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -116,7 +132,7 @@ export async function POST(request: Request) {
     const { error } = await supabase.from("admin_activity_log").insert({
       action,
       action_label: actionLabel,
-      admin_id: adminId,
+      admin_id: adminId || SYSTEM_USER_ID, // Use system user ID if adminId is null
       target,
       details,
       severity,
@@ -139,15 +155,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// Make sure the query is not filtering out post-related activities
-// Check if there's any filtering by action type that might exclude post actions
-
-// If there's a specific filter for action types, make sure it includes post actions
-// For example, if there's something like:
-// if (action && action !== "all") {
-//   query = query.eq("action", action)
-// }
-
-// This should be fine as long as the action parameter from the frontend includes post actions
-// No specific changes needed here unless there's explicit filtering that excludes post actions
