@@ -52,7 +52,7 @@ export async function autoJoinRoom(roomId: string) {
     if (room.room_type === "public") {
       // Add user to participants array
       participants.push(userId);
-      console.log("[AUTO JOIN] New participants list:", participants);
+      console.log("[AUTO JOIN] New participants lists:", participants);
 
       // DIRECT UPDATE: Use a direct SQL update to ensure the array is properly updated
       const { data: updateData, error: updateError } = await supabase
