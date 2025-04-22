@@ -7,7 +7,7 @@ import type { Post } from "@/types";
 import { checkDailyLimit } from "./point-system-actions";
 import { awardPoints } from "./point-system-actions";
 
-// Fetch all posts
+// Fetch all posts for the free board
 export async function getPosts(): Promise<Post[]> {
   try {
     const supabase = await createClient();
@@ -23,6 +23,7 @@ export async function getPosts(): Promise<Post[]> {
       `
       )
       .eq("status", "approved") // Only fetch approved posts
+      .eq("category", "free") // Only fetch posts with category "free"
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -37,7 +38,7 @@ export async function getPosts(): Promise<Post[]> {
   }
 }
 
-// Fetch top viewed posts
+// Fetch top viewed posts for the free board
 export async function getTopViewedPosts(count: number): Promise<Post[]> {
   try {
     const supabase = await createClient();
@@ -53,6 +54,7 @@ export async function getTopViewedPosts(count: number): Promise<Post[]> {
       `
       )
       .eq("status", "approved") // Only fetch approved posts
+      .eq("category", "free") // Only fetch posts with category "free"
       .order("view_count", { ascending: false })
       .limit(count);
 

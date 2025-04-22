@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import CreatePostForm from "@/components/post/create-post-form";
+import { CreatePostForm } from "@/components/post/create-post-form";
 import { PostPreview } from "@/components/post/post-preview";
 import { PageHeader } from "@/components/post/page-header";
 import { createPost } from "@/app/actions/post-actions";
@@ -53,6 +53,10 @@ export default function ProfitPostClient() {
 
   // Fix TypeScript error by adding proper type
   const updatePostData = (data: Partial<PostData>) => {
+    // Ensure category is always "profit" for profit board
+    if (data.category && data.category !== "profit") {
+      data.category = "profit";
+    }
     setPostData({ ...postData, ...data });
   };
 
@@ -72,7 +76,7 @@ export default function ProfitPostClient() {
     }
   };
 
-  // Handle form submission
+  // Modify handlePublish to include captcha token
   const handlePublish = async () => {
     console.log("Publish button clicked");
 
@@ -101,7 +105,7 @@ export default function ProfitPostClient() {
       const formData = new FormData();
       formData.append("title", postData.title);
       formData.append("content", postData.content);
-      formData.append("category", postData.category);
+      formData.append("category", "profit"); // Always set category to "profit" for profit board
       formData.append("tags", JSON.stringify(postData.tags));
       formData.append(
         "featuredImages",

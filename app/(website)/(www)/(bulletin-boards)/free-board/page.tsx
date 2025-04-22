@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -22,7 +21,7 @@ export default async function FreeBoard() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Fetch top posts and all posts
+  // Fetch top posts and all posts from the free category
   const topPosts = await getTopViewedPosts(6);
   const allPosts = await getPosts();
 
@@ -36,7 +35,7 @@ export default async function FreeBoard() {
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="/banner.png"
+          src="https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2070&auto=format&fit=crop"
           alt="trader-banner"
           width={1000}
           height={250}
@@ -116,7 +115,6 @@ export default async function FreeBoard() {
                         post.featured_images?.[0] ||
                         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
                         "/placeholder.svg" ||
-                        "/placeholder.svg" ||
                         "/placeholder.svg"
                       }
                       alt="Post thumbnail"
@@ -190,28 +188,6 @@ export default async function FreeBoard() {
                                 </div>
                               )}
                               <div className="flex items-center gap-1">
-                                <Badge
-                                  variant="secondary"
-                                  className="rounded-full bg-blue-100 px-1.5 text-xs text-blue-700"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="mr-1"
-                                  >
-                                    <circle cx="12" cy="12" r="10" />
-                                    <path d="M12 16v-4" />
-                                    <path d="M12 8h.01" />
-                                  </svg>
-                                  {post.category}
-                                </Badge>
                                 <span>{post.title}</span>
                                 {post.tags?.length > 0 && (
                                   <span className="text-gray-500">

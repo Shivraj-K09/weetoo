@@ -106,7 +106,7 @@ export default async function ProfitBoard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-3">
               {topProfitPosts.map((post) => (
                 <Link
-                  href={`/free-board/${post.id}`}
+                  href={`/profit-board/${post.id}`}
                   key={post.id}
                   className="flex items-center gap-4 w-full hover:bg-slate-50 p-2 rounded-md transition-colors"
                 >
@@ -115,6 +115,7 @@ export default async function ProfitBoard() {
                       src={
                         post.featured_images?.[0] ||
                         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
+                        "/placeholder.svg" ||
                         "/placeholder.svg" ||
                         "/placeholder.svg" ||
                         "/placeholder.svg"
@@ -171,7 +172,7 @@ export default async function ProfitBoard() {
                         </TableCell>
                         <TableCell>
                           <Link
-                            href={`/free-board/${post.id}`}
+                            href={`/profit-board/${post.id}`}
                             className="hover:underline block"
                           >
                             <div className="flex items-center gap-2">

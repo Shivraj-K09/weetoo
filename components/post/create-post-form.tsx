@@ -29,7 +29,7 @@ interface CreatePostFormProps {
   onCaptchaExpire?: () => void;
 }
 
-export default function CreatePostForm({
+export function CreatePostForm({
   postData,
   updatePostData,
   onPreview,
@@ -40,6 +40,22 @@ export default function CreatePostForm({
 }: CreatePostFormProps) {
   const [captchaToken, setCaptchaToken] = useState<string>("");
 
+  // Add a function to handle CAPTCHA verification
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+    if (onCaptchaVerify) {
+      onCaptchaVerify(token);
+    }
+  };
+
+  // Add a function to handle CAPTCHA expiration
+  const handleCaptchaExpire = () => {
+    setCaptchaToken("");
+    if (onCaptchaExpire) {
+      onCaptchaExpire();
+    }
+  };
+
   return (
     <div className="space-y-8 bg-white p-8 rounded-lg shadow-sm">
       {/* Title Section */}
@@ -49,11 +65,13 @@ export default function CreatePostForm({
           placeholder="Enter post title"
           value={postData.title}
           onChange={(e) => updatePostData({ title: e.target.value })}
-          className="!text-2xl font-medium border-0 p-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 shadow-none rounded-none"
+          className="text-2xl font-medium border-0 p-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
         />
       </div>
 
       <Separator />
+
+      {/* Category is removed from UI but still stored in postData */}
 
       {/* Featured Image Section */}
       <div className="space-y-2">
@@ -99,8 +117,8 @@ export default function CreatePostForm({
       {/* Captcha Section */}
       <div className="mt-6">
         <CaptchaWrapper
-          onVerify={(token) => onCaptchaVerify?.(token)}
-          onExpire={() => onCaptchaExpire?.()}
+          onVerify={handleCaptchaVerify}
+          onExpire={handleCaptchaExpire}
         />
       </div>
 

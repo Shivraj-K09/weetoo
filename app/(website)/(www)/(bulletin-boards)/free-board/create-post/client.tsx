@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import CreatePostForm from "@/components/post/create-post-form";
+import { CreatePostForm } from "@/components/post/create-post-form";
 import { PostPreview } from "@/components/post/post-preview";
 import { PageHeader } from "@/components/post/page-header";
 import { createPost } from "@/app/actions/post-actions";
@@ -25,7 +25,7 @@ export function CreatePostClient() {
     title: "",
     content: "",
     tags: [],
-    category: "free", // Set default category to "free"
+    category: "free", // Default to free category for free board
     featuredImages: [],
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -42,6 +42,10 @@ export function CreatePostClient() {
 
   // Fix TypeScript error by adding proper type
   const updatePostData = (data: Partial<PostData>) => {
+    // Ensure category is always "free" for free board
+    if (data.category && data.category !== "free") {
+      data.category = "free";
+    }
     setPostData({ ...postData, ...data });
   };
 
@@ -57,7 +61,7 @@ export function CreatePostClient() {
       console.error("Error uploading image:", error);
       setError("Failed to upload image. Please try again.");
       toast.error("Failed to upload image. Please try again.");
-      return null as string | null;
+      return null;
     }
   };
 
@@ -87,11 +91,6 @@ export function CreatePostClient() {
       return;
     }
 
-    if (!postData.category) {
-      toast.error("Category is required");
-      return;
-    }
-
     if (!captchaToken) {
       toast.error("Please complete the CAPTCHA verification");
       return;
@@ -106,7 +105,7 @@ export function CreatePostClient() {
       const formData = new FormData();
       formData.append("title", postData.title);
       formData.append("content", postData.content);
-      formData.append("category", postData.category);
+      formData.append("category", "free"); // Always set category to "free" for free board
       formData.append("tags", JSON.stringify(postData.tags));
       formData.append(
         "featuredImages",

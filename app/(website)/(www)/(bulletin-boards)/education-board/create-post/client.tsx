@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import CreatePostForm from "@/components/post/create-post-form";
+import { CreatePostForm } from "@/components/post/create-post-form";
 import { PostPreview } from "@/components/post/post-preview";
 import { PageHeader } from "@/components/post/page-header";
 import { createPost } from "@/app/actions/post-actions";
@@ -36,22 +36,16 @@ export default function EducationPostClient() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
 
-  const handleCaptchaVerify = (token: string) => {
-    setCaptchaToken(token);
-    setIsCaptchaVerified(true);
-  };
-
-  const handleCaptchaExpire = () => {
-    setCaptchaToken(null);
-    setIsCaptchaVerified(false);
-  };
-
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
   };
 
   // Fix TypeScript error by adding proper type
   const updatePostData = (data: Partial<PostData>) => {
+    // Ensure category is always "education" for education board
+    if (data.category && data.category !== "education") {
+      data.category = "education";
+    }
     setPostData({ ...postData, ...data });
   };
 
@@ -71,7 +65,18 @@ export default function EducationPostClient() {
     }
   };
 
-  // Handle form submission
+  // Add captcha handlers
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+    setIsCaptchaVerified(true);
+  };
+
+  const handleCaptchaExpire = () => {
+    setCaptchaToken(null);
+    setIsCaptchaVerified(false);
+  };
+
+  // Modify handlePublish to include captcha token
   const handlePublish = async () => {
     console.log("Publish button clicked");
 
@@ -100,7 +105,7 @@ export default function EducationPostClient() {
       const formData = new FormData();
       formData.append("title", postData.title);
       formData.append("content", postData.content);
-      formData.append("category", postData.category);
+      formData.append("category", "education"); // Always set category to "education" for education board
       formData.append("tags", JSON.stringify(postData.tags));
       formData.append(
         "featuredImages",
