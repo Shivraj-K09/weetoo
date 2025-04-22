@@ -1394,7 +1394,7 @@ export default function MyProfile() {
                 닉네임 변경 비용:{" "}
                 {isFirstNicknameChange
                   ? "무료"
-                  : `${NICKNAME_CHANGE_COST.toLocaleString()} 코코인`}
+                  : `${NICKNAME_CHANGE_COST.toLocaleString()} Kor_coins`}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
