@@ -18,8 +18,14 @@ interface UserState {
     signOut: () => Promise<void>;
     updateProfile: (profileData: Partial<UserProfile>) => Promise<void>; // New action for profile updates
     checkNicknameAvailability: (nickname: string) => Promise<boolean>; // New action
+    changeNickname: (
+      newNickname: string
+    ) => Promise<{ success: boolean; message: string }>; // New action for nickname change
   };
 }
+
+// Cost for changing nickname (after the first free change)
+const NICKNAME_CHANGE_COST = 100000;
 
 // Create the Zustand store
 export const useUserStore = create<UserState>((set, get) => ({
@@ -209,28 +215,109 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ isLoading: false });
       }
     },
+
+    // Replace the checkNicknameAvailability function with this more efficient version
     checkNicknameAvailability: async (nickname: string) => {
       const currentState = get();
       const userId = currentState.user?.id;
 
-      if (!nickname.trim()) {
+      if (!nickname.trim() || nickname.length < 3) {
         return false;
       }
 
       try {
-        // Check if nickname exists in the database
-        const { data, error, count } = await supabase
+        // Direct and efficient query to check nickname existence
+        const { count, error } = await supabase
           .from("users")
-          .select("nickname", { count: "exact" })
+          .select("nickname", { count: "exact", head: true }) // Using head: true to only count, not return data
           .eq("nickname", nickname)
-          .neq("id", userId || ""); // Exclude current user
+          .neq("id", userId || "");
 
         if (error) throw error;
 
         return count === 0; // Return true if nickname is available
       } catch (error: any) {
         console.error("Error checking nickname:", error);
-        return false;
+        throw error; // Propagate error to handle in UI
+      }
+    },
+
+    // New action to handle nickname changes with coin deduction
+    changeNickname: async (newNickname: string) => {
+      const currentState = get();
+      const userId = currentState.user?.id;
+      const profile = currentState.profile;
+
+      if (!userId || !profile) {
+        return {
+          success: false,
+          message: "You must be logged in to change your nickname",
+        };
+      }
+
+      // Check if nickname is available
+      const isAvailable =
+        await get().actions.checkNicknameAvailability(newNickname);
+      if (!isAvailable) {
+        return { success: false, message: "This nickname is already taken" };
+      }
+
+      // Check if this is the first nickname change (free) or if user has enough coins
+      const isFirstChange =
+        !profile.nickname || profile.nickname === profile.email?.split("@")[0];
+      const hasEnoughCoins = (profile.kor_coins || 0) >= NICKNAME_CHANGE_COST;
+
+      if (!isFirstChange && !hasEnoughCoins) {
+        return {
+          success: false,
+          message: `You don't have enough coins. Nickname change costs ${NICKNAME_CHANGE_COST.toLocaleString()} coins.`,
+        };
+      }
+
+      set({ isLoading: true });
+
+      try {
+        // Calculate new coin balance if not the first change
+        const newCoinBalance = isFirstChange
+          ? profile.kor_coins
+          : (profile.kor_coins || 0) - NICKNAME_CHANGE_COST;
+
+        // Update the profile in the database
+        const { error } = await supabase
+          .from("users")
+          .update({
+            nickname: newNickname,
+            kor_coins: newCoinBalance,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
+
+        if (error) {
+          throw error;
+        }
+
+        // Update the local state with the new profile data
+        set({
+          profile: {
+            ...profile,
+            nickname: newNickname,
+            kor_coins: newCoinBalance,
+          },
+        });
+
+        return {
+          success: true,
+          message: isFirstChange
+            ? "Nickname changed successfully"
+            : `Nickname changed successfully. ${NICKNAME_CHANGE_COST.toLocaleString()} coins have been deducted.`,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          message: `Failed to change nickname: ${error.message}`,
+        };
+      } finally {
+        set({ isLoading: false });
       }
     },
   },
