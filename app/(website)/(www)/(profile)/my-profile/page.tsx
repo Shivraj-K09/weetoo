@@ -39,7 +39,6 @@ import {
 import Image from "next/image";
 import { toast } from "sonner";
 
-// Import the user store at the top of the file
 import { useUserStore, useUserActions } from "@/lib/store/user-store";
 
 export default function MyProfile() {
@@ -61,8 +60,13 @@ export default function MyProfile() {
   const [editedNickname, setEditedNickname] = useState("");
   const [editedFirstName, setEditedFirstName] = useState("");
   const [editedLastName, setEditedLastName] = useState("");
+  const [isCheckingNickname, setIsCheckingNickname] = useState(false);
+  const [isNicknameAvailable, setIsNicknameAvailable] = useState<
+    boolean | null
+  >(null);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [hasChangedNickname, setHasChangedNickname] = useState(false);
 
-  // Add this useEffect to initialize the edit fields when profile data loads
   useEffect(() => {
     if (profile) {
       setEditedNickname(
@@ -339,6 +343,43 @@ export default function MyProfile() {
     setIsEditing(false);
   };
 
+  const handleNicknameChange = (e: any) => {
+    setEditedNickname(e.target.value);
+    setHasChangedNickname(true);
+  };
+
+  const checkNicknameAvailability = async (nickname: string) => {
+    setIsCheckingNickname(true);
+    setIsNicknameAvailable(null);
+    setNicknameError(null);
+
+    // Basic validation
+    if (!nickname) {
+      setNicknameError("Nickname cannot be empty.");
+      setIsCheckingNickname(false);
+      return;
+    }
+
+    if (nickname.length < 3) {
+      setNicknameError("Nickname must be at least 3 characters long.");
+      setIsCheckingNickname(false);
+      return;
+    }
+
+    // Simulate API call (replace with your actual API endpoint)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Simulate nickname availability check
+    const isAvailable = nickname !== "existingUser"; // Example: "existingUser" is taken
+
+    setIsCheckingNickname(false);
+    setIsNicknameAvailable(isAvailable);
+
+    if (!isAvailable) {
+      setNicknameError("This nickname is already taken.");
+    }
+  };
+
   return (
     <div className="flex flex-col w-full">
       <div className="flex flex-col w-full">
@@ -395,7 +436,8 @@ export default function MyProfile() {
                         <AvatarImage
                           src={
                             profile?.avatar_url ||
-                            "/placeholder.svg?height=96&width=96"
+                            "/placeholder.svg?height=96&width=96" ||
+                            "/placeholder.svg"
                           }
                           alt={`${profile?.first_name || "User"}'s Profile`}
                         />
@@ -413,7 +455,7 @@ export default function MyProfile() {
                       <Camera className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="text-center">
+                  {/* <div className="text-center">
                     <div className="text-xs text-gray-500 mb-1">
                       권장크기: 100x100px
                     </div>
@@ -427,8 +469,8 @@ export default function MyProfile() {
                     >
                       edit
                     </Button>
-                  </div>
-                  <div className="flex gap-2 mt-3">
+                  </div> */}
+                  {/* <div className="flex gap-2 mt-3">
                     <Button
                       variant="outline"
                       size="sm"
@@ -443,7 +485,7 @@ export default function MyProfile() {
                     >
                       삭제
                     </Button>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Account Info Section */}
@@ -489,11 +531,38 @@ export default function MyProfile() {
                       {isLoading ? (
                         <div className="h-5 w-28 bg-gray-200 rounded animate-pulse"></div>
                       ) : isEditing ? (
-                        <Input
-                          value={editedNickname}
-                          onChange={(e) => setEditedNickname(e.target.value)}
-                          className="max-w-[200px] h-9 bg-white border-gray-200"
-                        />
+                        <div className="flex flex-col gap-1 w-full max-w-[200px]">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editedNickname}
+                              onChange={handleNicknameChange}
+                              className="h-9 bg-white border-gray-200"
+                              onBlur={() =>
+                                editedNickname &&
+                                checkNicknameAvailability(editedNickname)
+                              }
+                            />
+                            {isCheckingNickname && (
+                              <div className="h-4 w-4 rounded-full border-2 border-gray-400 border-t-transparent animate-spin"></div>
+                            )}
+                            {isNicknameAvailable === true && (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            )}
+                          </div>
+                          {nicknameError && (
+                            <p className="text-xs text-red-500">
+                              {nicknameError}
+                            </p>
+                          )}
+                          {isSocialLogin() &&
+                            profile?.nickname &&
+                            !hasChangedNickname && (
+                              <p className="text-xs text-amber-500">
+                                Social login users can only change their
+                                nickname once.
+                              </p>
+                            )}
+                        </div>
                       ) : (
                         <div className="font-medium text-gray-800">
                           {profile?.nickname ||

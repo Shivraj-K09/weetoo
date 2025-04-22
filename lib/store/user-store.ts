@@ -4,19 +4,6 @@ import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { UserProfile } from "@/types";
 
-// Define the structure of the user profile data we expect from the 'users' table
-// export type UserProfile = { // Removed redundant declaration
-// id: string
-// first_name: string
-// last_name: string
-// email: string // Email might also be directly on the Auth user
-// provider_type: string
-// kor_coins: number
-// avatar_url?: string
-// role?: string // This is the important field
-// // Add any other fields you have in your public.users table
-// }
-
 // Define the state structure for the store
 interface UserState {
   user: SupabaseUser | null; // Supabase Auth user
@@ -30,6 +17,7 @@ interface UserState {
     listenToAuthState: () => () => void; // Returns the unsubscribe function
     signOut: () => Promise<void>;
     updateProfile: (profileData: Partial<UserProfile>) => Promise<void>; // New action for profile updates
+    checkNicknameAvailability: (nickname: string) => Promise<boolean>; // New action
   };
 }
 
@@ -165,10 +153,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         if (error) {
           throw error;
         }
-        // Successfully signed out via Supabase.
-        // The onAuthStateChange listener (SIGNED_OUT event) should trigger
-        // clearUserSession or fetchUserSession (which finds no session),
-        // which will set isLoading: false.
 
         toast.success("Signed out successfully");
 
@@ -225,80 +209,32 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ isLoading: false });
       }
     },
+    checkNicknameAvailability: async (nickname: string) => {
+      const currentState = get();
+      const userId = currentState.user?.id;
+
+      if (!nickname.trim()) {
+        return false;
+      }
+
+      try {
+        // Check if nickname exists in the database
+        const { data, error, count } = await supabase
+          .from("users")
+          .select("nickname", { count: "exact" })
+          .eq("nickname", nickname)
+          .neq("id", userId || ""); // Exclude current user
+
+        if (error) throw error;
+
+        return count === 0; // Return true if nickname is available
+      } catch (error: any) {
+        console.error("Error checking nickname:", error);
+        return false;
+      }
+    },
   },
 }));
 
 // Export actions separately for easier usage in components
 export const useUserActions = () => useUserStore((state) => state.actions);
-
-// Add this function to the userActions
-// const refreshProfile = async (set: any) => {
-//   set({ isLoading: true })
-
-//   try {
-//     const supabase = createClientComponentClient()
-//     const {
-//       data: { user },
-//     } = await supabase.auth.getUser()
-
-//     if (user) {
-//       // Fetch the user profile from the public.users table
-//       const { data: profile, error } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-//       if (error) {
-//         console.error("Error fetching profile:", error)
-//         set({ isLoading: false })
-//         return
-//       }
-
-//       set({ profile, isLoading: false })
-//     } else {
-//       set({ profile: null, isLoading: false })
-//     }
-//   } catch (error) {
-//     console.error("Error refreshing profile:", error)
-//     set({ isLoading: false })
-//   }
-// }
-
-// Then update the handleSaveProfile function in my-profile.tsx to call this:
-// const handleSaveProfile = async (
-//   user: any,
-//   editedNickname: string,
-//   editedFirstName: string,
-//   editedLastName: string,
-//   setIsEditing: any,
-// ) => {
-//   if (!user) return
-
-//   try {
-//     // Update the profile in the database
-//     const { error } = await fetch("/api/update-profile", {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({
-//         userId: user.id,
-//         nickname: editedNickname,
-//         firstName: editedFirstName,
-//         lastName: editedLastName,
-//       }),
-//     }).then((res) => res.json())
-
-//     if (error) {
-//       console.error("Error updating profile:", error)
-//       return
-//     }
-
-//     // Refresh the profile data
-//     // Assuming 'set' is available in the scope or passed as an argument
-//     // You might need to adjust this based on your actual implementation
-//     // For example: await refreshProfile(set);
-
-//     // Exit edit mode
-//     setIsEditing(false)
-//   } catch (error) {
-//     console.error("Error updating profile:", error)
-//   }
-// }
