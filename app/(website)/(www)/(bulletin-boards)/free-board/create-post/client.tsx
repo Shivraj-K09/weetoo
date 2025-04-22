@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-
+import CreatePostForm from "@/components/post/create-post-form";
+import { PostPreview } from "@/components/post/post-preview";
+import { PageHeader } from "@/components/post/page-header";
 import { createPost } from "@/app/actions/post-actions";
 import { uploadImage } from "@/app/actions/upload-actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/post/page-header";
-import { PostPreview } from "@/components/post/post-preview";
-import CreatePostForm from "@/components/post/create-post-form";
 
 // Define the PostData type to fix TypeScript errors
 interface PostData {
@@ -26,26 +25,16 @@ export function CreatePostClient() {
     title: "",
     content: "",
     tags: [],
-    category: "",
+    category: "free", // Set default category to "free"
     featuredImages: [],
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
   // Add captcha state
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
-
-  // Add captcha handlers
-  const handleCaptchaVerify = (token: string) => {
-    setCaptchaToken(token);
-    setIsCaptchaVerified(true);
-  };
-
-  const handleCaptchaExpire = () => {
-    setCaptchaToken(null);
-    setIsCaptchaVerified(false);
-  };
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
@@ -63,13 +52,24 @@ export function CreatePostClient() {
       if (result.error) {
         throw new Error(result.error);
       }
-      return result.url ?? null;
+      return result.url || null;
     } catch (error) {
       console.error("Error uploading image:", error);
       setError("Failed to upload image. Please try again.");
       toast.error("Failed to upload image. Please try again.");
-      return null;
+      return null as string | null;
     }
+  };
+
+  // Add captcha handlers
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+    setIsCaptchaVerified(true);
+  };
+
+  const handleCaptchaExpire = () => {
+    setCaptchaToken(null);
+    setIsCaptchaVerified(false);
   };
 
   // Handle form submission

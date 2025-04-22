@@ -13,7 +13,8 @@ interface CaptchaWrapperProps {
 export function CaptchaWrapper({
   onVerify,
   onExpire,
-  siteKey = "10000000-ffff-ffff-ffff-000000000001", // Test site key
+  siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ||
+    "10000000-ffff-ffff-ffff-000000000001", // Fallback to test key
 }: CaptchaWrapperProps) {
   const { resolvedTheme } = useTheme();
   const captchaRef = useRef<HCaptcha>(null);

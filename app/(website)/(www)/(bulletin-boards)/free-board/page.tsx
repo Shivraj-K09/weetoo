@@ -116,6 +116,7 @@ export default async function FreeBoard() {
                         post.featured_images?.[0] ||
                         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
                         "/placeholder.svg" ||
+                        "/placeholder.svg" ||
                         "/placeholder.svg"
                       }
                       alt="Post thumbnail"

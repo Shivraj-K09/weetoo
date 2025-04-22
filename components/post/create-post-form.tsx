@@ -3,13 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { TiptapEditor } from "./tiptap-editor";
 import { TagInput } from "./tag-input";
@@ -47,16 +40,6 @@ export default function CreatePostForm({
 }: CreatePostFormProps) {
   const [captchaToken, setCaptchaToken] = useState<string>("");
 
-  // Add a function to handle CAPTCHA verification
-  const handleCaptchaVerify = (token: string) => {
-    setCaptchaToken(token);
-  };
-
-  // Add a function to handle CAPTCHA expiration
-  const handleCaptchaExpire = () => {
-    setCaptchaToken("");
-  };
-
   return (
     <div className="space-y-8 bg-white p-8 rounded-lg shadow-sm">
       {/* Title Section */}
@@ -66,40 +49,11 @@ export default function CreatePostForm({
           placeholder="Enter post title"
           value={postData.title}
           onChange={(e) => updatePostData({ title: e.target.value })}
-          className="!text-2xl font-medium border-0 p-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 shadow-none"
+          className="!text-2xl font-medium border-0 p-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 shadow-none rounded-none"
         />
       </div>
 
       <Separator />
-
-      {/* Category Section */}
-      <div className="space-y-2">
-        <Label htmlFor="category" className="text-sm font-medium">
-          Category
-        </Label>
-        <Select
-          value={postData.category}
-          onValueChange={(value) => updatePostData({ category: value })}
-        >
-          <SelectTrigger
-            id="category"
-            className="w-full shadow-none h-10 cursor-pointer"
-          >
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="cryptocurrency">Cryptocurrency</SelectItem>
-            <SelectItem value="trading">Trading</SelectItem>
-            <SelectItem value="investment">Investment</SelectItem>
-            <SelectItem value="technology">Technology</SelectItem>
-            <SelectItem value="news">News</SelectItem>
-            <SelectItem value="analysis">Analysis</SelectItem>
-            <SelectItem value="tutorial">Tutorial</SelectItem>
-            <SelectItem value="education">Education</SelectItem>
-            <SelectItem value="profit">Profit</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       {/* Featured Image Section */}
       <div className="space-y-2">

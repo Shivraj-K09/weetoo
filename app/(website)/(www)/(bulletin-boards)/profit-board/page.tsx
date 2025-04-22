@@ -35,7 +35,7 @@ export default async function ProfitBoard() {
       <div className="flex flex-col w-full">
         <Image
           src="/banner.png"
-          alt="trader-banner"
+          alt="profit-banner"
           width={1000}
           height={250}
           className="w-full rounded object-cover h-[250px]"
@@ -115,6 +115,7 @@ export default async function ProfitBoard() {
                       src={
                         post.featured_images?.[0] ||
                         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
+                        "/placeholder.svg" ||
                         "/placeholder.svg" ||
                         "/placeholder.svg"
                       }
