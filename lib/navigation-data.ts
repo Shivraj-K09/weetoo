@@ -57,6 +57,11 @@ export const navigationData: NavGroup[] = [
         url: "/admin/activity",
         icon: ActivityIcon,
       },
+      // {
+      //   title: "Livekit Management",
+      //   url: "/admin/livekit",
+      //   icon: IconHome,
+      // }
     ],
   },
   {

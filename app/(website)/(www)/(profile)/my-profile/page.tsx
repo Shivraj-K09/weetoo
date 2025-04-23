@@ -51,7 +51,7 @@ declare global {
 }
 
 // Cost for changing nickname (after the first free change)
-const NICKNAME_CHANGE_COST = 100000;
+const NICKNAME_CHANGE_COST = 10000;
 
 export default function MyProfile() {
   const [activeTab, setActiveTab] = useState("profile");
