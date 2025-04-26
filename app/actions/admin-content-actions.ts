@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Post } from "@/types";
 
@@ -16,7 +16,7 @@ import { logAdminAction } from "@/lib/admin-logger";
 // Get all posts for admin (including pending ones)
 export async function getAdminPosts(): Promise<Post[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -81,7 +81,7 @@ export async function getAdminPosts(): Promise<Post[]> {
 // Get pending posts that need review
 export async function getPendingPosts(): Promise<Post[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -142,7 +142,7 @@ export async function getPendingPosts(): Promise<Post[]> {
 // Approve a post
 export async function approvePost(postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -231,7 +231,7 @@ export async function approvePost(postId: string) {
 // Reject a post
 export async function rejectPost(postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -287,7 +287,7 @@ export async function rejectPost(postId: string) {
 // Hide/unhide a post
 export async function togglePostVisibility(postId: string, isVisible: boolean) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -352,7 +352,7 @@ export async function revokePointsForPost(
   postTitle: string
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Find the original point transaction
     const { data: pointTransaction, error: fetchError } = await supabase
@@ -428,7 +428,7 @@ export async function revokePointsForPost(
 // Update the admin deletePost function to revoke points
 export async function adminDeletePost(postId: string, reason: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current admin user
     const { data: adminData, error: adminError } =
@@ -509,7 +509,7 @@ export async function adminDeletePost(postId: string, reason: string) {
 // Update the deletePost function to also revoke points
 export async function deletePost(postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user for admin logging
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -652,7 +652,7 @@ export interface PointTransaction {
 // Get all point transactions for admin - using a manual approach without relying on foreign keys
 export async function getPointTransactions(): Promise<PointTransaction[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {
@@ -732,7 +732,7 @@ export async function getPointTransactionById(
   id: string
 ): Promise<PointTransaction | null> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is admin
     const {

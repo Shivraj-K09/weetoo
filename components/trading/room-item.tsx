@@ -3,6 +3,7 @@
 import { Avatar } from "@/components/ui/avatar";
 import { GlobeIcon, LockIcon, MessageSquareIcon, MicIcon } from "lucide-react";
 import type { Room } from "@/types/index";
+import { Button } from "@/components/ui/button";
 
 interface RoomItemProps {
   room: Room;
@@ -105,6 +106,34 @@ export function RoomItem({ room, index, onClick }: RoomItemProps) {
           </Avatar>
           <div className="ml-1 text-sm text-gray-700">{room.username}</div>
         </div>
+        {/* <Button
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent the main onClick from firing
+
+            // Generate room slug
+            const roomSlug = `${room.id}-${room.title
+              .toLowerCase()
+              .replace(/\s+/g, "-")
+              .replace(/[^\w-]+/g, "")}`;
+
+            // Add a cache-busting timestamp
+            const timestamp = Date.now();
+
+            // Determine the URL based on room category
+            const roomUrl =
+              room.roomCategory === "voice"
+                ? `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`
+                : `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
+
+            // Open in a new tab
+            window.open(roomUrl, "_blank");
+          }}
+          size="sm"
+          variant="outline"
+          className="ml-2 text-xs bg-transparent border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white"
+        >
+          Direct Access
+        </Button> */}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import type { Post } from "@/types";
@@ -10,7 +10,7 @@ import { awardPoints } from "./point-system-actions";
 // Fetch all posts for the free board
 export async function getPosts(): Promise<Post[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("posts")
@@ -41,7 +41,7 @@ export async function getPosts(): Promise<Post[]> {
 // Fetch top viewed posts for the free board
 export async function getTopViewedPosts(count: number): Promise<Post[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("posts")
@@ -73,7 +73,7 @@ export async function getTopViewedPosts(count: number): Promise<Post[]> {
 // Fetch a single post by ID without incrementing view count
 export async function getPost(id: string): Promise<Post | null> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data: post, error } = await supabase
       .from("posts")
@@ -103,7 +103,7 @@ export async function getPost(id: string): Promise<Post | null> {
 // Separate action to increment view count - this will be called from the client
 export async function incrementPostView(postId: string): Promise<void> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user - using getUser() for security
     const { data: userData } = await supabase.auth.getUser();
@@ -161,7 +161,7 @@ export async function createPost(formData: FormData) {
   console.log("Server action: createPost called");
 
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user - using getUser() for security
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -341,7 +341,7 @@ export async function updatePost(formData: FormData) {
   console.log("Server action: updatePost called");
 
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user - using getUser() for security
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -446,7 +446,7 @@ export async function updatePost(formData: FormData) {
 // Delete a post
 export async function deletePost(postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -501,7 +501,7 @@ export async function deletePost(postId: string) {
 // Add this new function to fetch posts by category
 export async function getPostsByCategory(category: string): Promise<Post[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("posts")

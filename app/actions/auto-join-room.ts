@@ -1,11 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 export async function autoJoinRoom(roomId: string) {
   try {
     // Always use service role to bypass RLS for this operation
-    const supabase = await createClient(true);
+    const supabase = await createServerClient(true);
 
     // Check if user is authenticated
     const {

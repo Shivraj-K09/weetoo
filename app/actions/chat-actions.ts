@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 export async function sendChatMessage(roomId: string, message: string) {
   try {
@@ -8,7 +8,7 @@ export async function sendChatMessage(roomId: string, message: string) {
       return { success: false, message: "Message cannot be empty" };
     }
 
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is authenticated
     const {
@@ -45,7 +45,7 @@ export async function sendChatMessage(roomId: string, message: string) {
 
 export async function getChatMessages(roomId: string, limit = 50) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is authenticated
     const {

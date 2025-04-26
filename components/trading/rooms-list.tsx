@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RoomItem } from "./room-item";
 import { RoomSkeleton } from "./room-skeleton";
 import { PasswordModal } from "./password-modal";
+import { resetSupabaseClient } from "@/lib/supabase/utils";
 import type { Room, UserProfile } from "@/types/index";
-import { useRouter } from "next/navigation";
 
 interface RoomsListProps {
   rooms: Room[];
@@ -26,50 +26,299 @@ export function RoomsList({
   // Number of skeleton items to show (only when fewer than 9 rooms)
   const skeletonCount = Math.max(0, 9 - rooms.length);
   const skeletonItems = Array.from({ length: skeletonCount }, (_, i) => i + 1);
-  const router = useRouter();
 
   // State for password modal
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [openingRoom, setOpeningRoom] = useState(false);
+  const lastOpenedRoomRef = useRef<string | null>(null);
+  const roomOpenTimeRef = useRef<number>(0);
 
-  const openRoom = useCallback((room: Room) => {
-    // Generate room slug
-    const roomSlug = `${room.id}-${room.title
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^\w-]+/g, "")}`;
+  // Effect to reset Supabase connections when component mounts
+  useEffect(() => {
+    // Reset all Supabase connections when the rooms list loads
+    const resetConnections = async () => {
+      console.log("[ROOMS LIST] Resetting Supabase connections");
+      supabase.removeAllChannels();
 
-    // Conditional routing based on room category
-    if (room.roomCategory === "voice") {
-      // For voice rooms, redirect to the voice-room route
-      window.open(
-        `${window.location.origin}/voice-room/${roomSlug}`,
-        "_blank",
-        "width=1600,height=900"
-      );
-      // router.push(`/voice-rooms/${roomSlug}`);
-    } else {
-      // For regular rooms, use the existing rooms route
-      window.open(
-        `${window.location.origin}/rooms/${roomSlug}`,
-        "_blank",
-        "width=1600,height=900"
-      );
-      // router.push(`/rooms/${roomSlug}`);
-    }
+      // Force a refresh of the auth session
+      try {
+        await supabase.auth.refreshSession();
+        console.log("[ROOMS LIST] Auth session refreshed");
+      } catch (error) {
+        console.error("[ROOMS LIST] Error refreshing auth session:", error);
+      }
+
+      // Create a new channel to force reconnection
+      supabase.channel("system:reconnect").subscribe((status) => {
+        console.log("[ROOMS LIST] Reconnection status:", status);
+      });
+    };
+
+    resetConnections();
+
+    // Also listen for visibility changes to reset connections when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("[ROOMS LIST] Page became visible, resetting connections");
+        resetConnections();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
-  const handleRoomClick = useCallback(
+  // Function to clean up before opening a new room
+  const prepareForNewRoom = useCallback(async () => {
+    console.log("[ROOMS LIST] Preparing to open a new room");
+
+    // Reset Supabase client to clear all existing connections
+    resetSupabaseClient();
+
+    // Force refresh the auth session
+    try {
+      await supabase.auth.refreshSession();
+      console.log(
+        "[ROOMS LIST] Auth session refreshed before opening new room"
+      );
+    } catch (error) {
+      console.error("[ROOMS LIST] Error refreshing auth session:", error);
+    }
+
+    // Clear any existing localStorage data for previous rooms
+    localStorage.removeItem("lastOpenedRoom");
+    localStorage.removeItem("roomOpenedAt");
+
+    // Clear any cached position data
+    localStorage.removeItem("cachedPositions");
+    localStorage.removeItem("positionsLastUpdated");
+
+    // Clear any other room-specific cache items
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (
+        key &&
+        (key.includes("room-") ||
+          key.includes("position-") ||
+          key.includes("trade-"))
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    // Remove the identified keys
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+    // Add a pre-connection to Supabase to warm up the connection
+    const preconnectChannel = supabase.channel("preconnect");
+    preconnectChannel.subscribe((status) => {
+      console.log("[ROOMS LIST] Preconnect status:", status);
+      if (status === "SUBSCRIBED") {
+        // Once subscribed, we can remove this channel
+        supabase.removeChannel(preconnectChannel);
+      }
+    });
+
+    // Small delay to ensure everything is reset
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }, []);
+
+  // Update the openRoom function to handle window management better
+  const openRoom = useCallback(
     async (room: Room) => {
       try {
-        // If user is not logged in
-        if (!user) {
-          toast.error("You must be logged in to join a room");
+        // Check if this is the same room that was recently opened
+        const isSameRoom = lastOpenedRoomRef.current === room.id;
+        const timeSinceLastOpen = Date.now() - roomOpenTimeRef.current;
+
+        // If trying to open the same room within 5 seconds, show a message
+        if (isSameRoom && timeSinceLastOpen < 5000) {
+          toast.info("This room is already open or was recently opened");
+          setOpeningRoom(false);
           return;
         }
 
-        // Show loading toast
-        const loadingToast = toast.loading("Accessing room...");
+        // Show a toast that we're opening the room
+        const openingToastId = `opening-room-${room.id}`;
+        toast.loading("Opening room...", { id: openingToastId });
+
+        // Clean up before opening a new room
+        await prepareForNewRoom();
+
+        // Update the last opened room reference
+        lastOpenedRoomRef.current = room.id;
+        roomOpenTimeRef.current = Date.now();
+
+        // Generate room slug
+        const roomSlug = `${room.id}-${room.title
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^\w-]+/g, "")}`;
+
+        // Store the room being opened in localStorage to help with state management
+        localStorage.setItem("lastOpenedRoom", room.id);
+
+        // Set a timestamp to track when the room was opened
+        localStorage.setItem("roomOpenedAt", Date.now().toString());
+
+        // Add a cache-busting timestamp to prevent browser caching
+        const timestamp = Date.now();
+
+        // Conditional routing based on room category
+        let roomUrl = "";
+        if (room.roomCategory === "voice") {
+          // For voice rooms, redirect to the voice-room route
+          roomUrl = `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`;
+        } else {
+          // For regular rooms, use the existing rooms route
+          roomUrl = `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
+        }
+
+        // Try to open in a popup first
+        let roomWindow = window.open(
+          roomUrl,
+          `room_${room.id}`,
+          "width=1600,height=900"
+        );
+
+        // If popup is blocked, try opening in a new tab
+        if (!roomWindow) {
+          toast.dismiss(openingToastId);
+          toast.warning("Popup blocked. Opening in new tab instead.", {
+            id: openingToastId,
+          });
+          roomWindow = window.open(roomUrl, "_blank");
+
+          // If still blocked, show instructions
+          if (!roomWindow) {
+            toast.dismiss(openingToastId);
+            toast.error(
+              "Unable to open room. Please allow popups or click the link below.",
+              {
+                id: openingToastId,
+                duration: 5000,
+              }
+            );
+
+            // Create a clickable link for the user
+            const linkToast = toast.message(
+              <div>
+                <p className="mb-2">Click here to open the room:</p>
+                <a
+                  href={roomUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 underline"
+                >
+                  Open Room
+                </a>
+              </div>,
+              { duration: 10000 }
+            );
+          }
+        } else {
+          // Dismiss the toast if window opened successfully
+          toast.dismiss(openingToastId);
+          toast.success("Room opened successfully", {
+            id: openingToastId,
+            duration: 2000,
+          });
+
+          // Add event listener to detect when the window is closed
+          const checkWindowClosed = setInterval(() => {
+            if (roomWindow?.closed) {
+              clearInterval(checkWindowClosed);
+              // Force a refresh of the Supabase connection when window is closed
+              resetSupabaseClient();
+              // Small delay before reconnecting
+              setTimeout(() => {
+                // Reconnect to Supabase
+                supabase.channel("reconnect").subscribe();
+              }, 500);
+            }
+          }, 1000);
+        }
+
+        // Reset the opening state after a delay
+        setTimeout(() => {
+          setOpeningRoom(false);
+        }, 2000);
+      } catch (error) {
+        console.error("[ROOMS LIST] Error opening room:", error);
+        toast.error("Failed to open room. Please try again.");
+        setOpeningRoom(false);
+      }
+    },
+    [prepareForNewRoom]
+  );
+
+  // Update the handleRoomClick function to handle errors better
+  const handleRoomClick = useCallback(
+    async (room: Room) => {
+      try {
+        // Prevent multiple clicks
+        if (openingRoom) {
+          console.log("[ROOMS LIST] Already opening a room, ignoring click");
+          return;
+        }
+
+        setOpeningRoom(true);
+
+        // If user is not logged in
+        if (!user) {
+          toast.error("You must be logged in to join a room");
+          setOpeningRoom(false);
+          return;
+        }
+
+        // Check if a room was recently opened (within the last 2 seconds)
+        const lastOpenTime = localStorage.getItem("roomOpenedAt");
+        if (lastOpenTime && Date.now() - Number.parseInt(lastOpenTime) < 2000) {
+          console.log("[ROOMS LIST] Room opening throttled - please wait");
+          setOpeningRoom(false);
+          return;
+        }
+
+        // Show loading toast - use a unique ID to be able to update it
+        const loadingToastId = `accessing-room-${room.id}`;
+        toast.loading("Accessing room...", { id: loadingToastId });
+
+        // Set a timeout to detect if room opening is taking too long
+        const timeoutId = setTimeout(() => {
+          // If we're still in the opening state after 8 seconds, something might be wrong
+          if (openingRoom) {
+            toast.dismiss(loadingToastId);
+            toast.error(
+              "Room access is taking longer than expected. Opening in a new tab instead.",
+              {
+                id: loadingToastId,
+              }
+            );
+
+            // Force open in a new tab as a fallback
+            const roomSlug = `${room.id}-${room.title
+              .toLowerCase()
+              .replace(/\s+/g, "-")
+              .replace(/[^\w-]+/g, "")}`;
+
+            const timestamp = Date.now();
+            const roomUrl =
+              room.roomCategory === "voice"
+                ? `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`
+                : `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
+
+            window.open(roomUrl, "_blank");
+            setOpeningRoom(false);
+          }
+        }, 8000); // 8 second timeout
+
+        // Force refresh the auth session before checking room access
+        await supabase.auth.refreshSession();
 
         // If room is private, check if user is the owner or already a participant
         if (room.privacy === "private") {
@@ -80,9 +329,11 @@ export function RoomsList({
             .single();
 
           if (error) {
-            console.error("Error checking room access:", error);
-            toast.dismiss(loadingToast);
-            toast.error("Failed to access room");
+            console.error("[ROOMS LIST] Error checking room access:", error);
+            clearTimeout(timeoutId);
+            toast.dismiss(loadingToastId);
+            toast.error("Failed to access room", { id: loadingToastId });
+            setOpeningRoom(false);
             return;
           }
 
@@ -90,12 +341,14 @@ export function RoomsList({
           const isParticipant = data.participants.includes(user.id);
 
           // Dismiss loading toast
-          toast.dismiss(loadingToast);
+          clearTimeout(timeoutId);
+          toast.dismiss(loadingToastId);
 
           if (!isOwner && !isParticipant) {
             // Show password modal for private rooms
             setSelectedRoom(room);
             setPasswordModalOpen(true);
+            setOpeningRoom(false);
             return;
           }
 
@@ -103,15 +356,17 @@ export function RoomsList({
           openRoom(room);
         } else {
           // Public room, dismiss loading toast and open the room
-          toast.dismiss(loadingToast);
+          clearTimeout(timeoutId);
+          toast.dismiss(loadingToastId);
           openRoom(room);
         }
       } catch (error) {
-        console.error("Error accessing room:", error);
-        toast.error("Failed to access room");
+        console.error("[ROOMS LIST] Error accessing room:", error);
+        toast.error("Failed to access room. Please try again.");
+        setOpeningRoom(false);
       }
     },
-    [user, openRoom]
+    [user, openRoom, openingRoom]
   );
 
   const handlePasswordSuccess = () => {

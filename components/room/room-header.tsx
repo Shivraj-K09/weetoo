@@ -15,6 +15,7 @@ interface RoomHeaderProps {
   participants: any[];
   user: any;
   onCloseRoomClick: () => void;
+  onRefreshRoom?: () => Promise<void>; // Added onRefreshRoom property
 }
 
 export function RoomHeader({
@@ -23,6 +24,7 @@ export function RoomHeader({
   participants,
   user,
   onCloseRoomClick,
+  onRefreshRoom,
 }: RoomHeaderProps) {
   const isOwner = user && user.id === roomDetails.owner_id;
   const isVoiceRoom = roomDetails.room_category === "voice";

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkDailyLimit, awardPoints } from "./point-system-actions";
 
@@ -23,7 +23,7 @@ export interface Comment {
 // Get comments for a specific post
 export async function getComments(postId: string): Promise<Comment[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("comments")
@@ -56,7 +56,7 @@ export async function getComments(postId: string): Promise<Comment[]> {
 // Add a new comment
 export async function addComment(postId: string, content: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -123,7 +123,7 @@ export async function addComment(postId: string, content: string) {
 // Delete a comment
 export async function deleteComment(commentId: string, postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -189,7 +189,7 @@ export async function updateComment(
   postId: string
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -248,7 +248,7 @@ export async function updateComment(
 // Get comment count for a post
 export async function getCommentCount(postId: string): Promise<number> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { count, error } = await supabase
       .from("comments")

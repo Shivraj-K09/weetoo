@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -39,44 +39,171 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
   const [ownerName, setOwnerName] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
   const [lastParticipantsFetch, setLastParticipantsFetch] = useState<number>(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const authCheckedRef = useRef(false);
+  const fetchAttemptsRef = useRef(0);
+  const maxFetchAttempts = 5; // Increased from 3 to 5
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionAttemptRef = useRef(0);
 
-  // Create a memoized function to fetch participants
-  const fetchParticipants = useCallback(async (participantIds: string[]) => {
-    try {
-      if (!participantIds || participantIds.length === 0) {
-        console.log("[ROOM DETAILS] No participants to fetch");
-        setParticipants([]);
-        return;
+  // Check current user ID with improved error handling
+  useEffect(() => {
+    const checkCurrentUser = async () => {
+      try {
+        console.log("[ROOM DETAILS] Checking current user session");
+
+        // First try to refresh the session
+        await supabase.auth.refreshSession();
+
+        // Then get the current session
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("[ROOM DETAILS] Error getting session:", error);
+
+          // If we've tried too many times, give up
+          if (connectionAttemptRef.current >= 3) {
+            console.error(
+              "[ROOM DETAILS] Failed to get session after multiple attempts"
+            );
+            return;
+          }
+
+          // Otherwise, try again after a delay
+          connectionAttemptRef.current++;
+          setTimeout(checkCurrentUser, 2000);
+          return;
+        }
+
+        if (data.session) {
+          console.log(
+            "[ROOM DETAILS] Session found, user ID:",
+            data.session.user.id
+          );
+          setCurrentUserId(data.session.user.id);
+          connectionAttemptRef.current = 0; // Reset counter on success
+        } else {
+          console.log("[ROOM DETAILS] No session found");
+
+          // If we've tried too many times, give up
+          if (connectionAttemptRef.current >= 3) {
+            console.error(
+              "[ROOM DETAILS] No session found after multiple attempts"
+            );
+            return;
+          }
+
+          // Otherwise, try again after a delay
+          connectionAttemptRef.current++;
+          setTimeout(checkCurrentUser, 2000);
+        }
+      } catch (error) {
+        console.error("[ROOM DETAILS] Error checking current user:", error);
+
+        // If we've tried too many times, give up
+        if (connectionAttemptRef.current >= 3) {
+          console.error(
+            "[ROOM DETAILS] Failed to check current user after multiple attempts"
+          );
+          return;
+        }
+
+        // Otherwise, try again after a delay
+        connectionAttemptRef.current++;
+        setTimeout(checkCurrentUser, 2000);
       }
+    };
 
-      console.log("[ROOM DETAILS] Fetching participants:", participantIds);
-
-      const { data: participantsData, error: participantsError } =
-        await supabase
-          .from("users")
-          .select("id, first_name, last_name, email, avatar_url")
-          .in("id", participantIds);
-
-      if (participantsError) {
-        console.error(
-          "[ROOM DETAILS] Error fetching participants:",
-          participantsError
-        );
-        setParticipants([]);
-      } else {
-        console.log("[ROOM DETAILS] Participants fetched:", participantsData);
-        setParticipants(participantsData || []);
-        setLastParticipantsFetch(Date.now());
-      }
-    } catch (error) {
-      console.error("[ROOM DETAILS] Failed to fetch participants:", error);
-      setParticipants([]);
-    }
+    checkCurrentUser();
   }, []);
 
-  // Fetch room details if not provided
+  // Create a memoized function to fetch participants
+  const fetchParticipants = useCallback(
+    async (participantIds?: string[]) => {
+      try {
+        const idsToFetch = participantIds || roomDetails?.participants || [];
+
+        if (!idsToFetch || idsToFetch.length === 0) {
+          console.log("[ROOM DETAILS] No participants to fetch");
+          setParticipants([]);
+          return;
+        }
+
+        console.log("[ROOM DETAILS] Fetching participants:", idsToFetch);
+
+        const { data: participantsData, error: participantsError } =
+          await supabase
+            .from("users")
+            .select("id, first_name, last_name, email, avatar_url")
+            .in("id", idsToFetch);
+
+        if (participantsError) {
+          console.error(
+            "[ROOM DETAILS] Error fetching participants:",
+            participantsError
+          );
+          setParticipants([]);
+        } else {
+          console.log(
+            "[ROOM DETAILS] Participants fetched:",
+            participantsData?.length || 0
+          );
+          setParticipants(participantsData || []);
+          setLastParticipantsFetch(Date.now());
+        }
+      } catch (error) {
+        console.error("[ROOM DETAILS] Failed to fetch participants:", error);
+        setParticipants([]);
+      }
+    },
+    [roomDetails]
+  );
+
+  // Ensure owner is in participants list
+  const ensureOwnerInParticipants = useCallback(
+    async (roomId: string, participants: string[], ownerId: string) => {
+      if (!participants.includes(ownerId)) {
+        console.log(
+          "[ROOM DETAILS] Owner not in participants list, adding them"
+        );
+        try {
+          const updatedParticipants = [...participants, ownerId];
+          await supabase
+            .from("trading_rooms")
+            .update({ participants: updatedParticipants })
+            .eq("id", roomId);
+        } catch (error) {
+          console.error(
+            "[ROOM DETAILS] Error adding owner to participants:",
+            error
+          );
+        }
+      }
+    },
+    []
+  );
+
+  // Fetch room details if not provided with improved error handling
   useEffect(() => {
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+
+    // Set a new timeout to prevent infinite loading
+    loadingTimeoutRef.current = setTimeout(() => {
+      if (isLoading) {
+        console.error("[ROOM DETAILS] Loading timeout reached");
+        setIsLoading(false);
+        toast.error(
+          "Failed to load room details. Please try refreshing the page."
+        );
+      }
+    }, 15000); // 15 seconds timeout
+
+    // If room data is provided directly, use it
     if (roomData) {
+      console.log("[ROOM DETAILS] Using provided room data:", roomData.id);
       setRoomDetails(roomData);
       setIsLoading(false);
 
@@ -119,12 +246,30 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
 
       fetchOwner();
       fetchParticipants(roomData.participants || []);
+
+      // If current user is the owner, ensure they're in the participants list
+      if (currentUserId && currentUserId === roomData.owner_id) {
+        ensureOwnerInParticipants(
+          roomData.id,
+          roomData.participants || [],
+          currentUserId
+        );
+      }
+
+      // Clear the timeout since we're done loading
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+
       return;
     }
 
+    // If no room data provided, fetch it
     const fetchRoomDetails = async () => {
       try {
         setIsLoading(true);
+        fetchAttemptsRef.current += 1;
 
         if (!roomId) {
           console.error("[ROOM DETAILS] No room ID available");
@@ -132,7 +277,19 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
           return;
         }
 
-        console.log("[ROOM DETAILS] Fetching room details for ID:", roomId);
+        console.log(
+          `[ROOM DETAILS] Fetching room details for ID: ${roomId} (Attempt ${fetchAttemptsRef.current}/${maxFetchAttempts})`
+        );
+
+        // Add a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          console.error("[ROOM DETAILS] Fetch timeout - redirecting to home");
+          setIsLoading(false);
+          router.push("/");
+        }, 15000); // 15 seconds timeout
+
+        // Force refresh auth session before fetching room data
+        await supabase.auth.refreshSession();
 
         const { data, error } = await supabase
           .from("trading_rooms")
@@ -140,14 +297,30 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
           .eq("id", roomId)
           .single();
 
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+
         if (error) {
           console.error("[ROOM DETAILS] Error fetching room details:", error);
-          toast.error("Failed to load room details");
-          router.push("/");
+
+          // If we've tried too many times, give up
+          if (fetchAttemptsRef.current >= maxFetchAttempts) {
+            toast.error("Failed to load room details after multiple attempts");
+            router.push("/");
+            return;
+          }
+
+          // Otherwise, try again after a delay
+          setTimeout(() => {
+            fetchRoomDetails();
+          }, 2000);
+
           return;
         }
 
+        console.log("[ROOM DETAILS] Room data fetched successfully:", data.id);
         setRoomDetails(data);
+        fetchAttemptsRef.current = 0; // Reset counter on success
 
         // Set the selected symbol
         if (data.trading_pairs && data.trading_pairs.length > 0) {
@@ -183,10 +356,40 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
         }
 
         fetchParticipants(data.participants || []);
+
+        // If current user is the owner, ensure they're in the participants list
+        if (currentUserId && currentUserId === data.owner_id) {
+          ensureOwnerInParticipants(
+            data.id,
+            data.participants || [],
+            currentUserId
+          );
+        }
+
+        // Clear the loading timeout since we're done
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+
+        setIsLoading(false);
       } catch (error) {
         console.error("[ROOM DETAILS] Error:", error);
+
+        // If we've tried too many times, give up
+        if (fetchAttemptsRef.current >= maxFetchAttempts) {
+          setIsLoading(false);
+          toast.error("Failed to load room details after multiple attempts");
+        } else {
+          // Otherwise, try again after a delay
+          setTimeout(() => {
+            fetchRoomDetails();
+          }, 2000);
+        }
       } finally {
-        setIsLoading(false);
+        if (fetchAttemptsRef.current >= maxFetchAttempts) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -220,12 +423,31 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(
+          `[ROOM DETAILS] Subscription status for room:${roomId}:`,
+          status
+        );
+      });
 
     return () => {
+      console.log(`[ROOM DETAILS] Cleaning up subscription for room:${roomId}`);
       supabase.removeChannel(roomSubscription);
+
+      // Clear any existing timeout
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
     };
-  }, [roomId, router, roomData, fetchParticipants]);
+  }, [
+    roomId,
+    router,
+    roomData,
+    fetchParticipants,
+    currentUserId,
+    ensureOwnerInParticipants,
+    maxFetchAttempts,
+  ]);
 
   // Force refresh participants on a regular interval
   useEffect(() => {
@@ -283,5 +505,6 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
     selectedSymbol,
     setSelectedSymbol,
     setRoomDetails,
+    fetchParticipants: () => fetchParticipants(roomDetails?.participants || []),
   };
 }

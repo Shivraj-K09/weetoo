@@ -36,7 +36,7 @@ type Message = {
   content: string;
   created_at: string;
   user_name: string;
-  user_avatar?: string;
+  user_avatar: string;
   user_avatar_color?: string;
   isSystem?: boolean;
 };
@@ -96,12 +96,12 @@ export function UserChat() {
     console.log("Setting up realtime subscription for messages");
 
     try {
-      // Create a new subscription with minimal configuration
+      // Create a new subscription with standard configuration
       realtimeChannelRef.current = supabase
         .channel("chat_messages", {
           config: {
-            // Add broadcast and presence recovery options
             broadcast: { self: true },
+            presence: { key: userId || "anonymous" },
           },
         })
         .on(
@@ -112,6 +112,7 @@ export function UserChat() {
             table: "global_chat_messages",
           },
           async (payload) => {
+            // Rest of the handler remains the same
             console.log("Received new message:", payload);
             const newMessage = payload.new as Message;
 
@@ -168,9 +169,7 @@ export function UserChat() {
             if (retryCountRef.current < 5) {
               const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
               console.log(
-                `Retrying message subscription in ${delay}ms (attempt ${
-                  retryCountRef.current + 1
-                })`
+                `Retrying message subscription in ${delay}ms (attempt ${retryCountRef.current + 1})`
               );
 
               retryTimeoutRef.current = setTimeout(() => {
@@ -202,7 +201,31 @@ export function UserChat() {
         setupRealtimeSubscription();
       }, 5000);
     }
-  }, [userAvatars]);
+  }, [userAvatars, userId]);
+
+  // Add this function after the setupRealtimeSubscription function
+  const checkConnectionHealth = useCallback(() => {
+    if (!realtimeChannelRef.current) {
+      console.log("No channel reference, creating new subscription");
+      setupRealtimeSubscription();
+      return;
+    }
+
+    try {
+      const status = realtimeChannelRef.current.state;
+      console.log("Current channel status:", status);
+
+      // If not in SUBSCRIBED state, reconnect
+      if (status !== "SUBSCRIBED") {
+        console.log("Channel not in SUBSCRIBED state, reconnecting");
+        setupRealtimeSubscription();
+      }
+    } catch (error) {
+      console.error("Error checking channel status:", error);
+      // If there's any error, just reconnect
+      setupRealtimeSubscription();
+    }
+  }, [setupRealtimeSubscription]);
 
   // Function to generate a unique ID for pending messages
   const generatePendingId = () => {
@@ -322,9 +345,8 @@ export function UserChat() {
         .insert({
           user_id: userId,
           content: pendingMessage.content,
-          user_name: `${userData.first_name} ${
-            userData.last_name || ""
-          }`.trim(),
+          user_name:
+            `${userData.first_name} ${userData.last_name || ""}`.trim(),
           user_avatar: avatarText,
           user_avatar_color: avatarColor,
         })
@@ -583,67 +605,42 @@ export function UserChat() {
     };
   }, []);
 
-  // Add this new effect to handle visibility changes
-  // Add this after the other useEffect hooks
+  // Replace the visibility change effect with this improved version
   useEffect(() => {
     // Handle page visibility changes
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         console.log("Tab is now visible, checking connection status");
-
-        // Check if we need to reconnect
-        if (realtimeChannelRef.current) {
-          try {
-            // Try to ping the channel to see if it's still alive
-            const status = realtimeChannelRef.current.state;
-            console.log("Current channel status:", status);
-
-            if (status !== "SUBSCRIBED") {
-              console.log("Channel not in SUBSCRIBED state, reconnecting");
-              setupRealtimeSubscription();
-            }
-          } catch (error) {
-            console.error("Error checking channel status:", error);
-            // If there's any error, just reconnect
-            setupRealtimeSubscription();
-          }
-        } else {
-          // No channel reference, create a new one
-          console.log("No channel reference, creating new subscription");
-          setupRealtimeSubscription();
-        }
+        checkConnectionHealth();
       }
     };
 
     // Add event listener for visibility changes
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Set up a periodic connection check when the tab is visible
-    const intervalId = setInterval(() => {
-      if (
-        document.visibilityState === "visible" &&
-        realtimeChannelRef.current
-      ) {
-        try {
-          const status = realtimeChannelRef.current.state;
-          if (status !== "SUBSCRIBED") {
-            console.log(
-              "Periodic check: Channel not in SUBSCRIBED state, reconnecting"
-            );
-            setupRealtimeSubscription();
-          }
-        } catch (error) {
-          console.error("Error in periodic channel check:", error);
-          setupRealtimeSubscription();
-        }
+    // Set up a periodic connection check
+    const healthCheckInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        checkConnectionHealth();
       }
-    }, 60000); // Check every minute
+    }, 30000); // Check every 30 seconds when visible
+
+    // Set up a forced reconnection every 10 minutes to prevent stale connections
+    const forcedReconnectInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        console.log(
+          "Performing scheduled reconnection to prevent stale connection"
+        );
+        setupRealtimeSubscription();
+      }
+    }, 600000); // Every 10 minutes
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(intervalId);
+      clearInterval(healthCheckInterval);
+      clearInterval(forcedReconnectInterval);
     };
-  }, [setupRealtimeSubscription]);
+  }, [checkConnectionHealth, setupRealtimeSubscription]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -742,17 +739,16 @@ export function UserChat() {
             <div className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
               <p className="text-xs text-white/80">
-                Users Online:{" "}
-                {isConnecting
-                  ? "Connecting..."
-                  : onlineUsers.toLocaleString()}{" "}
+                Users Online: {onlineUsers.toLocaleString()}
               </p>
             </div>
           </div>
         </div>
-        <button className="text-white/80 hover:text-white">
-          <MoreHorizontal className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="text-white/80 hover:text-white">
+            <MoreHorizontal className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Chat content */}
@@ -774,9 +770,7 @@ export function UserChat() {
               {displayMessages.map((message) => (
                 <div
                   key={message.id}
-                  className={`px-4 py-2 ${
-                    message.isSystem ? "bg-emerald-600" : ""
-                  }`}
+                  className={`px-4 py-2 ${message.isSystem ? "bg-emerald-600" : ""}`}
                 >
                   {!message.isSystem ? (
                     <div className="flex items-start gap-2">

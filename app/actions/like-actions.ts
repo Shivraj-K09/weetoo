@@ -1,13 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkDailyLimit, awardPoints } from "./point-system-actions";
 
 // Toggle like status (like or unlike)
 export async function togglePostLike(postId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -113,7 +113,7 @@ export async function togglePostLike(postId: string) {
 // Get the number of likes for a post
 export async function getPostLikeCount(postId: string): Promise<number> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("post_likes")
@@ -135,7 +135,7 @@ export async function getPostLikeCount(postId: string): Promise<number> {
 // Check if a user has liked a post
 export async function hasUserLikedPost(postId: string): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();

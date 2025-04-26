@@ -2,6 +2,29 @@
 
 import { useState, useEffect, useRef } from "react";
 
+// Throttle function to limit update frequency
+function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  let inThrottle = false;
+  let lastResult: ReturnType<T> | undefined;
+
+  return function (
+    this: any,
+    ...args: Parameters<T>
+  ): ReturnType<T> | undefined {
+    if (!inThrottle) {
+      lastResult = func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
+    }
+    return lastResult;
+  };
+}
+
 // Update the PriceData interface to include volume and openInterest
 interface PriceData {
   currentPrice: string;
@@ -381,59 +404,27 @@ export function usePriceData(selectedSymbol: string) {
     };
   }, [selectedSymbol]);
 
-  // Handle price update from TradingTabs component
-  const handlePriceUpdate = (data: {
-    currentPrice: string;
-    priceDirection: "up" | "down" | "none";
-    priceChange: number;
-    priceChangePercent: number;
-    indexPrice?: string;
-    highPrice?: string;
-    lowPrice?: string;
-    quoteVolume?: string;
-    volume?: string;
-    openInterest?: string;
-  }) => {
-    // Throttle updates to prevent flickering
-    const now = Date.now();
-    if (now - lastUpdateTime.current < updateInterval) {
-      return;
-    }
-
-    lastUpdateTime.current = now;
-
-    setPriceData((prev) => {
-      const newPrice = data.currentPrice;
-      let direction = data.priceDirection;
-
-      // Determine price direction if not provided
-      if (direction === "none" && prev.currentPrice) {
-        if (Number(newPrice) > Number(prev.currentPrice)) {
-          direction = "up";
-        } else if (Number(newPrice) < Number(prev.currentPrice)) {
-          direction = "down";
-        }
-      }
-
-      return {
+  // Throttled price update handler
+  const handlePriceUpdate = throttle(
+    (data: {
+      currentPrice: string;
+      priceDirection: "up" | "down" | "none";
+      priceChange: number;
+      priceChangePercent: number;
+      indexPrice?: string;
+      highPrice?: string;
+      lowPrice?: string;
+      quoteVolume?: string;
+      volume?: string;
+      openInterest?: string;
+    }) => {
+      setPriceData((prev) => ({
         ...prev,
-        currentPrice: newPrice,
-        priceDirection: direction,
-        priceChange: data.priceChange,
-        priceChangePercent: data.priceChangePercent,
-        indexPrice: data.indexPrice || newPrice,
-        highPrice: data.highPrice
-          ? formatPrice(data.highPrice)
-          : prev.highPrice,
-        lowPrice: data.lowPrice ? formatPrice(data.lowPrice) : prev.lowPrice,
-        quoteVolume: data.quoteVolume || prev.quoteVolume,
-        volume: data.volume || prev.volume,
-        openInterest: data.openInterest || prev.openInterest,
-      };
-    });
-
-    setPriceDataLoaded(true);
-  };
+        ...data,
+      }));
+    },
+    500
+  ); // Update at most every 500ms
 
   return {
     priceData,

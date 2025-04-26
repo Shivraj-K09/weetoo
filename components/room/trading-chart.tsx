@@ -56,7 +56,7 @@ export const TradingChart = memo(function TradingChart({
   }, [symbol]); // Only re-run if symbol changes
 
   return (
-    <div className="bg-[#212631] rounded w-full h-[45rem] border border-[#3f445c]">
+    <div className="bg-[#212631] rounded w-full h-[45rem] border border-[#3f445c] ">
       <div
         className="tradingview-widget-container"
         ref={containerRef}

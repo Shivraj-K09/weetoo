@@ -8,7 +8,7 @@ import {
   type NaverUserResponse,
 } from "@/lib/auth/naver";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET!;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!;
@@ -226,7 +226,7 @@ export async function handleNaverCallback(
     if (responseData.userId) {
       try {
         // Get user creation time
-        const supabase = await createClient();
+        const supabase = await createServerClient();
         const { data: userData } = await supabase
           .from("users")
           .select("created_at, last_sign_in_at")

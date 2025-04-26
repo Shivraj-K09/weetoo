@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 // Define a constant for the system user ID - same as in auto-approve.ts
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const timeRange = searchParams.get("timeRange");
   const searchTerm = searchParams.get("searchTerm");
 
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     console.log("Fetching activity logs with params:", {
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Insert the activity log
     const { error } = await supabase.from("admin_activity_log").insert({

@@ -145,3 +145,76 @@ export interface ChatMessage {
   message: string;
   timestamp: number;
 }
+
+export interface Message {
+  id: string;
+  status: "read" | "unread";
+  type: "normal" | "important" | "ad";
+  sender: string;
+  title: string;
+  date: string;
+  time: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: string;
+  description: string;
+  amount: number;
+  date: string;
+}
+
+export interface PointsData {
+  totalPoints: number;
+  availablePoints: number;
+  transactions: Transaction[];
+}
+
+export interface Platform {
+  id: string;
+  name: string;
+  logo: string;
+  color: string;
+  status: string;
+  registered: boolean;
+  disabled?: boolean;
+}
+
+export interface Position {
+  id: string;
+  room_id: string;
+  user_id: string;
+  symbol: string;
+  direction: "buy" | "sell";
+  entry_price: number;
+  entry_amount: number;
+  leverage: number;
+  position_size: number;
+  current_price: number;
+  current_pnl?: number;
+  pnl_percentage?: number;
+  status: "open" | "closed" | "partially_closed";
+  created_at: string;
+  updated_at: string;
+  stop_loss?: number;
+  take_profit?: number;
+}
+
+export interface Trade {
+  id: string;
+  position_id: string;
+  room_id: string;
+  user_id: string;
+  symbol: string;
+  direction: "buy" | "sell";
+  entry_price: number;
+  exit_price: number;
+  entry_amount: number;
+  leverage: number;
+  position_size: number;
+  trade_volume: number;
+  pnl: number;
+  pnl_percentage: number;
+  entry_time: string;
+  exit_time: string;
+}

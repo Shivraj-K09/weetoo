@@ -8,6 +8,7 @@ import { LinkIcon } from "@/components/icons/link-icon";
 import { NotificationIcon } from "@/components/icons/notification";
 import { SettingsGearIcon } from "@/components/icons/settings-icon";
 import { UsersIcon } from "@/components/icons/user-icon";
+import { AudioLinesIcon } from "@/components/icons/voice-icon";
 import { WithDrawIcon } from "@/components/icons/withdraw-icon";
 import {
   IconCoins,
@@ -57,11 +58,11 @@ export const navigationData: NavGroup[] = [
         url: "/admin/activity",
         icon: ActivityIcon,
       },
-      // {
-      //   title: "Livekit Management",
-      //   url: "/admin/livekit",
-      //   icon: IconHome,
-      // }
+      {
+        title: "Livekit Management",
+        url: "/admin/livekit-management",
+        icon: AudioLinesIcon,
+      },
     ],
   },
   {

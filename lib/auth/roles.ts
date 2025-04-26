@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 /**
  * Check if the current user has admin role
  */
 export async function isAdmin(): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get current user
     const {
@@ -41,7 +41,7 @@ export async function isAdmin(): Promise<boolean> {
  */
 export async function getUserRole(): Promise<string | null> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get current user
     const {
@@ -76,7 +76,7 @@ export async function getUserRole(): Promise<string | null> {
  */
 export async function isOwnerOrAdmin(resourceUserId: string): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get current user
     const {

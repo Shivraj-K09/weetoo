@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { v4 as uuidv4 } from "uuid";
 
 export async function sendMessage(
@@ -15,7 +15,7 @@ export async function sendMessage(
       return { success: false, error: "Message cannot be empty" };
     }
 
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Create a new message object
     const newMessage = {

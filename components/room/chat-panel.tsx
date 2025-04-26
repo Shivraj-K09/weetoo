@@ -47,7 +47,7 @@ export const ChatPanel = memo(function ChatPanel({
   };
 
   return (
-    <div className="w-full bg-[#1a1e27] h-[680px] relative border border-[#3f445c]">
+    <div className="w-full bg-[#1a1e27] h-full relative border border-[#3f445c]">
       <div className="bg-[#1a1e27] flex items-center justify-between w-full p-2 border-b border-[#3f445c]">
         <div className="text-sm font-medium">Chat</div>
         <span className="text-xs text-gray-400">채팅방 규정</span>
@@ -55,7 +55,7 @@ export const ChatPanel = memo(function ChatPanel({
 
       {/* Chat messages area - NO auto-scrolling */}
       <div
-        className="p-2 overflow-y-auto h-[580px] chat-messages bg-[#1a1e27] no-scrollbar"
+        className="p-2 overflow-y-auto h-[930px] chat-messages bg-[#1a1e27] no-scrollbar"
         id="chat-messages"
       >
         {isLoading ? (

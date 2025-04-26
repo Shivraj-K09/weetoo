@@ -1,11 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { resetRoomVirtualCurrency } from "./virtual-currency-actions";
 
 export async function deleteRoom(roomId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // First, reset the virtual currency to zero
     await resetRoomVirtualCurrency(roomId);

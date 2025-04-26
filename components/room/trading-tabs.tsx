@@ -2,8 +2,7 @@
 
 import type React from "react";
 
-import { OrderBook } from "@/components/room/order-book";
-import { RecentTrades } from "@/components/room/recent-trades";
+import { useState, useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -12,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEffect, useRef, useState } from "react";
+import { OrderBook } from "./order-book";
+import { RecentTrades } from "./recent-trades";
 
 // Suppress WebSocket errors globally
 if (typeof window !== "undefined") {
@@ -63,6 +63,14 @@ interface OrderBookData {
   sellPercentage: number;
 }
 
+// Define WebSocket update data interface
+interface DepthUpdateData {
+  a: string[][]; // asks updates
+  b: string[][]; // bids updates
+  u: number; // final update id
+  U: number; // first update id
+}
+
 // Update the onPriceUpdate interface to include quoteVolume
 interface TradingTabsProps {
   symbol?: string;
@@ -79,6 +87,28 @@ interface TradingTabsProps {
   }) => void;
 }
 
+// Properly typed debounce function
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const debounce = <F extends (...args: any[]) => any>(
+  func: F,
+  wait: number
+): ((...args: Parameters<F>) => void) => {
+  let timeout: NodeJS.Timeout | null = null;
+
+  return function executedFunction(...args: Parameters<F>): void {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+
+    timeout = setTimeout(later, wait);
+  };
+};
+
 export function TradingTabs({
   symbol = "BTCUSDT",
   onPriceUpdate,
@@ -90,8 +120,8 @@ export function TradingTabs({
   );
 
   // Parse the trading pair to get base and quote currencies
-  // const baseCurrency = symbol.replace(/USDT$/, "") || "BTC";
-  // const quoteCurrency = "USDT";
+  const baseCurrency = symbol.replace(/USDT$/, "") || "BTC";
+  const quoteCurrency = "USDT";
 
   // Trade history for buy/sell ratio
   const tradeRatioHistory = useRef<TradeRatio[]>([]);
@@ -121,12 +151,12 @@ export function TradingTabs({
   const [isConnected, setIsConnected] = useState(false);
 
   // Change the limit variable to be dynamic based on the view mode
-  // const defaultLimit = 12;
+  const defaultLimit = 12;
   const filteredViewLimit = 25; // Adjusted to 25 entries as requested
 
   // Replace the static limit declaration with this
-  // const getLimit = () =>
-  //   orderBookView === "all" ? defaultLimit : filteredViewLimit;
+  const getLimit = () =>
+    orderBookView === "all" ? defaultLimit : filteredViewLimit;
 
   const lastUpdateId = useRef(0);
   const isComponentMounted = useRef(false);
@@ -184,7 +214,6 @@ export function TradingTabs({
         }
       } catch (e) {
         // Silently handle errors
-        console.error("Error closing WebSocket:", e);
       }
       ws.current = null;
     }
@@ -198,7 +227,7 @@ export function TradingTabs({
     setIsConnected(false);
   };
 
-  // Connect all WebSockets
+  // Connect all WebSockets with exponential backoff
   const connectWebSockets = () => {
     // Fetch initial order book data
     fetchOrderBook();
@@ -206,16 +235,39 @@ export function TradingTabs({
     // Fetch initial trade history
     fetchTradeHistory();
 
-    // Connect to depth WebSocket
-    connectDepthWs();
-
-    // Connect to ticker WebSocket
-    connectTickerWs();
-
-    // Connect to trade WebSocket
-    connectTradeWs();
+    // Connect to all WebSockets with proper error handling
+    connectWithBackoff(connectDepthWs, "Depth");
+    connectWithBackoff(connectTickerWs, "Ticker");
+    connectWithBackoff(connectTradeWs, "Trade");
 
     setIsConnected(true);
+  };
+
+  // Helper function for connection with exponential backoff
+  const connectWithBackoff = (
+    connectFn: () => void,
+    name: string,
+    attempt = 1
+  ) => {
+    const maxAttempts = 5;
+    const baseDelay = 1000;
+
+    try {
+      connectFn();
+    } catch (error) {
+      if (attempt <= maxAttempts && isComponentMounted.current) {
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
+        console.log(
+          `${name} WebSocket connection failed. Retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
+        );
+
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            connectWithBackoff(connectFn, name, attempt + 1);
+          }
+        }, delay);
+      }
+    }
   };
 
   // Update the fetchOrderBook function to use the dynamic limit
@@ -303,16 +355,10 @@ export function TradingTabs({
   };
 
   // Update the processOrderBookData function to use the dynamic limit
-  const processOrderBookData = (
-    data: {
-      asks?: string[][];
-      bids?: string[][];
-      lastUpdateId?: number;
-    } | null
-  ) => {
+  const processOrderBookData = (data: any) => {
     if (!data) return { asks: [], bids: [] };
 
-    // const currentLimit = getLimit();
+    const currentLimit = getLimit();
 
     const processedAsks = data.asks
       ? data.asks
@@ -327,7 +373,6 @@ export function TradingTabs({
             return { price, amount, total };
           })
           .sort(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (a: any, b: any) =>
               Number.parseFloat(a.price) - Number.parseFloat(b.price)
           )
@@ -346,7 +391,6 @@ export function TradingTabs({
             return { price, amount, total };
           })
           .sort(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (a: any, b: any) =>
               Number.parseFloat(b.price) - Number.parseFloat(a.price)
           )
@@ -368,17 +412,6 @@ export function TradingTabs({
         return 2;
     }
   };
-
-  // Add this interface before the connectDepthWs function
-  interface DepthUpdateData {
-    e: string; // Event type
-    E: number; // Event time
-    s: string; // Symbol
-    U: number; // First update ID in event
-    u: number; // Final update ID in event
-    b: string[][]; // Bids to be updated
-    a: string[][]; // Asks to be updated
-  }
 
   // Connect to depth WebSocket
   const connectDepthWs = () => {
@@ -412,27 +445,31 @@ export function TradingTabs({
 
           // Only process if the active tab is the order book
           if (activeTab === "tab-1") {
-            setOrderBookData((prev: OrderBookData) => {
-              // Apply updates to asks
-              const updatedAsks = applyAsksUpdate(data.a || [], prev.asks);
-
-              // Apply updates to bids
-              const updatedBids = applyBidsUpdate(data.b || [], prev.bids);
-
-              return {
-                ...prev,
-                asks: updatedAsks,
-                bids: updatedBids,
-              };
-            });
+            debouncedUpdateOrderBook(data);
           }
 
           lastUpdateId.current = data.u;
         } catch (error) {
           // Silently handle parsing errors
-          console.error("Error parsing WebSocket data:", error);
         }
       };
+
+      // Create debounced update function with proper typing
+      const debouncedUpdateOrderBook = debounce((data: DepthUpdateData) => {
+        setOrderBookData((prev) => {
+          // Apply updates to asks
+          const updatedAsks = applyAsksUpdate(data.a || [], prev.asks);
+
+          // Apply updates to bids
+          const updatedBids = applyBidsUpdate(data.b || [], prev.bids);
+
+          return {
+            ...prev,
+            asks: updatedAsks,
+            bids: updatedBids,
+          };
+        });
+      }, 100); // Update at most every 100ms
 
       ws.onerror = () => {
         // Completely suppress all errors
@@ -451,32 +488,8 @@ export function TradingTabs({
       };
     } catch (error) {
       // Silently handle connection errors
-      console.error("Error connecting to WebSocket:", error);
     }
   };
-
-  // Add this interface before the connectTickerWs function
-  interface TickerData {
-    e: string; // Event type
-    E: number; // Event time
-    s: string; // Symbol
-    p: string; // Price change
-    P: string; // Price change percent
-    w: string; // Weighted average price
-    c: string; // Last price
-    Q: string; // Last quantity
-    o: string; // Open price
-    h: string; // High price
-    l: string; // Low price
-    v: string; // Total traded base asset volume
-    q: string; // Total traded quote asset volume
-    O: number; // Statistics open time
-    C: number; // Statistics close time
-    F: number; // First trade ID
-    L: number; // Last trade ID
-    n: number; // Total number of trades
-    i?: string; // Index price
-  }
 
   // Connect to ticker WebSocket
   const connectTickerWs = () => {
@@ -498,7 +511,7 @@ export function TradingTabs({
         if (!isComponentMounted.current) return;
 
         try {
-          const data = JSON.parse(event.data) as TickerData;
+          const data = JSON.parse(event.data);
 
           // Process ticker data regardless of active tab
           if (data.c) {
@@ -574,7 +587,6 @@ export function TradingTabs({
           }
         } catch (error) {
           // Silently handle parsing errors
-          console.error("Error parsing WebSocket data:", error);
         }
       };
 
@@ -595,24 +607,8 @@ export function TradingTabs({
       };
     } catch (error) {
       // Silently handle connection errors
-      console.error("Error connecting to WebSocket:", error);
     }
   };
-
-  // Add this interface before the connectTradeWs function
-  interface TradeData {
-    e: string; // Event type
-    E: number; // Event time
-    s: string; // Symbol
-    t: number; // Trade ID
-    p: string; // Price
-    q: string; // Quantity
-    b: number; // Buyer order ID
-    a: number; // Seller order ID
-    T: number; // Trade time
-    m: boolean; // Is the buyer the market maker?
-    M: boolean; // Ignore
-  }
 
   // Connect to trade WebSocket
   const connectTradeWs = () => {
@@ -634,7 +630,7 @@ export function TradingTabs({
         if (!isComponentMounted.current) return;
 
         try {
-          const data = JSON.parse(event.data) as TradeData;
+          const data = JSON.parse(event.data);
 
           // Process for buy/sell ratio
           if (data && data.m !== undefined) {
@@ -670,7 +666,6 @@ export function TradingTabs({
           }
         } catch (error) {
           // Silently handle parsing errors
-          console.error("Error parsing WebSocket data:", error);
         }
       };
 
@@ -691,7 +686,6 @@ export function TradingTabs({
       };
     } catch (error) {
       // Silently handle connection errors
-      console.error("Error connecting to WebSocket:", error);
     }
   };
 

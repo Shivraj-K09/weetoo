@@ -19,6 +19,7 @@ import {
   type TrackPublication,
 } from "livekit-client";
 import { WaveVisualizer } from "./wave-visualizer";
+import { createLivekitToken } from "@/app/actions/livekit-actions";
 
 interface VoiceChannelProps {
   roomId: string;
@@ -415,16 +416,12 @@ function VoiceChannelInner({
         // Get the MediaStreamTrack
         const mediaTrack = track.track;
         if (mediaTrack) {
-          if (mediaTrack instanceof MediaStreamTrack) {
-            logVoice(
-              "MediaStreamTrack - readyState:",
-              mediaTrack.readyState,
-              "muted:",
-              mediaTrack.muted
-            );
-          } else {
-            logVoice("MediaStreamTrack is not an instance of MediaStreamTrack");
-          }
+          logVoice(
+            "MediaStreamTrack - readyState:",
+            (mediaTrack as unknown as MediaStreamTrack).readyState,
+            "muted:",
+            (mediaTrack as unknown as MediaStreamTrack).muted
+          );
         }
       } else {
         throw new Error("Failed to create audio track");
@@ -537,10 +534,10 @@ function VoiceChannelInner({
 
           {/* Audio Visualizer - Now positioned to the right of the status text */}
           {isBroadcasting && (
-            <div className="flex items-center">
+            <div className="flex-1 max-w-[300px]">
               <WaveVisualizer
                 track={isOwner ? actualAudioTrack : firstRemoteAudioTrack}
-                width={900}
+                width={300}
                 height={40}
                 color="#4ade80"
                 backgroundColor="#1a1e27"
@@ -575,6 +572,31 @@ function VoiceChannelInner({
 // Main component that wraps everything with the LiveKit provider
 export function VoiceChannel({ roomId, isOwner, ownerId }: VoiceChannelProps) {
   const [retryKey, setRetryKey] = useState(0);
+  const [token, setToken] = useState<string | null>(null);
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
+
+  // Fetch token when needed
+  useEffect(() => {
+    const fetchToken = async () => {
+      if (!isOwner) return; // Only fetch token for owner
+
+      try {
+        setIsTokenLoading(true);
+        const result = await createLivekitToken(roomId, true);
+        if (result.success && result.token) {
+          setToken(await result.token);
+        } else {
+          console.error("Failed to get token:", result.message);
+        }
+      } catch (error) {
+        console.error("Error fetching token:", error);
+      } finally {
+        setIsTokenLoading(false);
+      }
+    };
+
+    fetchToken();
+  }, [roomId, isOwner, retryKey]);
 
   // Add a retry mechanism for the entire component
   const handleRetry = () => {

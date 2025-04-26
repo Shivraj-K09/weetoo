@@ -1,38 +1,55 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { RoomsList } from "./rooms-list";
 import { CreateRoomPopover } from "./create-room-popover";
 import { useUser } from "@/hooks/use-user";
-import type { Room } from "@/types";
+import type { Room } from "@/types/index";
+import { resetSupabaseClient } from "@/lib/supabase/utils";
+import { Button } from "@/components/ui/button";
 
 export function TradingRooms() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isRoomsLoading, setIsRoomsLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
   const { user } = useUser();
 
   // Use a ref to track the subscription to ensure proper cleanup
   const subscriptionRef = useRef<any>(null);
 
+  // Function to force refresh the rooms list
+  const refreshRooms = useCallback(() => {
+    setLastRefresh(Date.now());
+    toast.success("Room list refreshed", { id: "refresh-rooms" });
+  }, []);
+
   // Fetch rooms from Supabase
-  useEffect(() => {
-    let isMounted = true;
-    let channelSubscription: any = null;
+  const fetchRooms = useCallback(async () => {
+    const isMounted = true;
 
-    const fetchRooms = async () => {
-      if (!isMounted) return;
+    try {
+      setIsRoomsLoading(true);
 
+      // Reset Supabase client before fetching rooms
+      resetSupabaseClient();
+
+      // Force refresh the auth session
       try {
-        setIsRoomsLoading(true);
-        const { data, error } = await supabase
-          .from("trading_rooms")
-          .select(
-            `
+        await supabase.auth.refreshSession();
+      } catch (error) {
+        console.error("[TRADING ROOMS] Error refreshing auth session:", error);
+      }
+
+      const { data, error } = await supabase
+        .from("trading_rooms")
+        .select(
+          `
           id,
           room_name,
           room_type,
@@ -43,51 +60,53 @@ export function TradingRooms() {
           room_category,
           users:owner_id (first_name, last_name)
         `
-          )
-          .order("created_at", { ascending: false });
+        )
+        .order("created_at", { ascending: false });
 
-        if (error) {
-          console.error("Error fetching rooms:", error);
-          if (isMounted) {
-            setIsRoomsLoading(false);
-          }
-          return;
-        }
-
-        if (!isMounted) return;
-
-        // Transform data with proper typing
-        const transformedRooms = (data || []).map((room: any) => {
-          // Handle users as an array or single object
-          const userObj = Array.isArray(room.users)
-            ? room.users[0]
-            : room.users;
-
-          return {
-            id: room.id,
-            title: room.room_name,
-            symbol: room.trading_pairs?.[0] || "BTCUSDT", // Use the first trading pair or default
-            privacy: room.room_type,
-            createdAt: new Date(room.created_at),
-            username: userObj
-              ? `${userObj.first_name} ${userObj.last_name}`
-              : "Unknown",
-            roomCategory: room.room_category || "regular",
-            owner_id: room.owner_id,
-          };
-        });
-
-        if (isMounted) {
-          setRooms(transformedRooms);
-          setIsRoomsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching rooms:", error);
+      if (error) {
+        console.error("[TRADING ROOMS] Error fetching rooms:", error);
         if (isMounted) {
           setIsRoomsLoading(false);
         }
+        return;
       }
-    };
+
+      if (!isMounted) return;
+
+      // Transform data with proper typing
+      const transformedRooms = (data || []).map((room: any) => {
+        // Handle users as an array or single object
+        const userObj = Array.isArray(room.users) ? room.users[0] : room.users;
+
+        return {
+          id: room.id,
+          title: room.room_name,
+          symbol: room.trading_pairs?.[0] || "BTCUSDT", // Use the first trading pair or default
+          privacy: room.room_type,
+          createdAt: new Date(room.created_at),
+          username: userObj
+            ? `${userObj.first_name} ${userObj.last_name}`
+            : "Unknown",
+          roomCategory: room.room_category || "regular",
+          owner_id: room.owner_id,
+        };
+      });
+
+      if (isMounted) {
+        setRooms(transformedRooms);
+        setIsRoomsLoading(false);
+      }
+    } catch (error) {
+      console.error("[TRADING ROOMS] Error fetching rooms:", error);
+      if (isMounted) {
+        setIsRoomsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let channelSubscription: any = null;
 
     // Call fetchRooms immediately
     fetchRooms();
@@ -114,7 +133,10 @@ export function TradingRooms() {
           }
         });
     } catch (subscriptionError) {
-      console.error("Error setting up room subscription:", subscriptionError);
+      console.error(
+        "[TRADING ROOMS] Error setting up room subscription:",
+        subscriptionError
+      );
     }
 
     // Cleanup function - critical for preventing navigation issues
@@ -130,18 +152,71 @@ export function TradingRooms() {
             supabase.removeChannel(channelToRemove);
           }
         } catch (error) {
-          console.error("Error removing channel:", error);
+          console.error("[TRADING ROOMS] Error removing channel:", error);
         }
       }
 
       // Clear the ref
       subscriptionRef.current = null;
     };
-  }, []);
+  }, [fetchRooms, lastRefresh]);
+
+  // Add a useEffect to handle room window closing
+  useEffect(() => {
+    // Check if we need to reset the Supabase client
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Page is now visible again, check if we need to reset
+        const lastOpenedRoom = localStorage.getItem("lastOpenedRoom");
+        const lastOpenTime = localStorage.getItem("roomOpenedAt");
+
+        if (lastOpenedRoom && lastOpenTime) {
+          const timeElapsed = Date.now() - Number.parseInt(lastOpenTime);
+          // If it's been less than 10 seconds since a room was opened,
+          // and we're back to the list view, we might need to reset
+          if (timeElapsed < 10000) {
+            console.log(
+              "[TRADING ROOMS] Detected return from room view, resetting connections"
+            );
+            // Reset the Supabase client
+            resetSupabaseClient();
+            // Clear the localStorage values
+            localStorage.removeItem("lastOpenedRoom");
+            localStorage.removeItem("roomOpenedAt");
+            // Refresh the rooms list
+            fetchRooms();
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Add a listener for the custom event from rooms
+    const handleRoomClosed = () => {
+      console.log(
+        "[TRADING ROOMS] Room closed event received, refreshing rooms"
+      );
+      fetchRooms();
+    };
+
+    window.addEventListener("room-closed", handleRoomClosed);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("room-closed", handleRoomClosed);
+    };
+  }, [fetchRooms]);
 
   return (
     <div className="w-full h-full">
-      <div className="flex justify-end w-full py-3">
+      <div className="flex justify-end w-full py-3 gap-2">
+        <Button
+          onClick={refreshRooms}
+          className="bg-[#3498DB] hover:bg-[#3498DB]/90 font-semibold rounded cursor-pointer h-10"
+        >
+          Refresh Rooms
+        </Button>
         <CreateRoomPopover open={open} setOpen={setOpen} user={user} />
       </div>
       <RoomsList

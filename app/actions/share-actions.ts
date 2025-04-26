@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkDailyLimit, awardPoints } from "./point-system-actions";
 
@@ -22,7 +22,7 @@ export interface Share {
 // Track a share action
 export async function trackShare(postId: string, shareType: string) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -84,7 +84,7 @@ export async function trackShare(postId: string, shareType: string) {
 // Get share count for a post
 export async function getShareCount(postId: string): Promise<number> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { count, error } = await supabase
       .from("post_shares")
@@ -109,7 +109,7 @@ export async function getRecentShares(
   limit = 5
 ): Promise<Share[]> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { data, error } = await supabase
       .from("post_shares")
@@ -143,7 +143,7 @@ export async function getRecentShares(
 // Check if user has shared a post
 export async function hasUserShared(postId: string): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();

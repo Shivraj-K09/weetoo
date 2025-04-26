@@ -138,3 +138,56 @@ For your first implementation sprint, focus on these high-priority tasks:
 8. Implement WebRTC for Viewers (Hard, High)
 
 This gives you a complete end-to-end implementation of the core broadcasting functionality that you can then refine and enhance in subsequent sprints.
+
+Error: Error subscribing to messages
+at createUnhandledError (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:879:71)
+at handleClientError (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:1052:56)
+at console.error (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:1191:56)
+at UserChat.useCallback[setupRealtimeSubscription] (http://localhost:3000/_next/static/chunks/\_adc98cf2._.js:1448:37)
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4084:84
+at Object.callback (http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4420:239)
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4348:22
+at Array.map (<anonymous>)
+at RealtimeChannel._trigger (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4333:16)
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4875:50
+at Array.forEach (<anonymous>)
+at RealtimeClient._triggerChanError (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4875:23)
+at RealtimeClient._onConnClose (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4864:14)
+at conn.onclose (http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4817:47)
+
+Error: Channel error
+at createUnhandledError (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:879:71)
+at handleClientError (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:1052:56)
+at console.error (http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_c24f7707._.js:1191:56)
+at http://localhost:3000/_next/static/chunks/\_adc98cf2._.js:1152:29
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4084:84
+at Object.callback (http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4420:239)
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4348:22
+at Array.map (<anonymous>)
+at RealtimeChannel._trigger (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4333:16)
+at http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4875:50
+at Array.forEach (<anonymous>)
+at RealtimeClient._triggerChanError (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4875:23)
+at RealtimeClient._onConnClose (http://localhost:3000/\_next/static/chunks/node_modules_fd3d4d93._.js:4864:14)
+at conn.onclose (http://localhost:3000/_next/static/chunks/node_modules_fd3d4d93._.js:4817:47)
+
+For the global chats error need to fix this.
+
+implement the funding fee (펀딩비) feature as it plays a crucial role in simulated trading!
+
+✅Implementable Structure for Funding Fees in Simulated Trading Broadcasts1. Core Structure Can Be Maintained
+
+• Binance's funding fee formula and logic can be directly applied.• When users hold long/short positions,
+funding fees are calculated based on the premium index and interest rate.
+• At each interval (e.g., every 8 hours),
+PnL is updated per position accordingly.2. Real-Time Price Data Integration (Recommended)
+• Binance API offers direct access to Mark Price, Index Price, and Funding Rate.• Even in a simulated environment, using these APIs enables accurate application of real-world funding mechanics.
+🎯Example:• A user holds 1 BTC in a BTCUSDT futures position.
+• Every 8 hours, retrieve the relevant funding rate via Binance API.• Multiply the rate by position size and update the user’s virtual asset accordingly. 3. Automated Funding Event Scheduling• Backend can implement a funding timer at set intervals:
+◦ 00:00, 08:00, 16:00, etc.• Update user portfolios based on positions at the time of funding.
+💡 Implementation TipsItemMethodMark PriceUse premiumIndex from Binance APIIndex PriceAvailable in the same APIFunding RateApply actual Binance funding rate directlyPosition TrackingUse internal DB to track each user’s mock positionApplication LogicAt funding time, update user’s balance accordinglyVisualizationShow timer, next funding rate, and history on the broadcast screen🚧 Cautions
+• Funding fees only make sense when there’s a real imbalance between long and short positions.• Even in a simulation, there should be a basic distribution of user positions.
+• Optionally, simulate market behavior using virtual order book or AI participants.• Prevent users from exploiting funding-only strategies.
+◦ Consider strategy restrictions or display guidance to avoid abuse.🎁 If needed, I can provide:
+• ✅ Sample Python code to pull real Binance funding rates and apply them• ✅ UI mockups for funding fee display on the trading broadcast screen
+• ✅ Backend module design for funding fee calculations

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 // Define types for daily activity limits
@@ -42,7 +42,7 @@ export async function checkDailyLimit(
   activityType: ActivityColumn
 ): Promise<boolean> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -108,7 +108,7 @@ export async function awardPoints(
   transaction?: PointTransaction;
 }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Define point values
     const pointValues = {
@@ -266,7 +266,7 @@ export async function getUserPointTransactions(
   offset = 0
 ): Promise<{ transactions: PointTransaction[]; count: number }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get transactions
     const { data, error, count } = await supabase
@@ -300,7 +300,7 @@ export async function hasReceivedLoginBonusLast24Hours(
   timeRemaining?: number; // in milliseconds
 }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Get the most recent daily login bonus
     const { data, error } = await supabase
@@ -354,7 +354,7 @@ export async function checkAndAwardWelcomeBonus(userId: string): Promise<{
   transaction?: PointTransaction;
 }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user has already received welcome bonus
     const { data, error } = await supabase
@@ -416,7 +416,7 @@ export async function checkAndAwardDailyLoginBonus(userId: string): Promise<{
   timeRemaining?: number;
 }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user has received a login bonus in the last 24 hours
     const eligibilityCheck = await hasReceivedLoginBonusLast24Hours(userId);
@@ -551,7 +551,7 @@ export async function revokePoints(
   error?: string;
 }> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Find the original transaction
     const { data: transactions, error: fetchError } = await supabase

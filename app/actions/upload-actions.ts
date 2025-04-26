@@ -1,10 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 // Upload image to Supabase Storage
 export async function uploadImage(file: File) {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   // Get the current user
   const {

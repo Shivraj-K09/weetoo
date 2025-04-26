@@ -1,13 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 export async function updateRoomParticipantCount(
   roomId: string,
   count: number
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Update the current_participants count in the database
     const { error } = await supabase

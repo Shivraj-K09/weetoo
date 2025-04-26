@@ -21,7 +21,24 @@ export function formatCurrency(amount: number | string): string {
 
 // Format number with commas
 export function formatNumber(num: number): string {
-  return num.toLocaleString("en-US");
+  if (num === undefined || num === null) return "0";
+
+  // For very small numbers, use scientific notation
+  if (Math.abs(num) < 0.0001 && num !== 0) {
+    return num.toExponential(4);
+  }
+
+  // For regular numbers, format with appropriate decimal places
+  const absNum = Math.abs(num);
+  let decimalPlaces = 2;
+
+  if (absNum < 1) decimalPlaces = 4;
+  if (absNum >= 1000) decimalPlaces = 0;
+
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  });
 }
 
 // Extract base and quote currency from symbol

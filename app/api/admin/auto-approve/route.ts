@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 // This endpoint will be called periodically to auto-approve pending posts
 export async function GET() {
   try {
     console.log("Auto-approve API: Starting auto-approval process");
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Fetch all pending posts
     const { data: pendingPosts, error: fetchError } = await supabase

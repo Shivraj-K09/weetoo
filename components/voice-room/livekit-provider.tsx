@@ -23,8 +23,6 @@ export function LiveKitProvider({
   isHost,
   children,
 }: LiveKitProviderProps) {
-  const hasConnectedRef = useRef(false);
-
   const [token, setToken] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +38,7 @@ export function LiveKitProvider({
     MediaDeviceInfo[]
   >([]);
   const [selectedMicrophone, setSelectedMicrophone] = useState<string>("");
+  const hasConnectedRef = useRef(false);
 
   // Add this function at the top of the component, before any other code
   const logLiveKit = (message: string, ...args: any[]) => {
@@ -120,10 +119,11 @@ export function LiveKitProvider({
 
   // Set up component mounted ref for cleanup
   useEffect(() => {
+    logLiveKit("Component mounted");
     isComponentMounted.current = true;
     hasConnectedRef.current = false;
-
     return () => {
+      logLiveKit("Component unmounting");
       isComponentMounted.current = false;
     };
   }, []);
@@ -180,7 +180,7 @@ export function LiveKitProvider({
 
   // Handle room creation and setup event listeners
   const handleRoomCreated = (room: Room) => {
-    logLiveKit("Room created:", room.name);
+    logLiveKit("Room created:", room.name, "Connection state:", room.state);
     roomRef.current = room;
     setConnectionState(room.state);
     reconnectAttempts.current = 0;
@@ -197,7 +197,6 @@ export function LiveKitProvider({
         setErrorMessage(null);
         reconnectAttempts.current = 0;
         hasConnectedRef.current = true;
-
         logLiveKit("Room fully connected");
       }
     };
@@ -238,7 +237,6 @@ export function LiveKitProvider({
       if (!isComponentMounted.current) return;
       setConnectionState(ConnectionState.Connected);
       hasConnectedRef.current = true;
-
       setErrorMessage(null);
     };
 
@@ -323,10 +321,12 @@ export function LiveKitProvider({
     };
   };
 
-  // Update the room instance cleanup effect to check connection state before disconnecting
+  // Handle room instance cleanup - FIX THE ERROR HERE
   useEffect(() => {
     // This function will be called when the LiveKitRoom component unmounts
     return () => {
+      logLiveKit("Cleanup function called, roomRef exists:", !!roomRef.current);
+
       // Don't attempt to disconnect if room ref is null
       if (!roomRef.current) {
         logLiveKit("No room reference during cleanup, nothing to disconnect");
@@ -340,8 +340,11 @@ export function LiveKitProvider({
         const localParticipant = roomRef.current.localParticipant;
         if (localParticipant) {
           try {
+            logLiveKit("Disabling microphone during cleanup");
             // Just try to disable microphone, don't wait for it
-            localParticipant.setMicrophoneEnabled(false);
+            localParticipant.setMicrophoneEnabled(false).catch((err) => {
+              logLiveKit("Error disabling microphone during cleanup:", err);
+            });
           } catch (err) {
             logLiveKit("Error disabling microphone during cleanup:", err);
           }
@@ -366,6 +369,17 @@ export function LiveKitProvider({
             "Room has not been fully connected or is not in connected state, skipping disconnect call"
           );
           // For other states, don't try to disconnect as it might cause the error
+
+          // ADDITIONAL FIX: If we're in the connecting state, we need to abort the connection
+          if (roomRef.current.state === ConnectionState.Connecting) {
+            logLiveKit("Room is in connecting state, aborting connection");
+            try {
+              // Use a different approach to abort the connection without sending a leave signal
+              roomRef.current.engine?.close();
+            } catch (err) {
+              logLiveKit("Error aborting connection:", err);
+            }
+          }
         }
       } catch (error) {
         console.error("Error during room cleanup:", error);

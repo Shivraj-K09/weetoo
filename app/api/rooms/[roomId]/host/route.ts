@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { getRoomParticipants } from "@/lib/livekit-service";
 
 // Use NextRequest instead of Request
@@ -28,7 +28,7 @@ export async function GET(
     }
 
     // If no host found in LiveKit, fall back to database
-    const supabase = await createClient();
+    const supabase = await createServerClient();
     const { data, error } = await supabase
       .from("trading_rooms")
       .select("owner_id")

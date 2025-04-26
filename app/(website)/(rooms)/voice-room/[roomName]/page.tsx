@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import VoiceRoomPage from "@/components/voice-room/voice-room-page";
 import { redirect } from "next/navigation";
 import { autoJoinRoom } from "@/app/actions/auto-join-room";
@@ -18,7 +18,7 @@ export default async function Page({ params, searchParams }: Props) {
     // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
     const roomId = roomName.substring(0, 36);
 
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     console.log("Fetching voice room with ID:", roomId);
 

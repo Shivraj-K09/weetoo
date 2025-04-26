@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { randomInt } from "crypto";
 import { sendOtpEmail } from "./email-service";
 
@@ -15,7 +15,7 @@ export async function sendAdminOtp(email: string) {
     console.log("sendAdminOtp called for email:", email);
 
     // Create server-side Supabase client
-    const supabaseServer = await createClient();
+    const supabaseServer = await createServerClient();
 
     // Check if user has admin role
     const { data: userData, error: userError } = await supabaseServer
@@ -137,7 +137,7 @@ export async function verifyAdminOtp(email: string, otp: string) {
     console.log("verifyAdminOtp called for email:", email, "with OTP:", otp);
 
     // Create server-side Supabase client
-    const supabaseServer = await createClient();
+    const supabaseServer = await createServerClient();
 
     // Get the user first
     const { data: userData, error: userError } = await supabaseServer

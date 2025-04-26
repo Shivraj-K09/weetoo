@@ -1,13 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
 export async function joinRoom(roomId: string, password?: string) {
   try {
     // Always use service role to bypass RLS for this operation
-    const supabase = await createClient(true);
+    const supabase = await createServerClient(true);
 
     // Check if user is authenticated
     const {

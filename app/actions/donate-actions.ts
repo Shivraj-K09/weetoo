@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function donateKorCoins(
@@ -16,7 +16,7 @@ export async function donateKorCoins(
       };
     }
 
-    const supabase = await createClient(true); // Use service role to bypass RLS
+    const supabase = await createServerClient(true); // Use service role to bypass RLS
 
     // Check if user is authenticated
     const {
@@ -94,7 +94,7 @@ export async function donateKorCoins(
 // Get user's KOR_COINS
 export async function getUserKorCoins() {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     // Check if user is authenticated
     const {
