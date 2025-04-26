@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import ProfitPostClient from "./client";
 
 export default async function CreateProfitPostPage() {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 /**
  * Utility function for logging admin actions directly to the admin_activity_log table
@@ -23,7 +23,7 @@ export async function logAdminAction({
   targetType?: string;
 }) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { error } = await supabase.from("admin_activity_log").insert({
       action,

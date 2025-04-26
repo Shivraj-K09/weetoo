@@ -1,7 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 export async function seedInitialActivityData(adminId: string) {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   // Check if there's already data in the activity log
   const { count, error: countError } = await supabase

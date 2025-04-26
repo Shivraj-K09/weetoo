@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface UserSession {
@@ -11,7 +11,7 @@ interface LastLoginMap {
 }
 
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     const { data, error } = await supabase

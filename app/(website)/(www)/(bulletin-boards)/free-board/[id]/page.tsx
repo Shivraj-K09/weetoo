@@ -5,7 +5,7 @@ import { getRecentShares, getShareCount } from "@/app/actions/share-actions";
 import { ImageCarousel } from "@/components/post/image-carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { ChevronLeft, Eye, Heart, MessageSquare } from "lucide-react";
 import Link from "next/link";
@@ -31,7 +31,7 @@ export default async function PostPage({
     notFound();
   }
 
-  const supabase = await createClient();
+  const supabase = await createServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();

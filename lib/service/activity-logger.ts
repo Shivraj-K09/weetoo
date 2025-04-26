@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 
 type ActivityAction =
   | "user_create"
@@ -39,7 +39,7 @@ export async function logActivity({
   targetType,
 }: LogActivityParams) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerClient();
 
     const { error } = await supabase.from("admin_activity_log").insert({
       action,

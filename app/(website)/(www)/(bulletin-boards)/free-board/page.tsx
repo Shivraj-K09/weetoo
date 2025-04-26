@@ -12,11 +12,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { getPosts, getTopViewedPosts } from "@/app/actions/post-actions";
 import { formatDistanceToNow } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { FileText } from "lucide-react";
 
 export default async function FreeBoard() {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();

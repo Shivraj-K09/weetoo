@@ -13,11 +13,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { getPostsByCategory } from "@/app/actions/post-actions";
 
 export default async function EducationBoard() {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
