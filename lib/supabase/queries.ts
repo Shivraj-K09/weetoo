@@ -1,4 +1,4 @@
-import { createClient } from "./server";
+import { createServerClient } from "./server";
 
 // Interface for KOR_Coin statistics
 export interface KorCoinStats {
@@ -12,7 +12,7 @@ export interface KorCoinStats {
  * Fetches the total KOR_Coins from all users
  */
 export async function getTotalKorCoins(): Promise<KorCoinStats> {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     // Get current total KOR_Coins
@@ -56,7 +56,7 @@ export async function updateUserKorCoins(
   userId: string,
   amount: number
 ): Promise<boolean> {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     // Get current KOR_Coins for the user

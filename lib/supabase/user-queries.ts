@@ -1,4 +1,4 @@
-import { createClient } from "./server";
+import { createServerClient } from "./server";
 
 // Interface for user statistics
 export interface UserStats {
@@ -12,7 +12,7 @@ export interface UserStats {
  * Fetches the total number of registered users
  */
 export async function getTotalUsers(): Promise<UserStats> {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     // Count total users
@@ -54,7 +54,7 @@ export interface DailySignupStats {
  * Gets users registered in the last 24 hours
  */
 export async function getDailySignups(): Promise<DailySignupStats> {
-  const supabase = await createClient();
+  const supabase = await createServerClient();
 
   try {
     // Calculate the timestamp for 24 hours ago
