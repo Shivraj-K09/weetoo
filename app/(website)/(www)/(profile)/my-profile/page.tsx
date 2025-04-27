@@ -51,7 +51,8 @@ declare global {
 }
 
 // Cost for changing nickname (after the first free change)
-const NICKNAME_CHANGE_COST = 10000;
+// Remove this line:
+// const NICKNAME_CHANGE_COST = 10000;
 
 export default function MyProfile() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -64,7 +65,7 @@ export default function MyProfile() {
   const [uidInput, setUidInput] = useState("");
 
   // Get user data and actions from the store
-  const { user, profile, isLoading } = useUserStore();
+  const { user, profile, isLoading, NICKNAME_CHANGE_COST } = useUserStore();
   const { updateProfile, checkNicknameAvailability, changeNickname } =
     useUserActions();
 
@@ -453,7 +454,9 @@ export default function MyProfile() {
   };
 
   // Check if this is the first nickname change (free) or if user has enough coins
-  const isFirstNicknameChange = !hasChangedNickname;
+  // const isFirstNicknameChange = !hasChangedNickname;
+  // const hasEnoughCoins = (profile?.kor_coins || 0) >= NICKNAME_CHANGE_COST;
+  // Check if user has enough coins for nickname change
   const hasEnoughCoins = (profile?.kor_coins || 0) >= NICKNAME_CHANGE_COST;
 
   return (
@@ -513,6 +516,9 @@ export default function MyProfile() {
                           src={
                             profile?.avatar_url ||
                             "/placeholder.svg?height=96&width=96" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={`${profile?.first_name || "User"}'s Profile`}
@@ -623,18 +629,24 @@ export default function MyProfile() {
                               변경
                             </Button>
                           </div>
-                          {hasChangedNickname && (
-                            <p className="text-xs text-amber-500">
-                              Nickname changes cost{" "}
-                              {NICKNAME_CHANGE_COST.toLocaleString()} kor_coins.
-                            </p>
-                          )}
+                          <p className="text-xs text-amber-500">
+                            모든 닉네임 변경은{" "}
+                            {NICKNAME_CHANGE_COST.toLocaleString()} kor_coins가
+                            필요합니다.
+                          </p>
                         </div>
                       ) : (
-                        <div className="font-medium text-gray-800">
-                          {profile?.nickname ||
-                            profile?.email?.split("@")[0] ||
-                            "user"}
+                        <div className="flex flex-col gap-1">
+                          <div className="font-medium text-gray-800">
+                            {profile?.nickname ||
+                              profile?.email?.split("@")[0] ||
+                              "user"}
+                          </div>
+                          <p className="text-xs text-amber-500">
+                            모든 닉네임 변경은{" "}
+                            {NICKNAME_CHANGE_COST.toLocaleString()} kor_coins가
+                            필요합니다.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -875,13 +887,10 @@ export default function MyProfile() {
                           <div className="w-2 h-1 bg-current rounded-sm"></div>
                           <div className="w-2 h-1 bg-current rounded-sm"></div>
                           <div className="w-2 h-1 bg-current rounded-sm"></div>
-                          <div className="w-2 h-1 bg-current rounded-sm"></div>
                         </div>
                       </TabsTrigger>
                       <TabsTrigger value="grid" className="h-6 px-2">
                         <div className="grid grid-cols-2 gap-0.5">
-                          <div className="w-2 h-2 bg-current rounded-sm"></div>
-                          <div className="w-2 h-2 bg-current rounded-sm"></div>
                           <div className="w-2 h-2 bg-current rounded-sm"></div>
                           <div className="w-2 h-2 bg-current rounded-sm"></div>
                         </div>
@@ -1390,11 +1399,15 @@ export default function MyProfile() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-center">닉네임 변경</DialogTitle>
-              <DialogDescription className="text-center">
+              {/* <DialogDescription className="text-center">
                 닉네임 변경 비용:{" "}
                 {isFirstNicknameChange
                   ? "무료"
                   : `${NICKNAME_CHANGE_COST.toLocaleString()} Kor_coins`}
+              </DialogDescription> */}
+              <DialogDescription className="text-center">
+                닉네임 변경 비용: {NICKNAME_CHANGE_COST.toLocaleString()}{" "}
+                Kor_coins
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -1412,7 +1425,7 @@ export default function MyProfile() {
                 </span>
               </div>
 
-              {!isFirstNicknameChange && (
+              {/* {!isFirstNicknameChange && (
                 <>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">
@@ -1435,7 +1448,25 @@ export default function MyProfile() {
                     </span>
                   </div>
                 </>
-              )}
+              )} */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">닉네임 변경 비용</span>
+                <span className="font-medium text-red-500">
+                  -{formatNumber(NICKNAME_CHANGE_COST)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">변경 후 잔액</span>
+                <span className="font-bold text-lg text-blue-600">
+                  {formatNumber(
+                    Math.max(
+                      0,
+                      (profile?.kor_coins || 0) - NICKNAME_CHANGE_COST
+                    )
+                  )}
+                </span>
+              </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -1497,16 +1528,13 @@ export default function MyProfile() {
               <div className="space-y-2 bg-gray-50 p-3 rounded-md">
                 <div className="text-sm font-medium mb-2">닉네임 변경 안내</div>
                 <div className="text-xs text-gray-600 space-y-2">
-                  <p>• The first nickname change is free.</p>
                   <p>
-                    • Subsequent nickname changes cost{" "}
-                    {NICKNAME_CHANGE_COST.toLocaleString()} kor_coins.
+                    • 모든 닉네임 변경은 {NICKNAME_CHANGE_COST.toLocaleString()}{" "}
+                    kor_coins가 필요합니다.
                   </p>
-                  <p>• Nicknames must be unique and cannot be duplicated.</p>
-                  <p>• Nicknames must be at least 3 characters long.</p>
-                  <p>
-                    • Inappropriate nicknames may be changed by administrators.
-                  </p>
+                  <p>• 닉네임은 고유해야 하며 중복될 수 없습니다.</p>
+                  <p>• 닉네임은 최소 3자 이상이어야 합니다.</p>
+                  <p>• 부적절한 닉네임은 관리자에 의해 변경될 수 있습니다.</p>
                 </div>
               </div>
             </div>
@@ -1523,11 +1551,17 @@ export default function MyProfile() {
                 type="submit"
                 className="flex-1 bg-[#E63946] hover:bg-[#D62C39] text-white"
                 onClick={handleNicknameChangeSubmit}
+                // disabled={
+                //   isChangingNickname ||
+                //   !newNickname ||
+                //   isNicknameAvailable === false ||
+                //   (!isFirstNicknameChange && !hasEnoughCoins)
+                // }
                 disabled={
                   isChangingNickname ||
                   !newNickname ||
                   isNicknameAvailable === false ||
-                  (!isFirstNicknameChange && !hasEnoughCoins)
+                  !hasEnoughCoins
                 }
               >
                 {isChangingNickname ? (

@@ -4,13 +4,14 @@ import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { UserProfile } from "@/types";
 
-// Define the state structure for the store
+// Update the UserState interface to include NICKNAME_CHANGE_COST
 interface UserState {
   user: SupabaseUser | null; // Supabase Auth user
   profile: UserProfile | null; // User profile from your public.users table
   isLoggedIn: boolean;
   isLoading: boolean;
   error: string | null;
+  NICKNAME_CHANGE_COST: number; // Add this line to expose the constant
   actions: {
     fetchUserSession: () => Promise<void>;
     clearUserSession: () => void;
@@ -25,15 +26,16 @@ interface UserState {
 }
 
 // Cost for changing nickname (after the first free change)
-const NICKNAME_CHANGE_COST = 100000;
+const NICKNAME_CHANGE_COST = 10000;
 
-// Create the Zustand store
+// Update the create function to include NICKNAME_CHANGE_COST in the state
 export const useUserStore = create<UserState>((set, get) => ({
   user: null,
   profile: null,
   isLoggedIn: false,
   isLoading: true, // Start loading initially
   error: null,
+  NICKNAME_CHANGE_COST, // Add this line to expose the constant
   actions: {
     // Action to fetch the current session and profile
     fetchUserSession: async () => {
@@ -262,12 +264,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         return { success: false, message: "This nickname is already taken" };
       }
 
-      // Check if this is the first nickname change (free) or if user has enough coins
-      const isFirstChange =
-        !profile.nickname || profile.nickname === profile.email?.split("@")[0];
+      // Check if user has enough coins
       const hasEnoughCoins = (profile.kor_coins || 0) >= NICKNAME_CHANGE_COST;
 
-      if (!isFirstChange && !hasEnoughCoins) {
+      if (!hasEnoughCoins) {
         return {
           success: false,
           message: `You don't have enough coins. Nickname change costs ${NICKNAME_CHANGE_COST.toLocaleString()} coins.`,
@@ -277,10 +277,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       set({ isLoading: true });
 
       try {
-        // Calculate new coin balance if not the first change
-        const newCoinBalance = isFirstChange
-          ? profile.kor_coins
-          : (profile.kor_coins || 0) - NICKNAME_CHANGE_COST;
+        // Calculate new coin balance
+        const newCoinBalance = (profile.kor_coins || 0) - NICKNAME_CHANGE_COST;
 
         // Update the profile in the database
         const { error } = await supabase
@@ -307,9 +305,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
         return {
           success: true,
-          message: isFirstChange
-            ? "Nickname changed successfully"
-            : `Nickname changed successfully. ${NICKNAME_CHANGE_COST.toLocaleString()} coins have been deducted.`,
+          message: `Nickname changed successfully. ${NICKNAME_CHANGE_COST.toLocaleString()} coins have been deducted.`,
         };
       } catch (error: any) {
         return {

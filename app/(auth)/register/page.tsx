@@ -35,6 +35,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    nickname: "",
   });
 
   useEffect(() => {
@@ -92,6 +93,11 @@ export default function RegisterPage() {
       return false;
     }
 
+    if (!formData.nickname.trim()) {
+      toast.error("Nickname is required");
+      return false;
+    }
+
     if (!formData.email.trim()) {
       toast.error("Email is required");
       return false;
@@ -137,6 +143,7 @@ export default function RegisterPage() {
           data: {
             first_name: formData.first_name,
             last_name: formData.last_name,
+            nickname: formData.nickname,
             role: "user",
           },
         },
@@ -404,6 +411,24 @@ export default function RegisterPage() {
                       onChange={handleInputChange}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nickname" className="text-sm font-medium">
+                    Nickname
+                  </Label>
+                  <Input
+                    id="nickname"
+                    name="nickname"
+                    type="text"
+                    placeholder="Your nickname"
+                    className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                    required
+                    aria-required="true"
+                    autoComplete="nickname"
+                    value={formData.nickname}
+                    onChange={handleInputChange}
+                  />
                 </div>
 
                 <div className="space-y-2">

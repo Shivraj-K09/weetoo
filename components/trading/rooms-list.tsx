@@ -173,7 +173,7 @@ export function RoomsList({
         let roomUrl = "";
         if (room.roomCategory === "voice") {
           // For voice rooms, redirect to the voice-room route
-          roomUrl = `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`;
+          roomUrl = `${window.location.origin}/voice-room/${roomSlug}?t=${timestamp}`;
         } else {
           // For regular rooms, use the existing rooms route
           roomUrl = `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
@@ -309,7 +309,7 @@ export function RoomsList({
             const timestamp = Date.now();
             const roomUrl =
               room.roomCategory === "voice"
-                ? `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`
+                ? `${window.location.origin}/voice-room/${roomSlug}?t=${timestamp}`
                 : `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
 
             window.open(roomUrl, "_blank");
