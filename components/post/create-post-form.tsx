@@ -9,6 +9,9 @@ import { TagInput } from "./tag-input";
 import { ImageUpload } from "./image-upload";
 import { CaptchaWrapper } from "../captcha-wrapper";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { EyeIcon, SaveIcon } from "lucide-react";
 
 interface PostData {
   title: string;
@@ -27,6 +30,11 @@ interface CreatePostFormProps {
   captchaVerified?: boolean;
   onCaptchaVerify?: (token: string) => void;
   onCaptchaExpire?: () => void;
+  onPublish?: () => void;
+  isPublishing?: boolean;
+  isPreviewMode?: boolean;
+  isEditing?: boolean;
+  boardType?: string;
 }
 
 export function CreatePostForm({
@@ -37,7 +45,13 @@ export function CreatePostForm({
   onImageUpload,
   onCaptchaVerify,
   onCaptchaExpire,
+  onPublish,
+  isPublishing = false,
+  isPreviewMode = false,
+  isEditing = false,
+  boardType = "free-board",
 }: CreatePostFormProps) {
+  const router = useRouter();
   const [captchaToken, setCaptchaToken] = useState<string>("");
 
   // Add a function to handle CAPTCHA verification
@@ -53,6 +67,16 @@ export function CreatePostForm({
     setCaptchaToken("");
     if (onCaptchaExpire) {
       onCaptchaExpire();
+    }
+  };
+
+  const handlePublishClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("Publish/Update button clicked in CreatePostForm");
+    if (onPublish) {
+      onPublish();
+    } else if (onSave) {
+      onSave(postData.content);
     }
   };
 
@@ -122,10 +146,39 @@ export function CreatePostForm({
         />
       </div>
 
-      {/* Action Buttons - Only showing Save as Draft since Preview is moved to header */}
-      <div className="flex justify-end pt-2">
+      {/* Action Buttons - Bottom section with all four buttons, styled like PageHeader */}
+      <div className="flex justify-center gap-3 pt-6">
+        <Button variant="outline" asChild>
+          <Link href={`/${boardType}`}>Cancel</Link>
+        </Button>
+
         <Button variant="outline" type="button">
           Save as Draft
+        </Button>
+
+        {!isPreviewMode && (
+          <Button variant="outline" onClick={onPreview} className="gap-2">
+            <EyeIcon className="h-4 w-4" />
+            Preview
+          </Button>
+        )}
+
+        <Button
+          className="bg-[#FF4C4C] hover:bg-[#FF4C4C]/90"
+          onClick={handlePublishClick}
+          disabled={isPublishing}
+          type="button"
+        >
+          {isEditing ? (
+            <>
+              <SaveIcon className="h-4 w-4 mr-2" />
+              {isPublishing ? "Saving..." : "Save Changes"}
+            </>
+          ) : isPublishing ? (
+            "Publishing..."
+          ) : (
+            "Publish"
+          )}
         </Button>
       </div>
     </div>

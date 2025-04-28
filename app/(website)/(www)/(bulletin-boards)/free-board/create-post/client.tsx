@@ -184,6 +184,7 @@ export function CreatePostClient() {
             captchaVerified={isCaptchaVerified}
             onCaptchaVerify={handleCaptchaVerify}
             onCaptchaExpire={handleCaptchaExpire}
+            onPublish={handlePublish}
           />
         )}
       </div>

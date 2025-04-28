@@ -184,6 +184,7 @@ export default function ProfitPostClient() {
             captchaVerified={isCaptchaVerified}
             onCaptchaVerify={handleCaptchaVerify}
             onCaptchaExpire={handleCaptchaExpire}
+            onPublish={handlePublish}
           />
         )}
       </div>
