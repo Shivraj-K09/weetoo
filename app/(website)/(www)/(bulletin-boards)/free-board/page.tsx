@@ -35,7 +35,7 @@ export default async function FreeBoard() {
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2070&auto=format&fit=crop"
+          src="/banner.png"
           alt="trader-banner"
           width={1000}
           height={250}

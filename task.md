@@ -191,3 +191,117 @@ PnL is updated per position accordingly.2. Real-Time Price Data Integration (Rec
 ◦ Consider strategy restrictions or display guidance to avoid abuse.🎁 If needed, I can provide:
 • ✅ Sample Python code to pull real Binance funding rates and apply them• ✅ UI mockups for funding fee display on the trading broadcast screen
 • ✅ Backend module design for funding fee calculations
+
+THis is done:✅
+
+2. Membership Registration Requirements
+
+For users who sign up directly through the website (not via social login),
+
+please add both custom nickname input and Danal mobile phone verification during the signup process.
+
+This way:
+
+- Social login users will have their nickname automatically assigned upon signup,
+  so they should be granted one free nickname change.
+- Website direct sign-up users can set their own nickname during registration,
+  so if they want to change it after signup, they must use a nickname change item from the store.
+  Please make sure nickname changes are only possible this way.
+
+This is done:✅
+3.Feedback on the Trading Panel (Chat Panel Size)
+
+Currently, in the trading panel, elements such as position size, leverage, cross/market order settings, buy/sell buttons, etc.,
+
+should only be enabled for the host and remain inactive or hidden for participants.
+
+Right now, it appears that these buttons are still active and visible to participants — please adjust this accordingly.
+
+Also, we’d like to expand the chat panel area (as marked in the red box)
+
+to eliminate the empty space in the bottom right corner.
+
+Livekit dashboard needs to be added to the website.
+
+4. LiveKit Usage Tracking Dashboard
+   As we are now using LiveKit, we’d like to add logging features to help estimate budget usage.
+
+Specifically, we’d like to:
+
+- Track the voice broadcasting time used by each trader,
+  and have this data stored per user account
+- Allow admins to view this usage history
+- Display a clear summary of total usage directly in the admin panel
+
+If this system is implemented, it would be a huge help in accurately calculating and managing LiveKit operating costs
+
+This is done:✅
+
+5.When displaying the number of online users in real time,
+
+a certain placeholder text appears briefly before switching to a number repeatedly.
+
+Would it be possible to have only the number displayed continuously,
+
+without the placeholder message flashing in and out? 😊
+
+Would it be possible to remove the “connecting” text so it doesn’t appear?
+In the reference site Gaemitok, the real-time user count is shown only as a number,
+
+without any loading or “connecting” message showing up.
+
+I’d love for it to work that way too!
+
+This is done only design section not functionality:
+Five Metrics to Display on the Leaderboard
+
+- Profit Rate
+  → Cumulative profit rate based on Virtual Trading Money
+- Virtual Balance
+  → Current remaining balance of Virtual Trading Money
+- Activity Ranking
+  → Based on EXP earned through posts, comments, likes, and other platform engagement
+- Top Sponsored
+  → Ranked by total amount of KOR_COIN received as support
+- Most Followed Users
+  → Ranked by the number of followers each user has
+  👉Currently, there are 4 leaderboards displayed on the website,
+  but the ranking based on the number of followers is missing :)
+
+This needs to be done:
+
+1.  Profit Rate Calculation
+
+If a user receives $10,000 in Virtual Trading Money after opening a trading room and loses it all,
+
+→ their profit rate is -100%.
+
+If they open a second trading room and lose another $10,000,
+
+→ their total profit rate becomes -200%.
+
+If in the third trading room they grow the $10,000 into $20,000,
+
+→ their profit rate increases by +100%, resulting in an overall profit rate of -100%.
+
+The profit rate is cumulatively recorded and stored.
+
+If a user uses the “Reset Trade History” item,
+
+→ all negative profit rates will be cleared.
+
+<!-- Issues Found -->
+
+while conducting the test, I did find some issues, and I would like to share them with you.
+⸻
+■ Issues Found
+
+1.  No changes observed in Evaluation / Holdings / Available Balance after entry 2. After closing a trade, the P&L in the history shows 0%
+2.  Opened positions are not being displayed on the chart 4. Profit rate is not increasing properly
+    ⸻
+    *During another round of testing, we noticed that positions couldn’t even be opened, and even when trades were made and profits were generated, the balance did not increase —
+    instead, the balance kept decreasing by the amount traded each time!It seems the balance system itself is not functioning correctly!
+    *Also, fees for market and limit orders should be applied differently depending on the leverage.
+    ⸻
+    Please review these points first,
+    and I will continue to share additional detailed feedback regarding the trading functionalities as we proceed!
