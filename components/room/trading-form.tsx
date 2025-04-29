@@ -91,6 +91,8 @@ export const TradingForm = React.memo(function TradingForm({
   useEffect(() => {
     const newAmount = (maxAmount * selectedPercentage) / 100;
     setAmount(Number.parseFloat(newAmount.toFixed(2)));
+    // Also update entryAmount to keep them in sync
+    setEntryAmount(newAmount.toFixed(2));
   }, [selectedPercentage, maxAmount]);
 
   // Update limit price when current price changes
@@ -118,22 +120,30 @@ export const TradingForm = React.memo(function TradingForm({
 
       const amount = (realTimeCurrency * percentage) / 100;
       setEntryAmount(amount.toFixed(2));
+      setAmount(amount); // Keep both in sync
       setEntryPercentage(percentage);
+      setSelectedPercentage(percentage); // Keep both percentage states in sync
     },
     [realTimeCurrency]
   );
 
   const handlePercentageClick = (percentage: number) => {
     setSelectedPercentage(percentage);
+    // Calculate and update amount based on percentage
+    const newAmount = (maxAmount * percentage) / 100;
+    setAmount(Number.parseFloat(newAmount.toFixed(2)));
+    setEntryAmount(newAmount.toFixed(2)); // Keep both in sync
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseFloat(e.target.value);
     if (!isNaN(value) && value >= 0) {
       setAmount(value);
+      setEntryAmount(value.toString()); // Keep both in sync
       // Update the selected percentage based on the amount
       const percentage = (value / maxAmount) * 100;
       setSelectedPercentage(Math.min(Math.round(percentage), 100));
+      setEntryPercentage(Math.min(Math.round(percentage), 100)); // Keep both in sync
     }
   };
 
@@ -173,11 +183,14 @@ export const TradingForm = React.memo(function TradingForm({
   // Handle trade execution
   const handleTrade = useCallback(
     async (dir: "buy" | "sell") => {
+      // Set the direction state
       setDirection(dir);
-      console.log("[TradingForm] handleTrade called with direction:", dir);
+      console.log("[LongShortCheck] handleTrade called with direction:", dir);
       console.log("[TradingForm] Using roomId:", cleanRoomId);
 
-      if (!entryAmount || Number.parseFloat(entryAmount) <= 0) {
+      // IMPORTANT: Use the amount from the input field directly
+      const inputAmount = Number.parseFloat(entryAmount);
+      if (!entryAmount || isNaN(inputAmount) || inputAmount <= 0) {
         console.log("[TradingForm] Invalid entry amount:", entryAmount);
         toast.error("Please enter a valid amount");
         return;
@@ -189,12 +202,10 @@ export const TradingForm = React.memo(function TradingForm({
         return;
       }
 
-      const amount = Number.parseFloat(entryAmount);
-
-      if (amount > (realTimeCurrency || 0)) {
+      if (inputAmount > (realTimeCurrency || 0)) {
         console.log(
           "[TradingForm] Insufficient balance. Amount:",
-          amount,
+          inputAmount,
           "Balance:",
           realTimeCurrency
         );
@@ -263,14 +274,18 @@ export const TradingForm = React.memo(function TradingForm({
         audio.play().catch((e) => console.error("Error playing sound:", e));
       }
 
+      // Calculate position size correctly
+      const positionSize = inputAmount * leverage;
+
       // Execute the trade
-      console.log("[TradingForm] Executing trade with params:", {
+      console.log("[AMOUNT_DEBUG] Executing trade with params:", {
         roomId: cleanRoomId,
         symbol,
-        direction,
-        entryAmount: amount,
+        direction: dir,
+        entryAmount: inputAmount, // Use the exact input amount
         leverage,
         entryPrice: price,
+        positionSize, // Log the calculated position size
         stopLoss,
         takeProfit,
       });
@@ -278,15 +293,15 @@ export const TradingForm = React.memo(function TradingForm({
       const result = await executeTradeHook({
         roomId: cleanRoomId,
         symbol,
-        direction,
-        entryAmount: amount,
+        direction: dir,
+        entryAmount: inputAmount, // Use the exact input amount
         leverage,
         entryPrice: price,
         stopLoss,
         takeProfit,
       });
 
-      console.log("[TradingForm] Trade execution result:", result);
+      console.log("[AMOUNT_DEBUG] Trade execution result:", result);
 
       if (result.success) {
         // Reset form
@@ -297,8 +312,7 @@ export const TradingForm = React.memo(function TradingForm({
     [
       cleanRoomId,
       symbol,
-      direction,
-      entryAmount,
+      entryAmount, // Use entryAmount directly
       leverage,
       orderType,
       limitPrice,
@@ -316,27 +330,48 @@ export const TradingForm = React.memo(function TradingForm({
   const handleSubmit = async (direction: "buy" | "sell") => {
     try {
       setIsSubmitting(true);
+      console.log(
+        "[LongShortCheck] handleSubmit called with direction:",
+        direction
+      );
 
-      // Client-side validation
-      if (amount <= 0) {
-        toast.error("Amount must be greater than 0");
+      // IMPORTANT: Use the amount from the input field directly
+      const inputAmount = Number.parseFloat(entryAmount);
+      if (isNaN(inputAmount) || inputAmount <= 0) {
+        toast.error("Please enter a valid amount");
         return;
       }
 
-      if (amount > maxAmount) {
+      if (inputAmount > maxAmount) {
         toast.error("Insufficient virtual currency");
         return;
       }
+
+      // Calculate position size correctly
+      const positionSize = inputAmount * leverage;
+
+      // Log the exact values being sent to the server
+      console.log("[AMOUNT_DEBUG] Submitting trade with:", {
+        roomId,
+        symbol,
+        direction,
+        entryAmount: inputAmount, // Use the exact input amount
+        leverage,
+        entryPrice: currentPrice,
+        calculatedPositionSize: positionSize, // This is what the position size should be
+      });
 
       // Execute the trade without causing a page refresh
       const result = await executeTrade({
         roomId,
         symbol,
         direction,
-        entryAmount: amount,
+        entryAmount: inputAmount, // Use the exact input amount
         leverage,
         entryPrice: currentPrice,
       });
+
+      console.log("[AMOUNT_DEBUG] executeTrade result:", result);
 
       if (result.success) {
         toast.success(
@@ -351,6 +386,10 @@ export const TradingForm = React.memo(function TradingForm({
           detail: {
             roomId,
             positionId: result.positionId,
+            direction,
+            entryAmount: inputAmount, // Include the exact entry amount
+            leverage,
+            positionSize, // Include the calculated position size
           },
         });
         window.dispatchEvent(newPositionEvent);
@@ -381,9 +420,8 @@ export const TradingForm = React.memo(function TradingForm({
   );
 
   const positionSize = useMemo(() => {
-    return entryAmount && !isNaN(Number.parseFloat(entryAmount))
-      ? (Number.parseFloat(entryAmount) * leverage).toFixed(2)
-      : "0";
+    const inputAmount = Number.parseFloat(entryAmount);
+    return !isNaN(inputAmount) ? (inputAmount * leverage).toFixed(2) : "0";
   }, [entryAmount, leverage]);
 
   return (
@@ -522,6 +560,11 @@ export const TradingForm = React.memo(function TradingForm({
               value={entryAmount}
               onChange={(e) => {
                 setEntryAmount(e.target.value);
+                // Keep amount in sync with entryAmount
+                const value = Number.parseFloat(e.target.value);
+                if (!isNaN(value)) {
+                  setAmount(value);
+                }
                 setEntryPercentage(0); // Reset percentage when manually entering amount
               }}
               type="number"
@@ -700,14 +743,26 @@ export const TradingForm = React.memo(function TradingForm({
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <Button
               className="bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => handleTrade("buy")}
+              onClick={() => {
+                console.log(
+                  "[AMOUNT_DEBUG] Buy/Long button clicked with amount:",
+                  entryAmount
+                );
+                handleSubmit("buy");
+              }}
               disabled={isLoading || !isHost || currencyLoading}
             >
               {isLoading ? "처리 중..." : "매수 / Long"}
             </Button>
             <Button
               className="bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => handleTrade("sell")}
+              onClick={() => {
+                console.log(
+                  "[AMOUNT_DEBUG] Sell/Short button clicked with amount:",
+                  entryAmount
+                );
+                handleSubmit("sell");
+              }}
               disabled={isLoading || !isHost || currencyLoading}
             >
               {isLoading ? "처리 중..." : "매도 / Short"}

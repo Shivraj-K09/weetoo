@@ -1,0 +1,108 @@
+# LiveKit Management Implementation Plan
+
+## Phase 1: Database Setup and Event Logging
+
+1. Create new tables in Supabase:
+
+   - `livekit_sessions`: Track individual broadcasting sessions
+     - id (UUID, primary key)
+     - user_id (references public.users)
+     - room_id (references trading_rooms)
+     - started_at (timestamp)
+     - ended_at (timestamp)
+     - duration_seconds (integer)
+     - created_at (timestamp)
+   - `livekit_user_stats`: Aggregate statistics per user
+     - user_id (references public.users, primary key)
+     - total_duration_seconds (integer)
+     - total_sessions (integer)
+     - last_session_at (timestamp)
+     - first_session_at (timestamp)
+     - updated_at (timestamp)
+
+2. Create database functions and triggers:
+   - Function to update user stats when a session is created/updated
+   - Function to calculate monthly usage statistics
+   - RLS policies to restrict access to admin users only
+
+## Phase 2: Backend Implementation
+
+1. Create LiveKit event handlers:
+
+   - Hook into LiveKit events (participant joined, participant left)
+   - Record session start/end times
+   - Calculate session durations
+   - Update user statistics
+
+2. Create API endpoints:
+
+   - GET /api/admin/livekit/stats: Overall platform statistics
+   - GET /api/admin/livekit/users: User-level statistics
+   - GET /api/admin/livekit/rooms: Room-level statistics
+   - GET /api/admin/livekit/history: Historical usage data
+
+3. Implement access control:
+   - Restrict access to users with 'admin' or 'super_admin' roles
+   - Add middleware to verify permissions
+
+## Phase 3: Frontend Implementation
+
+1. Create admin dashboard page:
+
+   - Create route at /admin/livekit-management
+   - Implement layout and navigation
+
+2. Implement dashboard components:
+
+   - Usage metric cards (already implemented)
+   - User usage table with sorting and filtering
+   - Usage history chart with date range selection
+   - Room usage breakdown
+
+3. Add admin controls:
+   - User search and filtering
+   - Date range selection
+   - Export functionality (CSV/Excel)
+   - Cost calculation based on LiveKit pricing
+
+## Phase 4: Cost Estimation and Reporting
+
+1. Implement cost calculation:
+
+   - Add LiveKit pricing parameters (configurable)
+   - Calculate estimated costs based on usage
+   - Project future costs based on growth trends
+
+2. Create reporting features:
+   - Monthly usage reports
+   - Cost breakdown by user/room
+   - Usage anomaly detection
+   - Budget alerts
+
+## Phase 5: Testing and Deployment
+
+1. Testing:
+
+   - Unit tests for backend functions
+   - Integration tests for API endpoints
+   - UI testing for admin dashboard
+
+2. Deployment:
+   - Database migrations
+   - Backend deployment
+   - Frontend deployment
+   - Monitoring setup
+
+## Phase 6: Future Enhancements
+
+1. Advanced analytics:
+
+   - User behavior patterns
+   - Usage optimization recommendations
+   - AI-powered cost forecasting
+
+2. Additional features:
+   - Usage quotas per user/room
+   - Automated cost allocation
+   - Integration with billing systems
+   - Real-time usage monitoring

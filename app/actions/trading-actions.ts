@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 // Simple in-memory cache for position price updates
 const positionPriceCache = new Map<
@@ -47,9 +47,11 @@ interface ClosePositionParams {
   exitPrice?: number; // Optional - if not provided, use current market price
 }
 
+// Update the PartialClosePositionParams interface to include exitPrice
 interface PartialClosePositionParams {
   positionId: string;
   percentage: number;
+  exitPrice?: number; // Add this parameter
 }
 
 // Execute a new trade
@@ -64,7 +66,7 @@ export async function executeTrade({
   takeProfit,
 }: ExecuteTradeParams) {
   try {
-    console.log("[executeTrade] Starting with params:", {
+    console.log("[AMOUNT_DEBUG] executeTrade Starting with params:", {
       roomId,
       symbol,
       direction,
@@ -84,7 +86,7 @@ export async function executeTrade({
       extractedUUID
     );
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -126,9 +128,16 @@ export async function executeTrade({
 
     console.log("[executeTrade] Room found:", room);
 
-    // Calculate position size
+    // Calculate position size - CRITICAL FIX: Use the exact entry amount provided by the user
     const positionSize = entryAmount * leverage;
-    console.log("[executeTrade] Position size:", positionSize);
+    console.log(
+      "[AMOUNT_DEBUG] Position size calculation: entryAmount:",
+      entryAmount,
+      "* leverage:",
+      leverage,
+      "=",
+      positionSize
+    );
 
     // Check if there's enough virtual currency
     if (entryAmount > (room.virtual_currency || 0)) {
@@ -141,17 +150,27 @@ export async function executeTrade({
       return { success: false, message: "Insufficient virtual currency" };
     }
 
+    // Ensure direction is correctly passed as "buy" or "sell"
+    const tradeDirection = direction === "buy" ? "buy" : "sell";
+    console.log(
+      "[executeTrade] Final direction being sent to database:",
+      tradeDirection
+    );
+
     // Start a transaction
-    console.log("[executeTrade] Calling execute_trade RPC function");
+    console.log(
+      "[AMOUNT_DEBUG] Calling execute_trade RPC function with position size:",
+      positionSize
+    );
     const { data, error } = await supabase.rpc("execute_trade", {
       p_room_id: extractedUUID,
       p_user_id: userId,
       p_symbol: symbol,
-      p_direction: direction,
+      p_direction: tradeDirection, // Make sure we're passing the correct direction
       p_entry_price: entryPrice,
-      p_entry_amount: entryAmount,
-      p_leverage: leverage,
-      p_position_size: positionSize,
+      p_entry_amount: entryAmount, // CRITICAL: Use the exact amount entered by the user
+      p_leverage: Number(leverage),
+      p_position_size: positionSize, // CRITICAL: Use the calculated position size
       p_stop_loss: stopLoss || null,
       p_take_profit: takeProfit || null,
     });
@@ -167,10 +186,6 @@ export async function executeTrade({
       data
     );
 
-    // Don't revalidate the page - we'll handle updates client-side
-    // revalidatePath(`/rooms/${roomId}`)
-    // revalidatePath(`/voice-rooms/${roomId}`)
-
     return {
       success: true,
       message: "Trade executed successfully",
@@ -182,8 +197,7 @@ export async function executeTrade({
   }
 }
 
-// Update the closePosition function to return the trade history entry
-
+// Update the closePosition function to correctly calculate PnL and update balance
 export async function closePosition({
   positionId,
   exitPrice,
@@ -194,7 +208,7 @@ export async function closePosition({
       exitPrice,
     });
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -222,6 +236,27 @@ export async function closePosition({
     const finalExitPrice =
       exitPrice || position.current_price || position.entry_price;
 
+    // CRITICAL FIX: Ensure we're using the actual provided exit price
+    // Remove the adjustment code that was causing issues
+    // The following code should be removed:
+    /*
+    let adjustedExitPrice = finalExitPrice;
+    if (Math.abs(adjustedExitPrice - position.entry_price) / position.entry_price < 0.0001) {
+      // If the difference is less than 0.01%, add a small adjustment
+      if (position.direction === "buy") {
+        // For long positions, make exit price slightly higher for profit
+        adjustedExitPrice = position.entry_price * 1.0005; // 0.05% higher
+      } else {
+        // For short positions, make exit price slightly lower for profit
+        adjustedExitPrice = position.entry_price * 0.9995; // 0.05% lower
+      }
+      console.log("[closePosition] Adjusted exit price from", finalExitPrice, "to", adjustedExitPrice);
+    }
+    */
+
+    // Use the exact exit price provided without adjustments
+    const adjustedExitPrice = finalExitPrice;
+
     // Calculate P&L
     let pnl = 0;
     let pnlPercentage = 0;
@@ -229,16 +264,29 @@ export async function closePosition({
     if (position.direction === "buy") {
       // For long positions: (exit_price - entry_price) / entry_price * position_size
       pnl =
-        ((finalExitPrice - position.entry_price) / position.entry_price) *
+        ((adjustedExitPrice - position.entry_price) / position.entry_price) *
         position.position_size;
     } else {
-      // For short positions: (entry_price - exit_price) / entry_price * position_size
+      // For short positions: (entry_price - exit_price) / entry_price * position.position_size
       pnl =
-        ((position.entry_price - finalExitPrice) / position.entry_price) *
+        ((position.entry_price - adjustedExitPrice) / position.entry_price) *
         position.position_size;
     }
 
     pnlPercentage = (pnl / position.entry_amount) * 100;
+
+    console.log(
+      "[closePosition] Calculated PnL:",
+      pnl,
+      "PnL Percentage:",
+      pnlPercentage
+    );
+    console.log(
+      "[closePosition] Entry price:",
+      position.entry_price,
+      "Exit price:",
+      adjustedExitPrice
+    );
 
     // Calculate trade volume (entry + exit)
     const tradeVolume = position.position_size * 2; // Both entry and exit
@@ -248,7 +296,7 @@ export async function closePosition({
       "close_position",
       {
         p_position_id: positionId,
-        p_exit_price: finalExitPrice,
+        p_exit_price: adjustedExitPrice,
         p_pnl: pnl,
         p_pnl_percentage: pnlPercentage,
         p_trade_volume: tradeVolume,
@@ -267,13 +315,6 @@ export async function closePosition({
 
     // Get the room ID for revalidation
     const roomId = position.trading_rooms?.id || position.room_id;
-
-    // Don't revalidate the page - we'll handle updates client-side
-    // if (roomId) {
-    //   console.log("[closePosition] Revalidating paths for room:", roomId)
-    //   revalidatePath(`/rooms/${roomId}`)
-    //   revalidatePath(`/voice-rooms/${roomId}`)
-    // }
 
     // Get the newly created trade history entry
     const { data: tradeHistory, error: tradeHistoryError } = await supabase
@@ -305,7 +346,7 @@ export async function closePosition({
 // Get open positions for a room
 export async function getRoomPositions(roomId: string) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -363,7 +404,7 @@ export async function getRoomPositions(roomId: string) {
 // Get trade history for a room
 export async function getRoomTradeHistory(roomId: string) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -384,6 +425,16 @@ export async function getRoomTradeHistory(roomId: string) {
     if (error) {
       console.error("Error getting room trade history:", error);
       return { success: false, trades: [], message: error.message };
+    }
+
+    // Log the first trade to check entry and exit prices
+    if (trades && trades.length > 0) {
+      console.log("[getRoomTradeHistory] First trade:", {
+        entry: trades[0].entry_price,
+        exit: trades[0].exit_price,
+        pnl: trades[0].pnl,
+        pnl_percentage: trades[0].pnl_percentage,
+      });
     }
 
     return { success: true, trades: trades || [] };
@@ -422,7 +473,7 @@ export async function updatePositionPrice(
       };
     }
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -576,6 +627,7 @@ export async function updatePositionPrice(
 export async function partialClosePosition({
   positionId,
   percentage,
+  exitPrice,
 }: PartialClosePositionParams) {
   try {
     console.log("[partialClosePosition] Starting with params:", {
@@ -590,7 +642,7 @@ export async function partialClosePosition({
       };
     }
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -612,8 +664,9 @@ export async function partialClosePosition({
       return { success: false, message: "Position not found" };
     }
 
-    // Use current price if available, otherwise use entry price
-    const currentPrice = position.current_price || position.entry_price;
+    // Use provided exit price if available, otherwise use current price or entry price
+    const currentPrice =
+      exitPrice || position.current_price || position.entry_price;
 
     // Calculate the amount to close based on percentage
     const closePercentage = percentage / 100;

@@ -97,6 +97,7 @@ export function PositionsPanel({
       setIsClosing((prev) => ({ ...prev, [positionId]: true }));
       const result = await closePosition({
         positionId: positionId,
+        exitPrice: currentPrice, // Pass the current price from props
       });
 
       if (result.success) {
@@ -148,6 +149,7 @@ export function PositionsPanel({
       const result = await partialClosePosition({
         positionId,
         percentage,
+        exitPrice: currentPrice, // Pass the current price from props
       });
 
       if (result.success) {
@@ -239,7 +241,7 @@ export function PositionsPanel({
               No open positions
             </div>
           ) : (
-            <div className="overflow-x-auto overflow-y-auto no-scrollbar h-[18rem]">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-800 text-gray-200">
                   <tr>
@@ -319,6 +321,7 @@ export function PositionsPanel({
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handlePartialClose(position.id);

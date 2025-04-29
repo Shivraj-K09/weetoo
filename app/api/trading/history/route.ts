@@ -1,5 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server";
 import { type NextRequest, NextResponse } from "next/server";
+import { getRoomTradeHistory } from "@/app/actions/trading-actions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,34 +13,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    // Get trade history using the server action
+    const result = await getRoomTradeHistory(roomId);
 
-    // Check if user is authenticated
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (!result.success) {
+      return NextResponse.json({ error: result.message }, { status: 400 });
     }
 
-    // Get all trade history for the room
-    const { data: trades, error } = await supabase
-      .from("trade_history")
-      .select("*")
-      .eq("room_id", roomId)
-      .order("exit_time", { ascending: false });
-
-    if (error) {
-      console.error("Error getting room trade history:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    // Log the first trade to check entry and exit prices
+    if (result.trades && result.trades.length > 0) {
+      console.log("[API] First trade:", {
+        entry: result.trades[0].entry_price,
+        exit: result.trades[0].exit_price,
+        pnl: result.trades[0].pnl,
+        pnl_percentage: result.trades[0].pnl_percentage,
+      });
     }
 
-    return NextResponse.json({ trades: trades || [] });
+    return NextResponse.json({ trades: result.trades });
   } catch (error) {
-    console.error("Unexpected error in trade history API:", error);
+    console.error("Error in trading history API:", error);
     return NextResponse.json(
-      { error: "An unexpected error occurred" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

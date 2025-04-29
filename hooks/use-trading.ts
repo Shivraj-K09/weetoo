@@ -162,36 +162,28 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
       setIsLoading(true);
       try {
         // First subtract the entry amount from virtual currency
-        const subtractResult = await subtractVirtualCurrency(
-          params.entryAmount
-        );
-        if (!subtractResult) {
-          toast.error("Insufficient balance");
-          return { success: false, message: "Insufficient balance" };
-        }
+        // Note: This is now handled properly in the execute_trade SQL function
+        // We don't need to manually subtract it here, but we'll check if there's enough balance
 
         const result = await executeTrade(params);
         if (result.success) {
           toast.success(result.message);
           await refreshPositions();
           router.refresh();
+          return result;
         } else {
-          // If trade failed, refund the amount
-          await addVirtualCurrency(params.entryAmount);
           toast.error(result.message);
+          return result;
         }
-        return result;
       } catch (error) {
         console.error("Error executing trade:", error);
-        // Attempt to refund on error
-        await addVirtualCurrency(params.entryAmount);
         toast.error("Failed to execute trade");
         return { success: false, message: "An unexpected error occurred" };
       } finally {
         setIsLoading(false);
       }
     },
-    [refreshPositions, subtractVirtualCurrency, addVirtualCurrency, router]
+    [refreshPositions, router]
   );
 
   // Close a position
@@ -209,21 +201,17 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
         if (result.success) {
           toast.success(result.message);
 
-          // Handle PnL - add to virtual currency if positive
-          if (result.pnl !== undefined) {
-            if (result.pnl > 0) {
-              await addVirtualCurrency(result.pnl);
-            }
-            // Note: negative PnL is already accounted for when opening the position
-          }
+          // Note: PnL is now handled correctly in the close_position SQL function
+          // We don't need to manually add it to the virtual currency here
 
           await refreshPositions();
           await refreshTradeHistory();
           router.refresh();
+          return result;
         } else {
           toast.error(result.message);
+          return result;
         }
-        return result;
       } catch (error) {
         console.error("Error closing position:", error);
         toast.error("Failed to close position");
@@ -232,7 +220,7 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
         setIsLoading(false);
       }
     },
-    [refreshPositions, refreshTradeHistory, addVirtualCurrency, router]
+    [refreshPositions, refreshTradeHistory, router]
   );
 
   // Update position prices

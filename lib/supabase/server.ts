@@ -45,3 +45,6 @@ export const createServerClient = async (useServiceRole = false) => {
     },
   });
 };
+
+// Add this line to provide createClient as an alias for createServerClient
+export const createClient = createServerClient;

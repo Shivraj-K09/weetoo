@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import MillionLint from "@million/lint";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -27,6 +28,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
-
-// https://bkbpcjtggmlbkpyjyohh.supabase.co
+export default MillionLint.next({ rsc: true })(nextConfig);

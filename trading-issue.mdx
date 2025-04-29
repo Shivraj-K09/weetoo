@@ -1,0 +1,58 @@
+1.  Profit Rate Calculation
+
+If a user receives $10,000 in Virtual Trading Money after opening a trading room and loses it all,
+→ their profit rate is -100%.
+
+If they open a second trading room and lose another $10,000,
+→ their total profit rate becomes -200%.
+
+If in the third trading room they grow the $10,000 into $20,000,
+→ their profit rate increases by +100%, resulting in an overall profit rate of -100%.
+
+The profit rate is cumulatively recorded and stored.
+If a user uses the “Reset Trade History” item,
+→ all negative profit rates will be cleared.
+
+Issues Found
+
+1.  No changes observed in Evaluation / Holdings / Available Balance after entry 2. After closing a trade, the P&L in the history shows 0%
+2.  Opened positions are not being displayed on the chart 4. Profit rate is not increasing properly
+    ⸻
+    *During another round of testing, we noticed that positions couldn’t even be opened, and even when trades were made and profits were generated, the balance did not increase —
+    instead, the balance kept decreasing by the amount traded each time!It seems the balance system itself is not functioning correctly!
+    *Also, fees for market and limit orders should be applied differently depending on the leverage.
+    ⸻
+    Please review these points first,
+    and I will continue to share additional detailed feedback regarding the trading functionalities as we proceed!
+
+3.  We’re currently testing the trading room, but it seems that the connection is not very stable!
+    In a trading system where every second counts, slow transaction processing speed is also a critical issue.
+    Could you please share the current progress status with us?
+    I’ll check the relevant points based on your update and provide feedback step by step!
+
+4.  At the moment, virtual trading funds are being credited properly.  
+    However, for the simulation trading system, it would be best to base the structure and standards on Binance.
+    Currently, the simulation trading is not functioning properly yet.
+
+5.  When users first enter the trading room, the window doesn’t automatically fit the UI properly — they have to manually adjust the size themselves.
+    We would like to fix it so that the screen we designed appears correctly and fully by default for everyone, without needing any manual resizing, like the second image below.
+    Also, regarding the white space inside the red box, it seems to be caused by the chat window being too short.
+    Please help us fix this part as well. :)
+
+6.  Currently, the section I dragged with the mouse doesn’t have a fixed position value,
+    so whenever the numbers change, the position also shifts along with it.
+    We would like to fix this by locking the position so that even if the numbers change, the position remains stable.
+
+7.  We conducted virtual trading, but the system’s response speed is significantly slow.
+    Since trading often involves split-second decisions, position entries and exits need to react immediately.
+    Also, after setting the position size and leverage and entering a trade, the corresponding profit should accumulate in the virtual money balance.
+    However, currently, only the portion used to open the position is being deducted from the virtual balance, without reflecting any profits.
+    We would also like to confirm whether today's profit record and total profit record are being properly updated,
+    but as of now, it seems this functionality has not yet been implemented.
+    Overall, the simulation trading flow is not working as expected.
+    It would be helpful if you could check the virtual trading example on our reference site,
+    AntTalk Virtual Trading - BTC/USDT, to better understand the structure we are aiming for.
+
+8.  Even though it's not a trading room that I created, I am still able to make changes.
+    What I want is for participants to only be able to watch,
+    while only the trader who created the room can control the screen.

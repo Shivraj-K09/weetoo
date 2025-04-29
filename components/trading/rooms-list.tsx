@@ -183,7 +183,7 @@ export function RoomsList({
         let roomWindow = window.open(
           roomUrl,
           `room_${room.id}`,
-          "width=1600,height=900"
+          `width=${screen.width},height=${screen.height},top=0,left=0`
         );
 
         // If popup is blocked, try opening in a new tab

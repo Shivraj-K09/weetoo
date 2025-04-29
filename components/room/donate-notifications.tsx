@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Coins } from "lucide-react";
 import { formatNumber } from "@/utils/format-utils";
 import { supabase } from "@/lib/supabase/client";

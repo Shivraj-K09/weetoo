@@ -218,14 +218,14 @@ export function CreateRoomPopover({
         window.open(
           `${window.location.origin}/voice-room/${roomSlug}`,
           "_blank",
-          "width=1600,height=900"
+          `width=${screen.width},height=${screen.height},top=0,left=0`
         );
       } else {
         // For regular rooms, use the existing rooms route
         window.open(
           `${window.location.origin}/rooms/${roomSlug}`,
           "_blank",
-          "width=1600,height=900"
+          `width=${screen.width},height=${screen.height},top=0,left=0`
         );
       }
     } catch (error) {
