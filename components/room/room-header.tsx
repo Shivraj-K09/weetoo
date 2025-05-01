@@ -8,6 +8,7 @@ import { VoiceChannel } from "@/components/voice-room/voice-room-channel";
 import { VirtualCurrencyDisplay } from "@/components/room/virtual-currency-display";
 import { DonationButton } from "@/components/room/donation-button";
 import { DonationNotification } from "@/components/room/donate-notifications";
+import { ProfitRateDisplay } from "@/components/room/profit-rate-display";
 
 interface RoomHeaderProps {
   roomDetails: any;
@@ -122,7 +123,7 @@ export function RoomHeader({
         </div>
 
         {/* Right side - Add refresh button here */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {onRefreshRoom && (
             <Button
               onClick={onRefreshRoom}
@@ -131,6 +132,13 @@ export function RoomHeader({
             >
               Refresh
             </Button>
+          )}
+
+          {/* Profit Rate Display (for all users) */}
+          {user && (
+            <div className="mr-4">
+              <ProfitRateDisplay />
+            </div>
           )}
 
           {/* Virtual Currency Display (only for owner) */}

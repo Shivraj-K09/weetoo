@@ -63,6 +63,8 @@ export interface UserProfile {
   role?: string;
   nickname?: string;
   provider?: string;
+  cumulative_profit_rate?: number;
+  total_rooms_opened?: number;
 }
 
 export interface SupabaseUser {
@@ -117,6 +119,10 @@ export interface Room {
   username: string;
   roomCategory?: RoomCategory;
   owner_id: string;
+  initial_balance?: number;
+  final_balance?: number;
+  room_profit_rate?: number;
+  is_included_in_user_rate?: boolean;
 }
 
 export interface RoomData {
@@ -129,6 +135,10 @@ export interface RoomData {
   created_at: string;
   users: UserData | UserData[];
   room_category?: RoomCategory;
+  initial_balance?: number;
+  final_balance?: number;
+  room_profit_rate?: number;
+  is_included_in_user_rate?: boolean;
 }
 
 export interface UserData {
@@ -252,4 +262,15 @@ export interface RoomDetails {
   owner_id: string;
   participants: string[];
   created_at: string;
+  initial_balance?: number;
+  final_balance?: number;
+  room_profit_rate?: number;
+  is_included_in_user_rate?: boolean;
+}
+
+export interface UserProfitRate {
+  user_id: string;
+  cumulative_profit_rate: number;
+  total_rooms_opened: number;
+  last_updated: string;
 }
