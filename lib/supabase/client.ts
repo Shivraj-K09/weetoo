@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { toast } from "sonner";
 
 // Enhanced createClient function with error handling and retry logic
 export function createClient() {
@@ -15,7 +16,7 @@ export function createClient() {
 
     console.log("Creating Supabase client with URL:", supabaseUrl);
 
-    // Create client with auto-refresh enabled
+    // Create client with default auth settings to ensure proper OAuth flow
     return createBrowserClient(supabaseUrl, supabaseKey, {
       auth: {
         autoRefreshToken: true,
@@ -36,6 +37,102 @@ export function createClient() {
 
 // Create a singleton instance
 export const supabase = createClient();
+
+// Global connection state
+let isReconnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Function to ensure we have a valid auth session
+export async function ensureAuthSession() {
+  try {
+    console.log("[SUPABASE] Ensuring auth session...");
+
+    // First try to get the existing session
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[SUPABASE] Error getting session:", sessionError);
+      return false;
+    }
+
+    if (sessionData.session) {
+      console.log("[SUPABASE] Session exists, refreshing...");
+
+      // Try to refresh the token
+      const { error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.error("[SUPABASE] Error refreshing session:", refreshError);
+        return false;
+      }
+
+      console.log("[SUPABASE] Session refreshed successfully");
+      return true;
+    } else {
+      console.log("[SUPABASE] No session found");
+      return false;
+    }
+  } catch (error) {
+    console.error("[SUPABASE] Error in ensureAuthSession:", error);
+    return false;
+  }
+}
+
+// Update the reconnectSupabase function to properly handle missing sessions
+
+// Replace the existing reconnectSupabase function with this improved version:
+export async function reconnectSupabase() {
+  if (isReconnecting) return false;
+
+  try {
+    isReconnecting = true;
+    console.log("[SUPABASE] Attempting to reconnect...");
+
+    // Remove all existing channels
+    supabase.removeAllChannels();
+
+    // First check if we have a session before trying to refresh it
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (!sessionData.session) {
+      console.log(
+        "[SUPABASE] No active session to refresh, reconnect successful"
+      );
+      // No session to refresh, but connection is still valid
+      return true;
+    }
+
+    // Only try to refresh if we have a session
+    const { error } = await supabase.auth.refreshSession();
+
+    if (error) {
+      console.error(
+        "[SUPABASE] Error refreshing session during reconnect:",
+        error
+      );
+      reconnectAttempts++;
+
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        toast.error("Connection lost. Please refresh the page.");
+        return false;
+      }
+
+      return false;
+    }
+
+    // Reset reconnect attempts on success
+    reconnectAttempts = 0;
+    console.log("[SUPABASE] Reconnected successfully");
+    return true;
+  } catch (error) {
+    console.error("[SUPABASE] Error during reconnect:", error);
+    return false;
+  } finally {
+    isReconnecting = false;
+  }
+}
 
 // Define the supported providers
 export type SupportedProvider =
@@ -81,4 +178,33 @@ export function resetSupabaseClient() {
     console.error("Failed to reset Supabase client:", error);
     return false;
   }
+}
+
+// Initialize connection monitoring
+if (typeof window !== "undefined") {
+  // Set up visibility change handler
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible") {
+      console.log("[SUPABASE] Page became visible, checking connection");
+      await reconnectSupabase();
+    }
+  });
+
+  // Set up online/offline handlers
+  window.addEventListener("online", async () => {
+    console.log("[SUPABASE] Browser went online, reconnecting");
+    await reconnectSupabase();
+  });
+
+  // Set up a periodic ping to keep connections alive
+  setInterval(async () => {
+    if (document.visibilityState === "visible") {
+      // Only ping if the page is visible
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        // If we have a session, send a small query to keep the connection alive
+        await supabase.from("users").select("id").limit(1).maybeSingle();
+      }
+    }
+  }, 30000); // Every 30 seconds
 }

@@ -30,6 +30,7 @@ function extractUUID(str: string): string | null {
 // Types for trade execution
 type TradeDirection = "buy" | "sell";
 type TradeStatus = "open" | "closed" | "partially_closed";
+type OrderType = "market" | "limit";
 
 interface ExecuteTradeParams {
   roomId: string;
@@ -40,6 +41,7 @@ interface ExecuteTradeParams {
   entryPrice: number;
   stopLoss?: number;
   takeProfit?: number;
+  orderType?: OrderType; // Added orderType parameter
 }
 
 interface ClosePositionParams {
@@ -64,6 +66,7 @@ export async function executeTrade({
   entryPrice,
   stopLoss,
   takeProfit,
+  orderType = "market", // Default to market order
 }: ExecuteTradeParams) {
   try {
     console.log("[AMOUNT_DEBUG] executeTrade Starting with params:", {
@@ -75,6 +78,7 @@ export async function executeTrade({
       entryPrice,
       stopLoss,
       takeProfit,
+      orderType, // Log the order type
     });
 
     // Extract the UUID part from the roomId if needed
@@ -173,6 +177,7 @@ export async function executeTrade({
       p_position_size: positionSize, // CRITICAL: Use the calculated position size
       p_stop_loss: stopLoss || null,
       p_take_profit: takeProfit || null,
+      p_order_type: orderType, // Pass the order type to the function
     });
 
     if (error) {
@@ -185,6 +190,14 @@ export async function executeTrade({
       "[executeTrade] Trade executed successfully. Position ID:",
       data
     );
+
+    // Dispatch a custom event to notify components about the new position
+    if (typeof window !== "undefined") {
+      const event = new CustomEvent("new-position-created", {
+        detail: { roomId: extractedUUID, positionId: data },
+      });
+      window.dispatchEvent(event);
+    }
 
     return {
       success: true,
@@ -328,6 +341,24 @@ export async function closePosition({
         "[closePosition] Error getting trade history:",
         tradeHistoryError
       );
+    }
+
+    // Dispatch a custom event to notify components about the closed position
+    if (typeof window !== "undefined") {
+      const event = new CustomEvent("position-closed", {
+        detail: {
+          roomId,
+          positionId,
+          tradeHistory: tradeHistory || null,
+        },
+      });
+      window.dispatchEvent(event);
+
+      // Also trigger a virtual currency update
+      const currencyEvent = new CustomEvent("virtual-currency-update", {
+        detail: { roomId },
+      });
+      window.dispatchEvent(currencyEvent);
     }
 
     return {
@@ -683,7 +714,7 @@ export async function partialClosePosition({
         ((currentPrice - position.entry_price) / position.entry_price) *
         closeAmount;
     } else {
-      // For short positions: (entry_price - current_price) / entry_price * close_amount
+      // For short positions: (entry_price - current_price) / entry_price * closeAmount
       pnl =
         ((position.entry_price - currentPrice) / position.entry_price) *
         closeAmount;
@@ -723,13 +754,6 @@ export async function partialClosePosition({
     // Get the room ID for revalidation
     const roomId = position.trading_rooms?.id || position.room_id;
 
-    // Don't revalidate the page - we'll handle updates client-side
-    // if (roomId) {
-    //   console.log("[partialClosePosition] Revalidating paths for room:", roomId)
-    //   revalidatePath(`/rooms/${roomId}`)
-    //   revalidatePath(`/voice-rooms/${roomId}`)
-    // }
-
     // Get the newly created trade history entry for the partial close
     const { data: tradeHistory, error: tradeHistoryError } = await supabase
       .from("trade_history")
@@ -744,6 +768,27 @@ export async function partialClosePosition({
         "[partialClosePosition] Error getting trade history:",
         tradeHistoryError
       );
+    }
+
+    // Dispatch custom events to notify components
+    if (typeof window !== "undefined") {
+      // Notify about position partial close
+      const closeEvent = new CustomEvent("position-closed", {
+        detail: {
+          roomId,
+          positionId,
+          partial: true,
+          percentage,
+          tradeHistory: tradeHistory || null,
+        },
+      });
+      window.dispatchEvent(closeEvent);
+
+      // Trigger virtual currency update
+      const currencyEvent = new CustomEvent("virtual-currency-update", {
+        detail: { roomId },
+      });
+      window.dispatchEvent(currencyEvent);
     }
 
     return {

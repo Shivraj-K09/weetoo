@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 // Helper function to extract UUID from a string
@@ -31,7 +31,7 @@ export async function getRoomVirtualCurrency(roomId: string) {
       return { success: false, amount: 0, message: "Invalid room ID format" };
     }
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {
@@ -72,6 +72,99 @@ export async function getRoomVirtualCurrency(roomId: string) {
   }
 }
 
+// Get detailed balance information for a room
+export async function getDetailedBalance(roomId: string) {
+  try {
+    console.log("[getDetailedBalance] Original roomId:", roomId);
+
+    // Extract the UUID part from the roomId
+    const extractedUUID = extractUUID(roomId);
+    console.log("[getDetailedBalance] Extracted UUID:", extractedUUID);
+
+    if (!extractedUUID) {
+      console.error(
+        "[getDetailedBalance] Could not extract UUID from roomId:",
+        roomId
+      );
+      return {
+        success: false,
+        holdings: 0,
+        initialMargin: 0,
+        available: 0,
+        unrealizedPnl: 0,
+        valuation: 0,
+        message: "Invalid room ID format",
+      };
+    }
+
+    const supabase = await createClient();
+
+    // Check if user is authenticated
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return {
+        success: false,
+        holdings: 0,
+        initialMargin: 0,
+        available: 0,
+        unrealizedPnl: 0,
+        valuation: 0,
+        message: "Not authenticated",
+      };
+    }
+
+    console.log(
+      "[getDetailedBalance] Calling get_detailed_balance with UUID:",
+      extractedUUID
+    );
+
+    // Call the database function to get detailed balance information
+    const { data, error } = await supabase.rpc("get_detailed_balance", {
+      p_room_id: extractedUUID,
+    });
+
+    if (error) {
+      console.error(
+        "[getDetailedBalance] Error getting detailed balance:",
+        error
+      );
+      return {
+        success: false,
+        holdings: 0,
+        initialMargin: 0,
+        available: 0,
+        unrealizedPnl: 0,
+        valuation: 0,
+        message: error.message,
+      };
+    }
+
+    console.log("[getDetailedBalance] Success, data:", data);
+    return {
+      success: true,
+      holdings: data.holdings || 0,
+      initialMargin: data.initial_margin || 0,
+      available: data.available || 0,
+      unrealizedPnl: data.unrealized_pnl || 0,
+      valuation: data.valuation || 0,
+    };
+  } catch (error) {
+    console.error("[getDetailedBalance] Unexpected error:", error);
+    return {
+      success: false,
+      holdings: 0,
+      initialMargin: 0,
+      available: 0,
+      unrealizedPnl: 0,
+      valuation: 0,
+      message: "An unexpected error occurred",
+    };
+  }
+}
+
 // Update virtual currency for a room (only works for room owner)
 export async function updateRoomVirtualCurrency(
   roomId: string,
@@ -97,7 +190,7 @@ export async function updateRoomVirtualCurrency(
       return { success: false, message: "Invalid room ID format" };
     }
 
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Check if user is authenticated
     const {

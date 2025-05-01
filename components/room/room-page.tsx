@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import {
+  ensureAuthSession,
+  reconnectSupabase,
+  supabase,
+} from "@/lib/supabase/client";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,17 @@ import { TradingChart } from "@/components/room/trading-chart";
 import { TradingTabsBottom } from "@/components/room/trading-tabs-bottom";
 import { RoomSkeleton } from "@/components/room/room-skeleton";
 import { RoomAccessManager } from "./room-access-manager";
+import { usePersistentConnection } from "@/hooks/use-persistent-connection";
+import {
+  saveRoomData,
+  getCachedRoomData,
+  saveAuthState,
+  getCachedAuthState,
+  wasPageRefreshed,
+  markRefreshHandled,
+  hasHandledRefresh,
+  clearRefreshHandled,
+} from "@/utils/room-persistence";
 
 // Add error boundary and fallback UI
 export default function RoomPage({ roomData }: { roomData: any }) {
@@ -30,9 +45,22 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const roomNameParam = params.roomName as string;
   const authCheckedRef = useRef(false);
   const authRetryCountRef = useRef(0);
-  const maxAuthRetries = 3;
+  const maxAuthRetries = 5;
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const forceRenderRef = useRef(0);
+  const isRefreshRef = useRef(false);
+  const mountedRef = useRef(false);
+
+  // Then add this effect to set it correctly on the client side
+  useEffect(() => {
+    // Set the refresh state once we're in the browser
+    isRefreshRef.current = wasPageRefreshed();
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Add state for warning dialog
   const [showWarning, setShowWarning] = useState(false);
@@ -40,11 +68,18 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [forceRender, setForceRender] = useState(0);
+  const [isRecovering, setIsRecovering] = useState(isRefreshRef.current);
 
   // Extract room ID from the URL - properly handle UUID format
   // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
   const roomId =
     roomData?.id || (roomNameParam ? roomNameParam.substring(0, 36) : "");
+
+  // Use persistent connection
+  const { connectionStatus, isConnected } = usePersistentConnection(
+    "room",
+    roomId
+  );
 
   // State for the user
   const [user, setUser] = useState<any>(null);
@@ -66,6 +101,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
   // Function to force a component re-render
   const forceComponentUpdate = useCallback(() => {
+    if (!mountedRef.current) return;
     forceRenderRef.current += 1;
     setForceRender((prev) => prev + 1);
     console.log(
@@ -74,16 +110,76 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     );
   }, []);
 
+  // Handle page refresh detection with improved recovery
+  useEffect(() => {
+    if (!mountedRef.current) return;
+
+    if (isRefreshRef.current && !hasHandledRefresh(roomId)) {
+      console.log("[ROOM PAGE] Detected page refresh, starting recovery");
+      setIsRecovering(true);
+
+      // Mark that we're handling this refresh
+      markRefreshHandled(roomId);
+
+      // Try to recover from cached data
+      const cachedRoomData = getCachedRoomData(roomId);
+      if (cachedRoomData) {
+        console.log(
+          "[ROOM PAGE] Found cached room data, using for initial render"
+        );
+      }
+
+      // Force auth session refresh with a more aggressive approach
+      const recoverSession = async () => {
+        // First try the normal refresh
+        const success = await ensureAuthSession();
+
+        if (success) {
+          console.log(
+            "[ROOM PAGE] Successfully recovered auth session after refresh"
+          );
+          if (mountedRef.current) {
+            setIsRecovering(false);
+            forceComponentUpdate();
+          }
+        } else {
+          console.log(
+            "[ROOM PAGE] Failed to recover auth session, trying reconnect"
+          );
+          // Try a more aggressive reconnect
+          const reconnectSuccess = await reconnectSupabase();
+
+          if (reconnectSuccess && mountedRef.current) {
+            setIsRecovering(false);
+            forceComponentUpdate();
+          } else if (mountedRef.current) {
+            // If still failing, show an error and let the user refresh
+            setLoadError("Connection lost. Please refresh the page.");
+            setIsRecovering(false);
+          }
+        }
+      };
+
+      recoverSession();
+    }
+
+    return () => {
+      // Clean up refresh handling when component unmounts
+      if (roomId) {
+        clearRefreshHandled(roomId);
+      }
+    };
+  }, [roomId, forceComponentUpdate]);
+
   // Add a function to refresh the room data
   const refreshRoom = useCallback(async () => {
+    if (!mountedRef.current) return;
+
     try {
       toast.loading("Refreshing room data...", { id: "refresh-room" });
 
-      // Reset Supabase connections
-      supabase.removeAllChannels();
-
-      // Force refresh the auth session
-      await supabase.auth.refreshSession();
+      // Force reconnect
+      await reconnectSupabase();
 
       // Refresh participants
       await fetchParticipants();
@@ -98,8 +194,10 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     }
   }, [fetchParticipants, forceComponentUpdate]);
 
-  // Function to retry authentication
+  // Function to retry authentication with improved error handling
   const retryAuth = useCallback(async () => {
+    if (!mountedRef.current) return false;
+
     console.log("[ROOM PAGE] Retrying authentication...");
 
     try {
@@ -113,14 +211,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
       setLoadError(null);
       setLoadTimeout(false);
 
-      // Reset Supabase connection
-      supabase.removeAllChannels();
-
-      // Force refresh the session
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.error("[ROOM PAGE] Error refreshing session:", refreshError);
-        throw new Error("Failed to refresh authentication session");
+      // Force reconnect
+      const reconnectSuccess = await reconnectSupabase();
+      if (!reconnectSuccess) {
+        console.log(
+          "[ROOM PAGE] Reconnect failed, trying direct session refresh"
+        );
       }
 
       // Get the current session
@@ -132,8 +228,10 @@ export default function RoomPage({ roomData }: { roomData: any }) {
       }
 
       if (!sessionData.session) {
-        setLoadError("You must be logged in to access this room.");
-        setAuthLoading(false);
+        if (mountedRef.current) {
+          setLoadError("You must be logged in to access this room.");
+          setAuthLoading(false);
+        }
         return false;
       }
 
@@ -150,8 +248,13 @@ export default function RoomPage({ roomData }: { roomData: any }) {
       }
 
       console.log("[ROOM PAGE] Authentication successful:", userData.id);
-      setUser(userData);
-      setAuthLoading(false);
+      if (mountedRef.current) {
+        setUser(userData);
+        setAuthLoading(false);
+      }
+
+      // Save auth state for recovery
+      saveAuthState(userData.id, userData);
 
       // Force a component update to ensure everything re-renders
       forceComponentUpdate();
@@ -159,33 +262,39 @@ export default function RoomPage({ roomData }: { roomData: any }) {
       return true;
     } catch (error) {
       console.error("[ROOM PAGE] Authentication retry failed:", error);
-      setLoadError("Authentication failed. Please try refreshing the page.");
-      setAuthLoading(false);
+      if (mountedRef.current) {
+        setLoadError("Authentication failed. Please try refreshing the page.");
+        setAuthLoading(false);
+      }
       return false;
     }
   }, [forceComponentUpdate]);
 
   // Add timeout for loading with better error recovery
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     // Clear any existing timeout when component re-renders
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set a new timeout
+    // Set a new timeout - reduced to 10 seconds for faster feedback
     loadingTimeoutRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+
       if (isLoading || authLoading) {
-        console.error("[ROOM PAGE] Loading timeout reached after 15 seconds");
+        console.error("[ROOM PAGE] Loading timeout reached after 10 seconds");
         setLoadTimeout(true);
 
         // Try to recover automatically
         retryAuth().then((success) => {
-          if (!success) {
+          if (!success && mountedRef.current) {
             console.log("[ROOM PAGE] Auto-recovery failed");
           }
         });
       }
-    }, 15000); // 15 seconds timeout (reduced from 20)
+    }, 10000); // 10 seconds timeout (reduced from 15)
 
     return () => {
       if (loadingTimeoutRef.current) {
@@ -196,20 +305,14 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
   // Reset Supabase connections when component mounts
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     const resetConnections = async () => {
       console.log("[ROOM PAGE] Resetting Supabase connections");
 
-      // Remove all existing channels
-      supabase.removeAllChannels();
-
       // Force a refresh of the auth session
       try {
-        const { error } = await supabase.auth.refreshSession();
-        if (error) {
-          console.error("[ROOM PAGE] Error refreshing auth session:", error);
-        } else {
-          console.log("[ROOM PAGE] Auth session refreshed successfully");
-        }
+        await reconnectSupabase();
       } catch (error) {
         console.error("[ROOM PAGE] Error refreshing auth session:", error);
       }
@@ -217,18 +320,50 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
     resetConnections();
 
+    // Set up a periodic check to ensure connection is maintained
+    const connectionCheckInterval = setInterval(() => {
+      if (!mountedRef.current) return;
+
+      if (!isConnected) {
+        console.log(
+          "[ROOM PAGE] Connection check failed, attempting reconnect"
+        );
+        reconnectSupabase();
+      }
+    }, 30000); // Check every 30 seconds
+
     return () => {
       // Clean up all channels when component unmounts
       supabase.removeAllChannels();
+      clearInterval(connectionCheckInterval);
     };
-  }, []);
+  }, [isConnected]);
 
   // Check if user is logged in with improved error handling
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     const checkAuth = async () => {
       try {
         setAuthLoading(true);
         console.log("[AUTH] Checking authentication status...");
+
+        // Try to recover from cached auth state first if this is a refresh
+        if (isRefreshRef.current) {
+          const cachedSession = await supabase.auth.getSession();
+          if (cachedSession.data.session) {
+            const userId = cachedSession.data.session.user.id;
+            const cachedUserData = getCachedAuthState(userId);
+
+            if (cachedUserData) {
+              console.log("[AUTH] Using cached auth state for quick render");
+              if (mountedRef.current) {
+                setUser(cachedUserData);
+              }
+              // Don't set authLoading to false yet, still do the full auth check
+            }
+          }
+        }
 
         // Force refresh the session first
         const refreshResult = await supabase.auth.refreshSession();
@@ -240,10 +375,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
           // If we've tried too many times, give up
           if (authRetryCountRef.current >= maxAuthRetries) {
-            setLoadError(
-              "Authentication failed after multiple attempts. Please try refreshing the page."
-            );
-            setAuthLoading(false);
+            if (mountedRef.current) {
+              setLoadError(
+                "Authentication failed after multiple attempts. Please try refreshing the page."
+              );
+              setAuthLoading(false);
+            }
             return;
           }
 
@@ -272,10 +409,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
             // If we've tried too many times, show error
             if (authRetryCountRef.current >= maxAuthRetries) {
-              setLoadError(
-                "Failed to load user data. Please try refreshing the page."
-              );
-              setAuthLoading(false);
+              if (mountedRef.current) {
+                setLoadError(
+                  "Failed to load user data. Please try refreshing the page."
+                );
+                setAuthLoading(false);
+              }
             } else {
               // Otherwise, try again
               authRetryCountRef.current++;
@@ -285,16 +424,23 @@ export default function RoomPage({ roomData }: { roomData: any }) {
           }
 
           console.log("[AUTH] User data fetched successfully:", userData.id);
-          setUser(userData);
-          setAuthLoading(false);
+          if (mountedRef.current) {
+            setUser(userData);
+            setAuthLoading(false);
+          }
           authRetryCountRef.current = 0; // Reset counter on success
+
+          // Save auth state for recovery
+          saveAuthState(userData.id, userData);
         } else {
           console.log("[AUTH] No session found");
 
           // If we've tried too many times, show error
           if (authRetryCountRef.current >= maxAuthRetries) {
-            setLoadError("You must be logged in to access this room.");
-            setAuthLoading(false);
+            if (mountedRef.current) {
+              setLoadError("You must be logged in to access this room.");
+              setAuthLoading(false);
+            }
           } else {
             // Try to sign in again
             authRetryCountRef.current++;
@@ -306,8 +452,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
         // If we've tried too many times, give up
         if (authRetryCountRef.current >= maxAuthRetries) {
-          setLoadError("Authentication error. Please try refreshing the page.");
-          setAuthLoading(false);
+          if (mountedRef.current) {
+            setLoadError(
+              "Authentication error. Please try refreshing the page."
+            );
+            setAuthLoading(false);
+          }
         } else {
           // Otherwise, try again after a delay
           authRetryCountRef.current++;
@@ -324,6 +474,8 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mountedRef.current) return;
+
         console.log("[AUTH] Auth state changed:", event);
 
         if (event === "SIGNED_IN" && session) {
@@ -334,15 +486,18 @@ export default function RoomPage({ roomData }: { roomData: any }) {
             .eq("id", session.user.id)
             .single();
 
-          if (!error && userData) {
+          if (!error && userData && mountedRef.current) {
             console.log("[AUTH] User data updated after auth change");
             setUser(userData);
             setAuthLoading(false);
 
+            // Save auth state for recovery
+            saveAuthState(userData.id, userData);
+
             // Force component update
             forceComponentUpdate();
           }
-        } else if (event === "SIGNED_OUT") {
+        } else if (event === "SIGNED_OUT" && mountedRef.current) {
           setUser(null);
           setAuthLoading(false);
           setLoadError("You must be logged in to access this room.");
@@ -357,7 +512,18 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
   const currentUserId = user?.id;
 
+  // Save room data for recovery when it changes
   useEffect(() => {
+    if (!mountedRef.current) return;
+
+    if (roomDetails) {
+      saveRoomData(roomId, roomDetails);
+    }
+  }, [roomId, roomDetails]);
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+
     // Set up real-time subscription for room updates
     const roomSubscription = supabase
       .channel(`room:${roomId}`)
@@ -370,6 +536,8 @@ export default function RoomPage({ roomData }: { roomData: any }) {
           filter: `id=eq.${roomId}`,
         },
         async (payload) => {
+          if (!mountedRef.current) return;
+
           console.log("Received room update:", payload);
           // Refresh participants and room details
           await fetchParticipants();
@@ -386,21 +554,57 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     const handleUnload = () => {
       console.log("Window unloading, cleaning up subscriptions");
       supabase.removeChannel(roomSubscription);
-      // Remove any other active channels
-      supabase.removeAllChannels();
     };
 
     window.addEventListener("beforeunload", handleUnload);
 
+    // Add visibility change handler to check connection when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!mountedRef.current) return;
+
+      if (document.visibilityState === "visible") {
+        console.log("[ROOM PAGE] Tab became visible, checking connection");
+
+        // Check if we need to reconnect
+        if (!isConnected) {
+          console.log(
+            "[ROOM PAGE] Connection lost while tab was hidden, reconnecting"
+          );
+          reconnectSupabase().then((success) => {
+            if (success && mountedRef.current) {
+              // Refresh data after reconnection
+              fetchParticipants();
+              forceComponentUpdate();
+            }
+          });
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
+      if (!mountedRef.current) return;
+
       console.log("Cleaning up room subscriptions");
       window.removeEventListener("beforeunload", handleUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       supabase.removeChannel(roomSubscription);
     };
-  }, [roomId, router, roomData, fetchParticipants, currentUserId]);
+  }, [
+    roomId,
+    router,
+    roomData,
+    fetchParticipants,
+    currentUserId,
+    isConnected,
+    forceComponentUpdate,
+  ]);
 
   // Check if warning should be shown
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     const checkWarningDismissed = () => {
       const dismissedTime = localStorage.getItem("trading-warning-dismissed");
 
@@ -421,7 +625,9 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
     // Small delay to ensure the component is mounted
     const timer = setTimeout(() => {
-      checkWarningDismissed();
+      if (mountedRef.current) {
+        checkWarningDismissed();
+      }
     }, 500);
 
     return () => clearTimeout(timer);
@@ -429,11 +635,14 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
   // Handle warning confirmation
   const handleWarningConfirm = useCallback(() => {
+    if (!mountedRef.current) return;
     setShowWarning(false);
   }, []);
 
   // Handle room closure
   const handleCloseRoom = useCallback(async () => {
+    if (!mountedRef.current) return;
+
     try {
       if (!roomDetails) {
         toast.error("Room details not available");
@@ -463,6 +672,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   // Handle symbol change
   const handleSymbolChange = useCallback(
     (symbol: string) => {
+      if (!mountedRef.current) return;
       setSelectedSymbol(symbol);
     },
     [setSelectedSymbol]
@@ -470,11 +680,13 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
   // Handle close room click
   const handleCloseRoomClick = useCallback(() => {
+    if (!mountedRef.current) return;
     setShowCloseRoomDialog(true);
   }, []);
 
   // Handle cancel close room
   const handleCancelCloseRoom = useCallback(() => {
+    if (!mountedRef.current) return;
     setShowCloseRoomDialog(false);
   }, []);
 
@@ -597,9 +809,6 @@ export default function RoomPage({ roomData }: { roomData: any }) {
         onConfirm={handleCloseRoom}
         onCancel={handleCancelCloseRoom}
       />
-
-      {/* Room Access Manager */}
-      <RoomAccessManager roomId={roomId} />
 
       <div className="p-4 w-full flex gap-1.5 bg-[#181a20]">
         <div className="h-full text-white rounded-md shadow-sm flex-1 w-full">

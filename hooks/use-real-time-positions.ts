@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 // Define the Position type
@@ -30,10 +30,13 @@ export function useRealTimePositions(roomId: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const positionsRef = useRef<Position[]>([]);
-  const supabaseRef = useRef<any>(null);
   const subscriptionRef = useRef<any>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    // Set mounted flag
+    mountedRef.current = true;
+
     if (!roomId) {
       setPositions([]);
       setIsLoading(false);
@@ -44,19 +47,12 @@ export function useRealTimePositions(roomId: string) {
     setIsLoading(true);
     setError(null);
 
-    // Create Supabase client
-    const supabase = createClient();
-    supabaseRef.current = supabase;
-
-    // Track if component is mounted
-    let isMounted = true;
-
     // Batch updates to reduce renders
     const pendingUpdates = new Map();
     let updateTimeout: NodeJS.Timeout | null = null;
 
     const processBatchUpdates = () => {
-      if (!isMounted) return;
+      if (!mountedRef.current) return;
 
       setPositions((current) => {
         // Create a map of current positions for faster lookup
@@ -96,10 +92,11 @@ export function useRealTimePositions(roomId: string) {
     const queueUpdate = (id: string, position: Position | null) => {
       pendingUpdates.set(id, position);
 
-      // Batch updates with a 100ms delay
-      if (!updateTimeout) {
-        updateTimeout = setTimeout(processBatchUpdates, 100);
+      // Process updates immediately for better responsiveness
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
       }
+      updateTimeout = setTimeout(processBatchUpdates, 50); // Reduced from 100ms to 50ms for faster updates
     };
 
     // Initial fetch of positions with retry logic
@@ -123,14 +120,14 @@ export function useRealTimePositions(roomId: string) {
           );
 
           // Retry logic for transient errors
-          if (retryCount < 3 && isMounted) {
+          if (retryCount < 3 && mountedRef.current) {
             const delay = Math.pow(2, retryCount) * 1000;
             console.log(`[useRealTimePositions] Retrying in ${delay}ms...`);
             setTimeout(() => fetchPositions(retryCount + 1), delay);
             return;
           }
 
-          if (isMounted) {
+          if (mountedRef.current) {
             setError(error.message);
             setIsLoading(false);
           }
@@ -141,14 +138,14 @@ export function useRealTimePositions(roomId: string) {
           "[useRealTimePositions] Initial positions loaded:",
           data?.length || 0
         );
-        if (isMounted) {
+        if (mountedRef.current) {
           setPositions(data || []);
           positionsRef.current = data || [];
           setIsLoading(false);
         }
       } catch (err) {
         console.error("[useRealTimePositions] Unexpected error:", err);
-        if (isMounted) {
+        if (mountedRef.current) {
           setError("Failed to load positions");
           setIsLoading(false);
         }
@@ -238,7 +235,7 @@ export function useRealTimePositions(roomId: string) {
         console.log(
           "[useRealTimePositions] Tab became visible, refreshing positions"
         );
-        setPositions(positionsRef.current);
+        fetchPositions();
       }
     };
 
@@ -257,7 +254,7 @@ export function useRealTimePositions(roomId: string) {
     // Cleanup subscription on unmount
     return () => {
       console.log("[useRealTimePositions] Cleaning up subscription");
-      isMounted = false;
+      mountedRef.current = false;
       if (updateTimeout) {
         clearTimeout(updateTimeout);
       }

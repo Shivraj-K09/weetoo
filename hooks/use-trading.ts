@@ -246,11 +246,37 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
 
   // Initial data fetch
   useEffect(() => {
+    // Only run this effect once on mount and when roomId changes
     if (isValidRoomId) {
-      refreshPositions();
-      refreshTradeHistory();
+      const fetchData = async () => {
+        try {
+          // Fetch positions
+          if (isValidRoomId) {
+            const result = await getRoomPositions(roomId);
+            if (result.success) {
+              setPositions(result.positions);
+            } else {
+              console.error("Failed to fetch positions:", result.message);
+            }
+          }
+
+          // Fetch trade history
+          if (isValidRoomId) {
+            const result = await getRoomTradeHistory(roomId);
+            if (result.success) {
+              setTradeHistory(result.trades);
+            } else {
+              console.error("Failed to fetch trade history:", result.message);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching trading data:", error);
+        }
+      };
+
+      fetchData();
     }
-  }, [refreshPositions, refreshTradeHistory, isValidRoomId]);
+  }, [roomId, isValidRoomId]); // Only depend on roomId and isValidRoomId
 
   return {
     isLoading,

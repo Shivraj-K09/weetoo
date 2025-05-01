@@ -6,7 +6,7 @@ import { useRoomPermissions } from "@/hooks/use-room-permission";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 // Helper function to extract UUID from a string
 function extractUUID(str: string): string | null {
@@ -20,18 +20,20 @@ function extractUUID(str: string): string | null {
 }
 
 export function TradingMarketPlace() {
+  // Debug render count
+  const renderCount = useRef(0);
+  renderCount.current++;
+
   const params = useParams();
   const fullRoomName =
     typeof params?.roomName === "string" ? params.roomName : "";
 
   // Extract the UUID from the full room name
   const roomId = useMemo(() => extractUUID(fullRoomName) || "", [fullRoomName]);
-  console.log(
-    "[TradingMarketPlace] Full room name:",
+  console.log(`[DEBUG] TradingMarketPlace render #${renderCount.current}`, {
     fullRoomName,
-    "Extracted UUID:",
-    roomId
-  );
+    extractedRoomId: roomId,
+  });
 
   const symbol = "BTCUSDT"; // Default symbol, could be made dynamic later
 
@@ -45,8 +47,29 @@ export function TradingMarketPlace() {
     [priceDataLoaded, priceData]
   );
 
+  // For now, let's use a fixed value for virtual currency to avoid any potential issues
+  // with the real-time updates causing infinite loops
+  const virtualCurrency = 10000;
+
+  // Debug dependencies
+  useEffect(() => {
+    console.log("[DEBUG] TradingMarketPlace - roomId changed:", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    console.log(
+      "[DEBUG] TradingMarketPlace - currentPrice changed:",
+      currentPrice
+    );
+  }, [currentPrice]);
+
+  useEffect(() => {
+    console.log("[DEBUG] TradingMarketPlace - isHost changed:", isHost);
+  }, [isHost]);
+
   // Show loading state while permissions are being determined
   if (permissionsLoading) {
+    console.log("[DEBUG] TradingMarketPlace - showing loading state");
     return (
       <div className="flex flex-col md:flex-row gap-4 w-full">
         <div className="flex flex-col gap-4">
@@ -59,6 +82,14 @@ export function TradingMarketPlace() {
       </div>
     );
   }
+
+  console.log("[DEBUG] TradingMarketPlace - about to render with:", {
+    roomId,
+    symbol,
+    currentPrice,
+    isHost,
+    virtualCurrency,
+  });
 
   // For now, let's proceed with the trading interface regardless of permissions
   // This allows us to test the trading functionality
@@ -82,13 +113,10 @@ export function TradingMarketPlace() {
             symbol={symbol}
             currentPrice={currentPrice}
             isHost={true}
+            virtualCurrency={virtualCurrency} // Use fixed value for now
           />
         </div>
-
-        {/* Removed the flex-1 div that contained PositionsPanel and TradeHistory */}
       </div>
-
-      {/* Removed TradingTabsBottom component */}
     </div>
   );
 }

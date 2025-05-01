@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTrading } from "@/hooks/use-trading";
-import { useRealTimeCurrency } from "@/hooks/use-real-time-currency";
 import { toast } from "sonner";
 import { MarginModeDialog } from "./margin-mode-dialog";
 import { LeverageDialog } from "./leverage-dialog";
@@ -39,233 +38,160 @@ export const TradingForm = React.memo(function TradingForm({
   symbol,
   currentPrice,
   isHost,
-  virtualCurrency,
+  virtualCurrency = 10000, // Provide a default value of 10000
 }: TradingFormProps) {
-  // State for form inputs
+  // Debug render count
+  const renderCount = useRef(0);
+  renderCount.current++;
+  console.log(`[DEBUG] TradingForm render #${renderCount.current}`, {
+    roomId,
+    symbol,
+    currentPrice,
+    isHost,
+    virtualCurrency,
+  });
+
+  // State for form inputs - simplified to avoid circular dependencies
   const [orderType, setOrderType] = useState<"limit" | "market">("market");
   const [leverage, setLeverage] = useState(1);
   const [marginMode, setMarginMode] = useState<"cross" | "isolated">("cross");
-  const [entryAmount, setEntryAmount] = useState("");
-  const [entryPercentage, setEntryPercentage] = useState(0);
+  const [entryAmount, setEntryAmount] = useState("1000");
   const [limitPrice, setLimitPrice] = useState(currentPrice.toString());
   const [playSound, setPlaySound] = useState(false);
   const [direction, setDirection] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState<number>(100);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [selectedPercentage, setSelectedPercentage] = useState<number>(10);
+  const [selectedPercentage, setSelectedPercentage] = useState(10);
 
   // Risk management state
   const [useStopLoss, setUseStopLoss] = useState(false);
   const [useTakeProfit, setUseTakeProfit] = useState(false);
-  const [stopLossPrice, setStopLossPrice] = useState("");
-  const [takeProfitPrice, setTakeProfitPrice] = useState("");
+  const [stopLossPrice, setStopLossPrice] = useState(
+    (currentPrice * 0.95).toFixed(2)
+  );
+  const [takeProfitPrice, setTakeProfitPrice] = useState(
+    (currentPrice * 1.05).toFixed(2)
+  );
   const [showRiskSettings, setShowRiskSettings] = useState(false);
 
   // Dialog states
   const [marginModeDialogOpen, setMarginModeDialogOpen] = useState(false);
   const [leverageDialogOpen, setLeverageDialogOpen] = useState(false);
 
-  // Make sure we have a clean UUID
-  const cleanRoomId = useMemo(() => extractUUID(roomId) || roomId, [roomId]);
-  console.log(
-    "[TradingForm] Original roomId:",
-    roomId,
-    "Clean roomId:",
-    cleanRoomId
-  );
+  // Clean roomId
+  const cleanRoomId = extractUUID(roomId) || roomId;
 
-  // Trading hook - pass isHost to useTrading
+  // Trading hook
   const { executeTrade: executeTradeHook, isLoading } = useTrading(
     cleanRoomId,
     isHost
   );
 
-  // Use our new real-time currency hook instead of useVirtualCurrency
-  const { virtualCurrency: realTimeCurrency, isLoading: currencyLoading } =
-    useRealTimeCurrency(cleanRoomId);
+  // Calculate position size
+  const positionSize = Number.parseFloat(entryAmount || "0") * leverage;
 
-  // Calculate max amount based on virtual currency
-  const maxAmount = virtualCurrency || 10000;
-
-  // Update amount when percentage changes
+  // Debug state changes
   useEffect(() => {
-    const newAmount = (maxAmount * selectedPercentage) / 100;
-    setAmount(Number.parseFloat(newAmount.toFixed(2)));
-    // Also update entryAmount to keep them in sync
-    setEntryAmount(newAmount.toFixed(2));
-  }, [selectedPercentage, maxAmount]);
+    console.log("[DEBUG] entryAmount changed:", entryAmount);
+  }, [entryAmount]);
 
-  // Update limit price when current price changes
   useEffect(() => {
+    console.log("[DEBUG] selectedPercentage changed:", selectedPercentage);
+  }, [selectedPercentage]);
+
+  useEffect(() => {
+    console.log("[DEBUG] virtualCurrency changed:", virtualCurrency);
+  }, [virtualCurrency]);
+
+  useEffect(() => {
+    console.log("[DEBUG] currentPrice changed:", currentPrice);
+  }, [currentPrice]);
+
+  // Update limit price when current price changes - with debugging
+  useEffect(() => {
+    console.log(
+      "[DEBUG] Updating limit price. Current orderType:",
+      orderType,
+      "Current price:",
+      currentPrice
+    );
+
     if (orderType === "market") {
+      console.log(
+        "[DEBUG] Setting limit price to current price:",
+        currentPrice.toString()
+      );
       setLimitPrice(currentPrice.toString());
     }
+  }, [currentPrice, orderType]);
 
-    // Set default stop loss and take profit prices based on current price
-    if (stopLossPrice === "" && currentPrice) {
-      // Default stop loss 5% below current price for buy, 5% above for sell
-      setStopLossPrice((currentPrice * 0.95).toFixed(2));
-    }
+  // Handle percentage selection - with debugging
+  const handlePercentageSelect = (percentage: number) => {
+    console.log(
+      "[DEBUG] handlePercentageSelect called with:",
+      percentage,
+      "virtualCurrency:",
+      virtualCurrency
+    );
 
-    if (takeProfitPrice === "" && currentPrice) {
-      // Default take profit 5% above current price for buy, 5% below for sell
-      setTakeProfitPrice((currentPrice * 1.05).toFixed(2));
-    }
-  }, [currentPrice, orderType, stopLossPrice, takeProfitPrice]);
-
-  // Handle percentage selection
-  const handlePercentageSelect = useCallback(
-    (percentage: number) => {
-      if (!realTimeCurrency) return;
-
-      const amount = (realTimeCurrency * percentage) / 100;
-      setEntryAmount(amount.toFixed(2));
-      setAmount(amount); // Keep both in sync
-      setEntryPercentage(percentage);
-      setSelectedPercentage(percentage); // Keep both percentage states in sync
-    },
-    [realTimeCurrency]
-  );
-
-  const handlePercentageClick = (percentage: number) => {
     setSelectedPercentage(percentage);
-    // Calculate and update amount based on percentage
-    const newAmount = (maxAmount * percentage) / 100;
-    setAmount(Number.parseFloat(newAmount.toFixed(2)));
-    setEntryAmount(newAmount.toFixed(2)); // Keep both in sync
-  };
+    const amount = (virtualCurrency * percentage) / 100;
+    const formattedAmount = amount.toFixed(2);
+    console.log("[DEBUG] Calculated amount:", formattedAmount);
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number.parseFloat(e.target.value);
-    if (!isNaN(value) && value >= 0) {
-      setAmount(value);
-      setEntryAmount(value.toString()); // Keep both in sync
-      // Update the selected percentage based on the amount
-      const percentage = (value / maxAmount) * 100;
-      setSelectedPercentage(Math.min(Math.round(percentage), 100));
-      setEntryPercentage(Math.min(Math.round(percentage), 100)); // Keep both in sync
-    }
+    setEntryAmount(formattedAmount);
   };
 
   // Handle margin mode change
   const handleMarginModeChange = useCallback((mode: "cross" | "isolated") => {
+    console.log("[DEBUG] Margin mode changing to:", mode);
     setMarginMode(mode);
     toast.success(`Margin mode changed to ${mode}`);
   }, []);
 
   // Handle leverage change
   const handleLeverageChange = useCallback((newLeverage: number) => {
+    console.log("[DEBUG] Leverage changing to:", newLeverage);
     setLeverage(newLeverage);
     toast.success(`Leverage changed to ${newLeverage}x`);
   }, []);
 
   // Calculate liquidation price (simplified)
-  const calculateLiquidationPrice = useCallback(
-    (direction: "buy" | "sell", entryPrice: number): number => {
-      const maintenanceMargin = 0.6; // 60%
-      const leverageMultiplier = leverage;
+  const calculateLiquidationPrice = (
+    direction: "buy" | "sell",
+    entryPrice: number
+  ): string => {
+    const maintenanceMargin = 0.6; // 60%
+    const leverageMultiplier = leverage;
 
-      if (direction === "buy") {
-        // For long positions: entry_price * (1 - (1 / leverage) * (1 / maintenance_margin))
-        return (
-          entryPrice * (1 - (1 / leverageMultiplier) * (1 / maintenanceMargin))
-        );
-      } else {
-        // For short positions: entry_price * (1 + (1 / leverage) * (1 / maintenance_margin))
-        return (
-          entryPrice * (1 + (1 / leverageMultiplier) * (1 / maintenanceMargin))
-        );
-      }
-    },
-    [leverage]
-  );
+    let liquidationPrice = 0;
+    if (direction === "buy") {
+      // For long positions: entry_price * (1 - (1 / leverage) * (1 / maintenance_margin))
+      liquidationPrice =
+        entryPrice * (1 - (1 / leverageMultiplier) * (1 / maintenanceMargin));
+    } else {
+      // For short positions: entry_price * (1 + (1 / leverage) * (1 / maintenance_margin))
+      liquidationPrice =
+        entryPrice * (1 + (1 / leverageMultiplier) * (1 / maintenanceMargin));
+    }
+    return liquidationPrice.toFixed(2);
+  };
 
-  // Handle trade execution
-  const handleTrade = useCallback(
-    async (dir: "buy" | "sell") => {
-      // Set the direction state
-      setDirection(dir);
-      console.log("[LongShortCheck] handleTrade called with direction:", dir);
-      console.log("[TradingForm] Using roomId:", cleanRoomId);
+  const handleSubmit = async (direction: "buy" | "sell") => {
+    console.log("[DEBUG] handleSubmit called with direction:", direction);
+    try {
+      setIsSubmitting(true);
+      setDirection(direction);
 
-      // IMPORTANT: Use the amount from the input field directly
+      // Validate input
       const inputAmount = Number.parseFloat(entryAmount);
-      if (!entryAmount || isNaN(inputAmount) || inputAmount <= 0) {
-        console.log("[TradingForm] Invalid entry amount:", entryAmount);
+      if (isNaN(inputAmount) || inputAmount <= 0) {
         toast.error("Please enter a valid amount");
         return;
       }
 
-      if (leverage < 1 || leverage > 125) {
-        console.log("[TradingForm] Invalid leverage:", leverage);
-        toast.error("Leverage must be between 1x and 125x");
+      if (inputAmount > virtualCurrency) {
+        toast.error("Insufficient virtual currency");
         return;
-      }
-
-      if (inputAmount > (realTimeCurrency || 0)) {
-        console.log(
-          "[TradingForm] Insufficient balance. Amount:",
-          inputAmount,
-          "Balance:",
-          realTimeCurrency
-        );
-        toast.error("Insufficient balance");
-        return;
-      }
-
-      const price =
-        orderType === "limit" ? Number.parseFloat(limitPrice) : currentPrice;
-      console.log(
-        "[TradingForm] Using price:",
-        price,
-        "Order type:",
-        orderType
-      );
-
-      // Validate stop loss and take profit if enabled
-      let stopLoss: number | undefined = undefined;
-      let takeProfit: number | undefined = undefined;
-
-      if (useStopLoss) {
-        stopLoss = Number.parseFloat(stopLossPrice);
-        if (isNaN(stopLoss) || stopLoss <= 0) {
-          toast.error("Please enter a valid stop loss price");
-          return;
-        }
-
-        // Validate stop loss direction
-        if (direction === "buy" && stopLoss >= price) {
-          toast.error(
-            "Stop loss price must be below entry price for buy orders"
-          );
-          return;
-        } else if (direction === "sell" && stopLoss <= price) {
-          toast.error(
-            "Stop loss price must be above entry price for sell orders"
-          );
-          return;
-        }
-      }
-
-      if (useTakeProfit) {
-        takeProfit = Number.parseFloat(takeProfitPrice);
-        if (isNaN(takeProfit) || takeProfit <= 0) {
-          toast.error("Please enter a valid take profit price");
-          return;
-        }
-
-        // Validate take profit direction
-        if (direction === "buy" && takeProfit <= price) {
-          toast.error(
-            "Take profit price must be above entry price for buy orders"
-          );
-          return;
-        } else if (direction === "sell" && takeProfit >= price) {
-          toast.error(
-            "Take profit price must be below entry price for sell orders"
-          );
-          return;
-        }
       }
 
       // Play sound if enabled
@@ -274,125 +200,41 @@ export const TradingForm = React.memo(function TradingForm({
         audio.play().catch((e) => console.error("Error playing sound:", e));
       }
 
-      // Calculate position size correctly
-      const positionSize = inputAmount * leverage;
-
       // Execute the trade
-      console.log("[AMOUNT_DEBUG] Executing trade with params:", {
-        roomId: cleanRoomId,
-        symbol,
-        direction: dir,
-        entryAmount: inputAmount, // Use the exact input amount
-        leverage,
-        entryPrice: price,
-        positionSize, // Log the calculated position size
-        stopLoss,
-        takeProfit,
-      });
-
-      const result = await executeTradeHook({
-        roomId: cleanRoomId,
-        symbol,
-        direction: dir,
-        entryAmount: inputAmount, // Use the exact input amount
-        leverage,
-        entryPrice: price,
-        stopLoss,
-        takeProfit,
-      });
-
-      console.log("[AMOUNT_DEBUG] Trade execution result:", result);
-
-      if (result.success) {
-        // Reset form
-        setEntryAmount("");
-        setEntryPercentage(0);
-      }
-    },
-    [
-      cleanRoomId,
-      symbol,
-      entryAmount, // Use entryAmount directly
-      leverage,
-      orderType,
-      limitPrice,
-      currentPrice,
-      useStopLoss,
-      stopLossPrice,
-      useTakeProfit,
-      takeProfitPrice,
-      playSound,
-      executeTradeHook,
-      realTimeCurrency,
-    ]
-  );
-
-  const handleSubmit = async (direction: "buy" | "sell") => {
-    try {
-      setIsSubmitting(true);
-      console.log(
-        "[LongShortCheck] handleSubmit called with direction:",
-        direction
-      );
-
-      // IMPORTANT: Use the amount from the input field directly
-      const inputAmount = Number.parseFloat(entryAmount);
-      if (isNaN(inputAmount) || inputAmount <= 0) {
-        toast.error("Please enter a valid amount");
-        return;
-      }
-
-      if (inputAmount > maxAmount) {
-        toast.error("Insufficient virtual currency");
-        return;
-      }
-
-      // Calculate position size correctly
-      const positionSize = inputAmount * leverage;
-
-      // Log the exact values being sent to the server
-      console.log("[AMOUNT_DEBUG] Submitting trade with:", {
-        roomId,
-        symbol,
-        direction,
-        entryAmount: inputAmount, // Use the exact input amount
-        leverage,
-        entryPrice: currentPrice,
-        calculatedPositionSize: positionSize, // This is what the position size should be
-      });
-
-      // Execute the trade without causing a page refresh
       const result = await executeTrade({
         roomId,
         symbol,
         direction,
-        entryAmount: inputAmount, // Use the exact input amount
+        entryAmount: inputAmount,
         leverage,
         entryPrice: currentPrice,
       });
 
-      console.log("[AMOUNT_DEBUG] executeTrade result:", result);
+      console.log("[DEBUG] Trade execution result:", result);
 
       if (result.success) {
         toast.success(
           `${direction === "buy" ? "Long" : "Short"} position opened successfully`
         );
-
-        // Update virtual currency display immediately without page refresh
         updateVirtualCurrencyDisplay(roomId);
 
         // Emit a custom event to notify other components about the new position
         const newPositionEvent = new CustomEvent("new-position-created", {
           detail: {
-            roomId,
+            roomId: cleanRoomId, // Use the clean room ID
             positionId: result.positionId,
             direction,
-            entryAmount: inputAmount, // Include the exact entry amount
+            entryAmount: inputAmount,
             leverage,
-            positionSize, // Include the calculated position size
+            positionSize: inputAmount * leverage,
           },
         });
         window.dispatchEvent(newPositionEvent);
+
+        console.log("[DEBUG] Dispatched new-position-created event:", {
+          roomId: cleanRoomId,
+          positionId: result.positionId,
+        });
       } else {
         toast.error(`Failed to open position: ${result.message}`);
       }
@@ -404,28 +246,19 @@ export const TradingForm = React.memo(function TradingForm({
     }
   };
 
-  // Calculate estimated liquidation price
-  const estimatedLiquidationPrice = useCallback(
-    (direction: "buy" | "sell"): string => {
-      const entryPrice =
-        orderType === "limit"
-          ? Number.parseFloat(limitPrice || "0")
-          : currentPrice;
-      if (!entryPrice) return "0";
-
-      const liquidationPrice = calculateLiquidationPrice(direction, entryPrice);
-      return liquidationPrice.toFixed(2);
-    },
-    [calculateLiquidationPrice, currentPrice, limitPrice, orderType]
-  );
-
-  const positionSize = useMemo(() => {
-    const inputAmount = Number.parseFloat(entryAmount);
-    return !isNaN(inputAmount) ? (inputAmount * leverage).toFixed(2) : "0";
-  }, [entryAmount, leverage]);
+  // Log before render
+  console.log("[DEBUG] TradingForm about to render with state:", {
+    orderType,
+    leverage,
+    marginMode,
+    entryAmount,
+    limitPrice,
+    selectedPercentage,
+    virtualCurrency,
+  });
 
   return (
-    <div className="bg-[#212631] p-2 rounded max-w-[290px] w-full h-[45rem] border border-[#3f445c]">
+    <div className="bg-[#212631] p-2 rounded max-w-[290px] w-full h-[45rem] border border-[#3f445c] overflow-y-auto no-scrollbar">
       <div className="flex gap-1.5 w-full">
         <button
           className="flex items-center w-full cursor-pointer justify-between gap-2 px-4 py-2 bg-[#1a1e27] text-white rounded-md border border-white/10 hover:border-orange-500/50 transition-all duration-300"
@@ -474,12 +307,17 @@ export const TradingForm = React.memo(function TradingForm({
         </button>
       </div>
 
+      {/* Simplified Balance Display */}
+
       <div className="flex gap-[0.715rem] flex-col w-full">
         <div className="flex justify-between items-center w-full">
           <Tabs
             defaultValue={orderType}
             className="flex-1"
-            onValueChange={(value) => setOrderType(value as "limit" | "market")}
+            onValueChange={(value) => {
+              console.log("[DEBUG] Tab value changing to:", value);
+              setOrderType(value as "limit" | "market");
+            }}
           >
             <div className="flex justify-between items-center">
               <TabsList className="h-auto rounded-none bg-transparent p-0">
@@ -517,14 +355,26 @@ export const TradingForm = React.memo(function TradingForm({
                   <Input
                     className="h-8 text-white focus-visible:ring-0 focus-visible:border-[#f97316] border border-white/30 rounded text-xs pr-24 bg-transparent selection:bg-[#f97316] selection:text-white"
                     value={limitPrice}
-                    onChange={(e) => setLimitPrice(e.target.value)}
+                    onChange={(e) => {
+                      console.log(
+                        "[DEBUG] Limit price changing to:",
+                        e.target.value
+                      );
+                      setLimitPrice(e.target.value);
+                    }}
                     type="number"
                     step="0.01"
                   />
                   <div className="absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
                     <button
                       className="text-xs text-[#f97316] hover:text-[#f97316]/80"
-                      onClick={() => setLimitPrice(currentPrice.toString())}
+                      onClick={() => {
+                        console.log(
+                          "[DEBUG] Setting limit price to current price:",
+                          currentPrice.toString()
+                        );
+                        setLimitPrice(currentPrice.toString());
+                      }}
                     >
                       현재가
                     </button>
@@ -559,18 +409,16 @@ export const TradingForm = React.memo(function TradingForm({
               className="h-8 text-white focus-visible:ring-0 focus-visible:border-[#f97316] border border-white/30 rounded text-xs pr-24 bg-transparent selection:bg-[#f97316] selection:text-white"
               value={entryAmount}
               onChange={(e) => {
+                console.log(
+                  "[DEBUG] Entry amount changing to:",
+                  e.target.value
+                );
                 setEntryAmount(e.target.value);
-                // Keep amount in sync with entryAmount
-                const value = Number.parseFloat(e.target.value);
-                if (!isNaN(value)) {
-                  setAmount(value);
-                }
-                setEntryPercentage(0); // Reset percentage when manually entering amount
               }}
               type="number"
               step="0.01"
               min="0"
-              max={realTimeCurrency?.toString()}
+              max={virtualCurrency.toString()}
             />
             <div className="text-xs text-white/75 absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
               USDT
@@ -584,7 +432,11 @@ export const TradingForm = React.memo(function TradingForm({
               {[10, 25, 50, 75, 100].map((percent) => (
                 <button
                   key={percent}
-                  className={`text-xs ${entryPercentage === percent ? "text-[#f97316]" : "text-white/70 hover:text-white"} min-w-[40px] text-center`}
+                  className={`text-xs ${
+                    selectedPercentage === percent
+                      ? "text-[#f97316]"
+                      : "text-white/70 hover:text-white"
+                  } min-w-[40px] text-center`}
                   onClick={() => handlePercentageSelect(percent)}
                 >
                   {percent}%
@@ -717,7 +569,9 @@ export const TradingForm = React.memo(function TradingForm({
             <div className="border-t border-white/10 pt-2 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">포지션 크기</span>
-                <span className="text-xs text-white">{positionSize} USDT</span>
+                <span className="text-xs text-white">
+                  {positionSize.toFixed(2)} USDT
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">사용 마진</span>
@@ -728,13 +582,13 @@ export const TradingForm = React.memo(function TradingForm({
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">청산가 (Long)</span>
                 <span className="text-xs text-[#FF5252]">
-                  {estimatedLiquidationPrice("buy")} USDT
+                  {calculateLiquidationPrice("buy", currentPrice)} USDT
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">청산가 (Short)</span>
                 <span className="text-xs text-[#FF5252]">
-                  {estimatedLiquidationPrice("sell")} USDT
+                  {calculateLiquidationPrice("sell", currentPrice)} USDT
                 </span>
               </div>
             </div>
@@ -743,27 +597,15 @@ export const TradingForm = React.memo(function TradingForm({
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <Button
               className="bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => {
-                console.log(
-                  "[AMOUNT_DEBUG] Buy/Long button clicked with amount:",
-                  entryAmount
-                );
-                handleSubmit("buy");
-              }}
-              disabled={isLoading || !isHost || currencyLoading}
+              onClick={() => handleSubmit("buy")}
+              disabled={isLoading || !isHost}
             >
               {isLoading ? "처리 중..." : "매수 / Long"}
             </Button>
             <Button
               className="bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => {
-                console.log(
-                  "[AMOUNT_DEBUG] Sell/Short button clicked with amount:",
-                  entryAmount
-                );
-                handleSubmit("sell");
-              }}
-              disabled={isLoading || !isHost || currencyLoading}
+              onClick={() => handleSubmit("sell")}
+              disabled={isLoading || !isHost}
             >
               {isLoading ? "처리 중..." : "매도 / Short"}
             </Button>
@@ -775,20 +617,20 @@ export const TradingForm = React.memo(function TradingForm({
             <div className="flex justify-between items-center">
               <span className="text-xs text-white/70">평가</span>
               <span className="text-xs text-[#00C879]">
-                {realTimeCurrency?.toFixed(2) || "0"} USDT
+                {virtualCurrency.toFixed(2)} USDT
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-white/70">보유</span>
               <span className="text-xs text-[#00C879]">
-                {realTimeCurrency?.toFixed(2) || "0"} USDT
+                {virtualCurrency.toFixed(2)} USDT
               </span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-xs text-white/70">가능</span>
               <span className="text-xs text-[#00C879]">
-                {realTimeCurrency?.toFixed(2) || "0"} USDT
+                {virtualCurrency.toFixed(2)} USDT
               </span>
             </div>
           </div>

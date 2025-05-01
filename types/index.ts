@@ -198,6 +198,9 @@ export interface Position {
   updated_at: string;
   stop_loss?: number;
   take_profit?: number;
+  order_type?: "market" | "limit";
+  initial_margin?: number;
+  cumulative_funding_fee?: number | null;
 }
 
 export interface Trade {
@@ -217,4 +220,36 @@ export interface Trade {
   pnl_percentage: number;
   entry_time: string;
   exit_time: string;
+}
+
+export interface TradeHistory {
+  id: string;
+  position_id: string;
+  room_id: string;
+  user_id: string;
+  symbol: string;
+  direction: "buy" | "sell";
+  entry_price: number;
+  exit_price: number;
+  entry_amount: number;
+  leverage: number;
+  position_size: number;
+  trade_volume: number;
+  pnl: number;
+  pnl_percentage: number;
+  entry_time: string;
+  exit_time: string;
+  created_at: string;
+}
+
+export interface RoomDetails {
+  id: string;
+  room_name: string;
+  room_type: Privacy;
+  trading_pairs: string[];
+  current_participants: number;
+  max_participants: number;
+  owner_id: string;
+  participants: string[];
+  created_at: string;
 }

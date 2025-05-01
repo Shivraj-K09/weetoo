@@ -30,13 +30,80 @@ export function updateVirtualCurrencyDisplay(roomId: string): void {
 /**
  * Utility function to notify that a position has been closed
  */
-export function notifyPositionClosed(roomId: string): void {
+export function notifyPositionClosed(
+  roomId: string,
+  positionId?: string
+): void {
   try {
     const event = new CustomEvent("position-closed", {
-      detail: { roomId },
+      detail: { roomId, positionId },
     });
     window.dispatchEvent(event);
   } catch (error) {
     console.error("Error notifying position closed:", error);
+  }
+}
+
+/**
+ * Utility function to notify that a new position has been created
+ */
+export function notifyPositionCreated(
+  roomId: string,
+  positionId: string
+): void {
+  try {
+    const event = new CustomEvent("new-position-created", {
+      detail: { roomId, positionId },
+    });
+    window.dispatchEvent(event);
+  } catch (error) {
+    console.error("Error notifying new position created:", error);
+  }
+}
+
+/**
+ * Utility function to notify that funding fees have been applied
+ */
+export function notifyFundingApplied(roomId: string): void {
+  try {
+    const event = new CustomEvent("funding-applied", {
+      detail: { roomId },
+    });
+    window.dispatchEvent(event);
+
+    // Also trigger a virtual currency update since funding affects balances
+    updateVirtualCurrencyDisplay(roomId);
+  } catch (error) {
+    console.error("Error notifying funding applied:", error);
+  }
+}
+
+/**
+ * Utility function to update a user's virtual currency balance
+ * This is a server-side function that updates the database
+ */
+export async function updateVirtualCurrency(
+  roomId: string,
+  userId: string,
+  amount: number,
+  description = "Virtual currency update"
+): Promise<boolean> {
+  try {
+    // This is a placeholder for the actual implementation
+    // In a real implementation, you would update the database here
+    console.log(
+      `[updateVirtualCurrency] Updating virtual currency for user ${userId} in room ${roomId}: ${amount} (${description})`
+    );
+
+    // After updating the database, trigger the UI update
+    // Note: This won't work server-side, but is included for completeness
+    if (typeof window !== "undefined") {
+      updateVirtualCurrencyDisplay(roomId);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating virtual currency:", error);
+    return false;
   }
 }

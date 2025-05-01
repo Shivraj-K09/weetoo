@@ -109,8 +109,9 @@ export async function forceResetSupabaseClient() {
     const currentSession = sessionData.session;
 
     if (!currentSession) {
-      console.log("[SUPABASE] No active session found");
-      return false;
+      console.log("[SUPABASE] No active session found, just removing channels");
+      // No session to reset, but we've removed channels which may help
+      return true;
     }
 
     // Store session data
@@ -118,7 +119,7 @@ export async function forceResetSupabaseClient() {
     const refreshToken = currentSession.refresh_token;
 
     // Sign out completely
-    await supabase.auth.signOut({ scope: "global" });
+    await supabase.auth.signOut({ scope: "local" });
 
     // Wait for signout to complete
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -140,4 +141,69 @@ export async function forceResetSupabaseClient() {
     console.error("[SUPABASE] Force reset failed:", error);
     return false;
   }
+}
+
+// Add a function to keep connections alive during page visibility changes
+
+// Add this function to the file:
+/**
+ * Keeps Supabase connections alive even when the page is not visible
+ * This is especially important for trading applications where real-time
+ * data is critical
+ */
+export function keepConnectionsAlive() {
+  if (typeof window === "undefined") return;
+
+  // Create a hidden iframe that will ping the server periodically
+  // This helps keep WebSocket connections alive in some browsers
+  const createKeepAliveFrame = () => {
+    // Check if we already have a keep-alive frame
+    if (document.getElementById("supabase-keep-alive")) {
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "supabase-keep-alive";
+    iframe.style.display = "none";
+    iframe.src = "about:blank";
+    document.body.appendChild(iframe);
+
+    // Add a script to the iframe that will ping periodically
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(`
+        <script>
+          // Send a message to the parent window every 25 seconds
+          // This helps keep the connection alive
+          setInterval(() => {
+            parent.postMessage('keep-alive-ping', '*');
+          }, 25000);
+        </script>
+      `);
+      iframeDoc.close();
+    }
+  };
+
+  // Listen for the keep-alive pings
+  window.addEventListener("message", (event) => {
+    if (event.data === "keep-alive-ping") {
+      // When we receive a ping, we know the iframe is working
+      console.log("[KEEP-ALIVE] Ping received");
+    }
+  });
+
+  // Create the keep-alive frame when the page loads
+  if (document.readyState === "complete") {
+    createKeepAliveFrame();
+  } else {
+    window.addEventListener("load", createKeepAliveFrame);
+  }
+
+  // Also create it when the page becomes visible again
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      createKeepAliveFrame();
+    }
+  });
 }

@@ -4,10 +4,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ArrowUp } from "lucide-react";
 import { getRoomInitial } from "@/utils/format-utils";
-import { VoiceChannel } from "../voice-room/voice-room-channel";
+import { VoiceChannel } from "@/components/voice-room/voice-room-channel";
 import { VirtualCurrencyDisplay } from "@/components/room/virtual-currency-display";
 import { DonationButton } from "@/components/room/donation-button";
-import { DonationNotification } from "./donate-notifications";
+import { DonationNotification } from "@/components/room/donate-notifications";
 
 interface RoomHeaderProps {
   roomDetails: any;
@@ -15,7 +15,8 @@ interface RoomHeaderProps {
   participants: any[];
   user: any;
   onCloseRoomClick: () => void;
-  onRefreshRoom?: () => Promise<void>; // Added onRefreshRoom property
+  onRefreshRoom?: () => void;
+  connectionStatus?: "connected" | "connecting" | "disconnected";
 }
 
 export function RoomHeader({
@@ -25,6 +26,7 @@ export function RoomHeader({
   user,
   onCloseRoomClick,
   onRefreshRoom,
+  connectionStatus,
 }: RoomHeaderProps) {
   const isOwner = user && user.id === roomDetails.owner_id;
   const isVoiceRoom = roomDetails.room_category === "voice";
@@ -34,8 +36,9 @@ export function RoomHeader({
       {/* Donation notification - visible to everyone */}
       <DonationNotification roomId={roomDetails.id} />
 
-      <div className="w-full bg-[#1a1e27] border border-[#3f445c] rounded-md">
-        <div className="flex items-center p-3">
+      <div className="bg-[#212631] rounded-md p-3 flex justify-between items-center border border-[#3f445c]">
+        {/* Left side */}
+        <div className="flex items-center gap-2">
           {/* Avatar and Room Info */}
           <div className="flex items-center">
             <Avatar className="h-16 w-16 bg-green-700 border-2 border-green-500">
@@ -116,10 +119,27 @@ export function RoomHeader({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Right side - Add refresh button here */}
+        <div className="flex items-center gap-2">
+          {onRefreshRoom && (
+            <Button
+              onClick={onRefreshRoom}
+              className="bg-[#3498DB] hover:bg-[#3498DB]/90 text-white h-8 px-3"
+              size="sm"
+            >
+              Refresh
+            </Button>
+          )}
 
           {/* Virtual Currency Display (only for owner) */}
           <div className="ml-auto mr-4">
-            <VirtualCurrencyDisplay roomId={roomDetails.id} isOwner={isOwner} />
+            <VirtualCurrencyDisplay
+              roomId={roomDetails.id}
+              isOwner={isOwner}
+              currentPrice={roomDetails.current_price || 0}
+            />
           </div>
 
           {/* Donation Button (only for participants) */}
@@ -136,29 +156,32 @@ export function RoomHeader({
 
           {/* Close Room Button (for owners) */}
           {isOwner && (
-            <div className="flex items-center">
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 px-4 py-2"
-                onClick={onCloseRoomClick}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="lucide lucide-x-circle"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="m15 9-6 6" />
-                  <path d="m9 9 6 6" />
-                </svg>
-                Close Room
-              </Button>
+            <Button
+              onClick={onCloseRoomClick}
+              className="bg-[#E74C3C] hover:bg-[#E74C3C]/90 text-white h-8 px-3"
+              size="sm"
+            >
+              Close Room
+            </Button>
+          )}
+          {connectionStatus && (
+            <div className="flex items-center ml-2">
+              <div
+                className={`w-2 h-2 rounded-full mr-1 ${
+                  connectionStatus === "connected"
+                    ? "bg-green-500"
+                    : connectionStatus === "connecting"
+                      ? "bg-yellow-500 animate-pulse"
+                      : "bg-red-500"
+                }`}
+              />
+              <span className="text-xs text-gray-400">
+                {connectionStatus === "connected"
+                  ? "Connected"
+                  : connectionStatus === "connecting"
+                    ? "Connecting..."
+                    : "Disconnected"}
+              </span>
             </div>
           )}
         </div>

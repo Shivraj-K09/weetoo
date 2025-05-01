@@ -21,6 +21,7 @@ import { ChatPanel } from "@/components/room/chat-panel";
 import { TradingChart } from "@/components/room/trading-chart";
 import { TradingTabsBottom } from "@/components/room/trading-tabs-bottom";
 import { RoomSkeleton } from "../room/room-skeleton";
+import { usePersistentConnection } from "@/hooks/use-persistent-connection";
 
 // Add error boundary and fallback UI
 export default function VoiceRoomPage({ roomData }: { roomData: any }) {
@@ -28,12 +29,15 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
   const router = useRouter();
   const roomNameParam = params.roomName as string;
   const authCheckedRef = useRef(false);
+  const connectionAttemptsRef = useRef(0);
+  const maxConnectionAttempts = 3;
 
   // Add state for warning dialog
   const [showWarning, setShowWarning] = useState(false);
   const [showCloseRoomDialog, setShowCloseRoomDialog] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadTimeout, setLoadTimeout] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Extract room ID from the URL - properly handle UUID format
   // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
@@ -62,7 +66,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (isLoading || authLoading) {
-        console.error("Loading timeout reached");
+        console.error("[VOICE ROOM] Loading timeout reached");
         setLoadTimeout(true);
       }
     }, 20000); // 20 seconds timeout
@@ -70,19 +74,92 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
     return () => clearTimeout(timeoutId);
   }, [isLoading, authLoading]);
 
+  // Function to retry authentication
+  const retryAuth = useCallback(async () => {
+    try {
+      setRetryCount((prev) => prev + 1);
+      setLoadTimeout(false);
+      setLoadError(null);
+      setAuthLoading(true);
+
+      console.log(
+        `[VOICE ROOM] Retrying authentication (attempt ${retryCount + 1})`
+      );
+
+      // Force reset Supabase connections
+      supabase.removeAllChannels();
+
+      // Force refresh the auth session
+      await supabase.auth.refreshSession();
+
+      // Reconnect to Supabase
+      supabase.channel("system:reconnect").subscribe();
+
+      // Get the current session
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+
+      if (!session) {
+        throw new Error("No session found after refresh");
+      }
+
+      // Fetch user data
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, first_name, last_name, email, avatar_url, kor_coins")
+        .eq("id", session.user.id)
+        .single();
+
+      if (userError) {
+        throw new Error(`User data error: ${userError.message}`);
+      }
+
+      console.log("[VOICE ROOM] Auth retry successful, user:", userData.id);
+      setUser(userData);
+      setAuthLoading(false);
+
+      // Reload the page if we're on the third retry
+      if (retryCount >= 2) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("[VOICE ROOM] Auth retry failed:", error);
+      setAuthLoading(false);
+      setLoadError(
+        `Authentication failed. Please try refreshing the page. (Error: ${error instanceof Error ? error.message : "Unknown error"})`
+      );
+    }
+  }, [retryCount]);
+
   // Check if user is logged in
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setAuthLoading(true);
-        console.log("[AUTH] Checking authentication status...");
+        console.log("[VOICE ROOM] Checking authentication status...");
+
+        // Force refresh the auth session
+        await supabase.auth.refreshSession();
 
         const {
           data: { session },
+          error: sessionError,
         } = await supabase.auth.getSession();
 
+        if (sessionError) {
+          console.error("[VOICE ROOM] Session error:", sessionError);
+          setLoadError("Authentication error. Please try refreshing the page.");
+          return;
+        }
+
         if (session) {
-          console.log("[AUTH] Session found, fetching user data...");
+          console.log("[VOICE ROOM] Session found, fetching user data...");
 
           // Fetch user data
           const { data: userData, error } = await supabase
@@ -92,32 +169,40 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
             .single();
 
           if (error) {
-            console.error("[AUTH] Error fetching user data:", error);
+            console.error("[VOICE ROOM] Error fetching user data:", error);
             setLoadError(
               "Failed to load user data. Please try refreshing the page."
             );
             return;
           }
 
-          console.log("[AUTH] User data fetched successfully:", userData.id);
+          console.log(
+            "[VOICE ROOM] User data fetched successfully:",
+            userData.id
+          );
           setUser(userData);
 
           // If we're in a voice room and this user is the owner, ensure they're added as a participant
           if (roomData && userData.id === roomData.owner_id) {
             console.log(
-              "[AUTH] User is room owner, ensuring they're in participants list"
+              "[VOICE ROOM] User is room owner, ensuring they're in participants list"
             );
 
             // Check if user is already in participants
-            const { data: roomCheck } = await supabase
+            const { data: roomCheck, error: roomError } = await supabase
               .from("trading_rooms")
               .select("participants")
               .eq("id", roomId)
               .single();
 
-            if (roomCheck && Array.isArray(roomCheck.participants)) {
+            if (roomError) {
+              console.error(
+                "[VOICE ROOM] Error checking room participants:",
+                roomError
+              );
+            } else if (roomCheck && Array.isArray(roomCheck.participants)) {
               if (!roomCheck.participants.includes(userData.id)) {
-                console.log("[AUTH] Adding owner to participants list");
+                console.log("[VOICE ROOM] Adding owner to participants list");
 
                 // Add user to participants if not already there
                 const updatedParticipants = [
@@ -132,11 +217,11 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
             }
           }
         } else {
-          console.log("[AUTH] No session found");
+          console.log("[VOICE ROOM] No session found");
           setLoadError("You must be logged in to access this room.");
         }
       } catch (error) {
-        console.error("[AUTH] Error checking auth:", error);
+        console.error("[VOICE ROOM] Error checking auth:", error);
         setLoadError("Authentication error. Please try refreshing the page.");
       } finally {
         setAuthLoading(false);
@@ -149,7 +234,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("[AUTH] Auth state changed:", event);
+        console.log("[VOICE ROOM] Auth state changed:", event);
 
         if (event === "SIGNED_IN" && session) {
           // Fetch user data on sign in
@@ -160,7 +245,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
             .single();
 
           if (!error && userData) {
-            console.log("[AUTH] User data updated after auth change");
+            console.log("[VOICE ROOM] User data updated after auth change");
             setUser(userData);
           }
         } else if (event === "SIGNED_OUT") {
@@ -177,10 +262,13 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
   const currentUserId = user?.id;
 
   // Add cleanup code to the useEffect that sets up subscriptions
+  const { connectionStatus, isConnected, isConnecting } =
+    usePersistentConnection("voice-room", roomId);
+
   useEffect(() => {
     // Set up real-time subscription for room updates
     const roomSubscription = supabase
-      .channel(`room:${roomId}`)
+      .channel(`voice-room:${roomId}`)
       .on(
         "postgres_changes",
         {
@@ -190,16 +278,68 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
           filter: `id=eq.${roomId}`,
         },
         async (payload) => {
-          console.log("Received room update:", payload);
-          // Refresh the room details and participants
-          fetchParticipants();
+          console.log("[VOICE ROOM] Received room update:", payload);
+          // No need to manually call fetchParticipants as the hook will handle this
+          // when roomDetails is updated
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(
+          `[VOICE ROOM] Subscription status for voice-room:${roomId}:`,
+          status
+        );
+
+        // If subscription fails, increment connection attempts
+        if (status === "SUBSCRIBED") {
+          connectionAttemptsRef.current = 0;
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          connectionAttemptsRef.current += 1;
+
+          // If we've tried too many times, show an error
+          if (connectionAttemptsRef.current >= maxConnectionAttempts) {
+            console.error(
+              `[VOICE ROOM] Failed to connect after ${maxConnectionAttempts} attempts`
+            );
+            setLoadError(
+              "Failed to establish a real-time connection. Please refresh the page."
+            );
+          } else {
+            // Try to reconnect
+            console.log(
+              `[VOICE ROOM] Reconnecting (attempt ${connectionAttemptsRef.current})...`
+            );
+            supabase.removeChannel(roomSubscription);
+
+            // Small delay before reconnecting
+            setTimeout(() => {
+              supabase
+                .channel(
+                  `voice-room:${roomId}-retry-${connectionAttemptsRef.current}`
+                )
+                .on(
+                  "postgres_changes",
+                  {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "trading_rooms",
+                    filter: `id=eq.${roomId}`,
+                  },
+                  async (payload) => {
+                    console.log(
+                      "[VOICE ROOM] Received room update (retry):",
+                      payload
+                    );
+                  }
+                )
+                .subscribe();
+            }, 1000);
+          }
+        }
+      });
 
     // Add window unload event listener for better cleanup
     const handleUnload = () => {
-      console.log("Window unloading, cleaning up subscriptions");
+      console.log("[VOICE ROOM] Window unloading, cleaning up subscriptions");
       supabase.removeChannel(roomSubscription);
       // Remove any other active channels
       supabase.removeAllChannels();
@@ -208,7 +348,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
     window.addEventListener("beforeunload", handleUnload);
 
     return () => {
-      console.log("Cleaning up room subscriptions");
+      console.log("[VOICE ROOM] Cleaning up room subscriptions");
       window.removeEventListener("beforeunload", handleUnload);
       supabase.removeChannel(roomSubscription);
     };
@@ -296,13 +436,19 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
   // Show error UI if timeout or error occurred
   if (loadTimeout) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#212631]">
+      <div className="h-full flex flex-col items-center justify-center">
         <p className="text-white mb-4">Loading timeout reached</p>
         <p className="text-white/70 mb-6 max-w-md text-center">
           The room is taking too long to load. This might be due to connection
           issues or server problems.
         </p>
         <div className="flex gap-4">
+          <Button
+            onClick={retryAuth}
+            className="bg-[#E74C3C] hover:bg-[#E74C3C]/90"
+          >
+            Retry Connection
+          </Button>
           <Button
             onClick={() => window.location.reload()}
             className="bg-[#E74C3C] hover:bg-[#E74C3C]/90"
@@ -323,6 +469,12 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
         <p className="text-white mb-4">Error Loading Room</p>
         <p className="text-white/70 mb-6 max-w-md text-center">{loadError}</p>
         <div className="flex gap-4">
+          <Button
+            onClick={retryAuth}
+            className="bg-[#E74C3C] hover:bg-[#E74C3C]/90"
+          >
+            Retry Connection
+          </Button>
           <Button
             onClick={() => window.location.reload()}
             className="bg-[#E74C3C] hover:bg-[#E74C3C]/90"
@@ -356,7 +508,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
 
   const isHost = user?.id === roomDetails?.owner_id;
   console.log(
-    "[RENDER] User ID:",
+    "[VOICE ROOM] User ID:",
     user?.id,
     "Owner ID:",
     roomDetails?.owner_id,

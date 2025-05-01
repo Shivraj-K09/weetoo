@@ -8,7 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronUp, ChevronDown, ZapIcon } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
+import { FundingInfo } from "./funding-info";
+import { formatPrice } from "@/utils/format-utils";
 
 // Define the PriceData interface
 interface PriceData {
@@ -52,9 +54,44 @@ export function PriceInfoBar({
   formatLargeNumber,
   extractCurrencies,
 }: PriceInfoBarProps) {
+  // Format all price values consistently as soon as they're received
+  const formattedCurrentPrice =
+    priceDataLoaded && priceData.currentPrice
+      ? formatPrice(priceData.currentPrice)
+      : "--";
+  const formattedHighPrice =
+    priceDataLoaded && priceData.highPrice
+      ? formatPrice(priceData.highPrice)
+      : "--";
+  const formattedLowPrice =
+    priceDataLoaded && priceData.lowPrice
+      ? formatPrice(priceData.lowPrice)
+      : "--";
+  const formattedQuoteVolume =
+    priceDataLoaded && priceData.quoteVolume
+      ? formatLargeNumber(priceData.quoteVolume)
+      : "--";
+  const formattedVolume =
+    priceDataLoaded && priceData.volume
+      ? formatLargeNumber(priceData.volume)
+      : "--";
+  const formattedOpenInterest =
+    priceDataLoaded && priceData.openInterest
+      ? formatLargeNumber(priceData.openInterest)
+      : "--";
+
+  // Format price change with consistent decimal places
+  const formattedPriceChange = priceDataLoaded
+    ? priceData.priceChange.toFixed(2)
+    : "--";
+  const formattedPriceChangePercent = priceDataLoaded
+    ? priceData.priceChangePercent.toFixed(2)
+    : "--";
+
   return (
     <div className="border w-full border-[#3f445c] text-white rounded p-4 flex items-center bg-[#1a1e27]">
-      <div className="flex flex-col gap-1.5">
+      {/* Symbol selector - fixed width */}
+      <div className="flex flex-col gap-1.5 min-w-[8rem]">
         <Select defaultValue={selectedSymbol} onValueChange={onSymbolChange}>
           <SelectTrigger className="text-white rounded h-7 border-[#494f6b] border min-w-[8rem]">
             <SelectValue placeholder="Select a symbol" className="text-white" />
@@ -71,22 +108,26 @@ export function PriceInfoBar({
           USDT Futures Trading
         </span>
       </div>
+
       <div className="mx-5 h-15">
         <Separator className="w-full bg-[#3f445c]" orientation="vertical" />
       </div>
 
       <div className="flex items-center gap-9.5">
-        <div className="flex items-center gap-1.5 flex-col">
+        {/* Current Price - fixed width */}
+        <div className="flex items-center gap-1.5 flex-col min-w-[7rem]">
           <div
             className={`flex items-center text-sm ${
               priceData.priceDirection === "up"
                 ? "text-green-500"
                 : priceData.priceDirection === "down"
-                ? "text-red-500"
-                : "text-white"
+                  ? "text-red-500"
+                  : "text-white"
             }`}
           >
-            {priceDataLoaded ? priceData.currentPrice : "--"}
+            <span className="min-w-[6rem] text-center">
+              {formattedCurrentPrice}
+            </span>
             {priceData.priceDirection === "up" && (
               <ChevronUp className="ml-1 h-4 w-4" />
             )}
@@ -94,106 +135,76 @@ export function PriceInfoBar({
               <ChevronDown className="ml-1 h-4 w-4" />
             )}
           </div>
-          <span className="text-sm border-b border-dotted text-white/75">
-            ${priceDataLoaded ? priceData.currentPrice : "--"}
+          <span className="text-sm border-b border-dotted text-white/75 min-w-[6rem] text-center">
+            ${formattedCurrentPrice}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* 24h Change - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[8rem]">
           <span className="text-xs text-white/75">변경률(24H)</span>
           <span
-            className={`text-sm ${
-              priceData.priceChange >= 0 ? "text-green-500" : "text-red-500"
-            }`}
+            className={`text-sm min-w-[7rem] text-center ${priceData.priceChange >= 0 ? "text-green-500" : "text-red-500"}`}
           >
             {priceDataLoaded
-              ? `${priceData.priceChange.toFixed(
-                  2
-                )}(${priceData.priceChangePercent.toFixed(2)}%)`
+              ? `${formattedPriceChange}(${formattedPriceChangePercent}%)`
               : "--"}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* 24h High - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[6rem]">
           <span className="text-xs text-white/75">최고가(24H)</span>
-          <span className="text-sm">
-            {priceDataLoaded && priceData.highPrice ? (
-              priceData.highPrice
-            ) : (
-              <span className="text-gray-500">--</span>
-            )}
+          <span className="text-sm min-w-[5rem] text-center">
+            {formattedHighPrice}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* 24h Low - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[6rem]">
           <span className="text-xs text-white/75">최저가(24H)</span>
-          <span className="text-sm">
-            {priceDataLoaded && priceData.lowPrice ? (
-              priceData.lowPrice
-            ) : (
-              <span className="text-gray-500">--</span>
-            )}
+          <span className="text-sm min-w-[5rem] text-center">
+            {formattedLowPrice}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* Turnover - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[8rem]">
           <span className="text-xs text-white/75">
             턴오버(24H/
             {selectedSymbol ? extractCurrencies(selectedSymbol).quote : "USDT"})
           </span>
-          <span className="text-sm">
-            {priceDataLoaded && priceData.quoteVolume ? (
-              formatLargeNumber(priceData.quoteVolume)
-            ) : (
-              <span className="text-gray-500">--</span>
-            )}
+          <span className="text-sm min-w-[7rem] text-center">
+            {formattedQuoteVolume}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* Volume - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[8rem]">
           <span className="text-xs text-white/75">
             거래량(24H/
             {selectedSymbol ? extractCurrencies(selectedSymbol).base : "BTC"})
           </span>
-          <span className="text-sm">
-            {priceDataLoaded && priceData.volume ? (
-              formatLargeNumber(priceData.volume)
-            ) : (
-              <span className="text-gray-500">--</span>
-            )}
+          <span className="text-sm min-w-[7rem] text-center">
+            {formattedVolume}
           </span>
         </div>
-        <div className="flex flex-col items-center gap-1.5">
+
+        {/* Open Interest - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[8rem]">
           <span className="text-xs text-white/75">
             미결제약정(24H/
             {selectedSymbol ? extractCurrencies(selectedSymbol).base : "BTC"})
           </span>
-          <span className="text-sm">
-            {priceDataLoaded && priceData.openInterest ? (
-              formatLargeNumber(priceData.openInterest)
-            ) : (
-              <span className="text-gray-500">--</span>
-            )}
+          <span className="text-sm min-w-[7rem] text-center">
+            {formattedOpenInterest}
           </span>
         </div>
 
-        <div className="flex flex-col items-center gap-1.5">
+        {/* Funding Info - fixed width */}
+        <div className="flex flex-col items-center gap-1.5 min-w-[12rem]">
           <span className="text-xs text-white/75">펀딩율 / 남은시간</span>
-          <div className="flex items-center gap-1">
-            <span
-              className={`text-sm ${
-                fundingData.rate && fundingData.rate > 0
-                  ? "text-green-500"
-                  : fundingData.rate && fundingData.rate < 0
-                  ? "text-red-500"
-                  : "text-orange-500"
-              } flex items-center gap-1.5`}
-            >
-              <ZapIcon className="w-4 h-4" />
-              {fundingData.rate !== null
-                ? `${fundingData.rate.toFixed(4)}%`
-                : "0.0000%"}
-            </span>
-            /
-            <span className="text-sm">
-              {fundingData.countdown || "00:00:00"}
-            </span>
-          </div>
+          <FundingInfo symbol={selectedSymbol} />
         </div>
       </div>
     </div>

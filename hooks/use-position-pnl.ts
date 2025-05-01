@@ -1,15 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-
-interface Position {
-  id: string;
-  direction: "buy" | "sell";
-  entry_price: number;
-  position_size: number;
-  leverage: number;
-  entry_amount: number;
-}
+import { useState, useEffect, useRef, useMemo } from "react";
+import type { Position } from "@/types";
 
 interface PnLData {
   currentPnL: number;
@@ -17,17 +9,31 @@ interface PnLData {
   liquidationPrice: number;
 }
 
-interface PositionPnLMap {
-  [positionId: string]: {
-    pnl: number;
-    pnlPercentage: number;
-  };
+export interface PositionPnL {
+  pnl: number;
+  pnlPercentage: number;
 }
+
+export interface PositionPnLMap {
+  [positionId: string]: PositionPnL;
+}
+
+// Create a type that only requires the properties we actually use
+type MinimalPosition = Pick<
+  Position,
+  | "id"
+  | "direction"
+  | "entry_price"
+  | "position_size"
+  | "leverage"
+  | "entry_amount"
+  | "symbol"
+>;
 
 // For a single position
 export function usePositionPnL(
-  position: Position | null,
-  currentPrice: number
+  position: Position | MinimalPosition | null,
+  currentPrice: number | Record<string, number>
 ): PnLData {
   const [pnlData, setPnlData] = useState<PnLData>({
     currentPnL: 0,
@@ -36,15 +42,14 @@ export function usePositionPnL(
   });
 
   // Use a ref to track the previous values to avoid unnecessary updates
-  const prevPositionRef = useRef<Position | null>(null);
-  const prevPriceRef = useRef<number>(0);
+  const prevPositionRef = useRef<Position | MinimalPosition | null>(null);
+  const prevPriceRef = useRef<number | Record<string, number>>(0);
 
   useEffect(() => {
     // Skip calculation if inputs haven't changed
     if (
       !position ||
       !currentPrice ||
-      currentPrice === 0 ||
       (prevPositionRef.current === position &&
         prevPriceRef.current === currentPrice)
     ) {
@@ -55,6 +60,22 @@ export function usePositionPnL(
     prevPositionRef.current = position;
     prevPriceRef.current = currentPrice;
 
+    // Get the actual price to use
+    let priceToUse: number;
+
+    if (typeof currentPrice === "number") {
+      priceToUse = currentPrice;
+    } else {
+      // If it's a record, try to get the price for the position's symbol
+      // Default to the first price in the record if symbol not found
+      priceToUse =
+        position.symbol && currentPrice[position.symbol]
+          ? currentPrice[position.symbol]
+          : Object.values(currentPrice)[0] || 0;
+    }
+
+    if (priceToUse === 0) return;
+
     // Calculate P&L
     let currentPnL = 0;
     let pnlPercentage = 0;
@@ -64,7 +85,7 @@ export function usePositionPnL(
     if (position.direction === "buy") {
       // For long positions: (current_price - entry_price) / entry_price * position_size
       currentPnL =
-        ((currentPrice - position.entry_price) / position.entry_price) *
+        ((priceToUse - position.entry_price) / position.entry_price) *
         position.position_size;
 
       // Calculate liquidation price (simplified)
@@ -75,7 +96,7 @@ export function usePositionPnL(
     } else {
       // For short positions: (entry_price - current_price) / entry_price * position_size
       currentPnL =
-        ((position.entry_price - currentPrice) / position.entry_price) *
+        ((position.entry_price - priceToUse) / position.entry_price) *
         position.position_size;
 
       // Calculate liquidation price (simplified)
@@ -98,109 +119,115 @@ export function usePositionPnL(
 }
 
 // For multiple positions
-export function usePositionsPnL(positions: Position[], currentPrice: number) {
+export function usePositionsPnL(
+  positions: (Position | MinimalPosition)[],
+  currentPrice: number | Record<string, number>
+) {
   const [positionsPnL, setPositionsPnL] = useState<PositionPnLMap>({});
+  const [totalPnL, setTotalPnL] = useState(0);
 
-  // Use refs to track previous values and prevent unnecessary updates
-  const positionsRef = useRef<Position[]>([]);
-  const priceRef = useRef<number>(0);
-  const calculatedRef = useRef<boolean>(false);
+  // Memoize the positions array to prevent unnecessary recalculations
+  const memoizedPositions = useMemo(
+    () => positions,
+    [JSON.stringify(positions)]
+  );
+
+  // Memoize the current price to prevent unnecessary recalculations
+  const memoizedPrice = useMemo(() => {
+    if (typeof currentPrice === "number") {
+      return currentPrice;
+    }
+    return { ...currentPrice };
+  }, [
+    typeof currentPrice === "number"
+      ? currentPrice
+      : JSON.stringify(currentPrice),
+  ]);
+
+  // Use a ref to track if we've already calculated for these inputs
+  const calculatedRef = useRef(false);
+  const positionsRef = useRef<(Position | MinimalPosition)[]>([]);
+  const priceRef = useRef<number | Record<string, number>>(0);
 
   useEffect(() => {
-    // Skip if we don't have valid inputs or if they haven't changed
+    // Skip if no positions or no price
     if (
-      !positions.length ||
-      !currentPrice ||
-      currentPrice === 0 ||
-      (calculatedRef.current &&
-        priceRef.current === currentPrice &&
-        positionsAreEqual(positionsRef.current, positions))
+      !memoizedPositions ||
+      memoizedPositions.length === 0 ||
+      !memoizedPrice
     ) {
+      setPositionsPnL({});
+      setTotalPnL(0);
+      calculatedRef.current = true;
       return;
     }
 
-    // Update refs with current values
-    positionsRef.current = [...positions];
-    priceRef.current = currentPrice;
+    // Skip if we've already calculated for these exact inputs
+    const positionsEqual =
+      JSON.stringify(positionsRef.current) ===
+      JSON.stringify(memoizedPositions);
+    const priceEqual =
+      JSON.stringify(priceRef.current) === JSON.stringify(memoizedPrice);
+
+    if (calculatedRef.current && positionsEqual && priceEqual) {
+      return;
+    }
+
+    // Update refs
+    positionsRef.current = [...memoizedPositions];
+    priceRef.current =
+      typeof memoizedPrice === "number" ? memoizedPrice : { ...memoizedPrice };
     calculatedRef.current = true;
 
-    // Create a new PnL data object
-    const newPnLData: PositionPnLMap = {};
+    // Now calculate PnL
+    const pnlMap: PositionPnLMap = {};
+    let totalPnlValue = 0;
 
-    // Calculate PnL for each position
-    positions.forEach((position) => {
+    memoizedPositions.forEach((position) => {
+      // Get the actual price to use
+      let priceToUse: number;
+
+      if (typeof memoizedPrice === "number") {
+        priceToUse = memoizedPrice;
+      } else {
+        // If it's a record, try to get the price for the position's symbol
+        // Default to the first price in the record if symbol not found
+        priceToUse =
+          position.symbol && memoizedPrice[position.symbol]
+            ? memoizedPrice[position.symbol]
+            : Object.values(memoizedPrice)[0] || 0;
+      }
+
+      if (priceToUse === 0) return;
+
       let pnl = 0;
       let pnlPercentage = 0;
 
-      // Calculate P&L based on direction
       if (position.direction === "buy") {
-        // For long positions: (current_price - entry_price) / entry_price * position_size
+        // Long position: profit when price goes up
         pnl =
-          ((currentPrice - position.entry_price) / position.entry_price) *
-          position.position_size;
+          (priceToUse - position.entry_price) *
+          (position.position_size / position.entry_price);
       } else {
-        // For short positions: (entry_price - current_price) / entry_price * position_size
+        // Short position: profit when price goes down
         pnl =
-          ((position.entry_price - currentPrice) / position.entry_price) *
-          position.position_size;
+          (position.entry_price - priceToUse) *
+          (position.position_size / position.entry_price);
       }
 
-      // Calculate P&L percentage relative to the entry amount
+      // Calculate PnL percentage
       pnlPercentage = (pnl / position.entry_amount) * 100;
 
-      newPnLData[position.id] = { pnl, pnlPercentage };
+      // Ensure we always have a valid percentage value, even if it's zero
+      pnlPercentage = isNaN(pnlPercentage) ? 0 : pnlPercentage;
+
+      pnlMap[position.id] = { pnl, pnlPercentage };
+      totalPnlValue += pnl;
     });
 
-    // Only update state if the values have actually changed
-    if (!areEqual(positionsPnL, newPnLData)) {
-      setPositionsPnL(newPnLData);
-    }
-  }, [positions, currentPrice, positionsPnL]);
+    setPositionsPnL(pnlMap);
+    setTotalPnL(totalPnlValue);
+  }, [memoizedPositions, memoizedPrice]);
 
-  return { positionsPnL };
-}
-
-// Helper function to check if two position arrays are equal
-function positionsAreEqual(
-  prevPositions: Position[],
-  currentPositions: Position[]
-): boolean {
-  if (prevPositions.length !== currentPositions.length) {
-    return false;
-  }
-
-  // Create a map of position IDs for faster lookup
-  const prevMap = new Map(prevPositions.map((p) => [p.id, p]));
-
-  // Check if all current positions exist in previous positions with same values
-  return currentPositions.every((curr) => {
-    const prev = prevMap.get(curr.id);
-    if (!prev) return false;
-
-    return (
-      prev.direction === curr.direction &&
-      prev.entry_price === curr.entry_price &&
-      prev.position_size === curr.position_size &&
-      prev.leverage === curr.leverage &&
-      prev.entry_amount === curr.entry_amount
-    );
-  });
-}
-
-// Helper function to check if two PnL data objects are equal
-function areEqual(obj1: PositionPnLMap, obj2: PositionPnLMap): boolean {
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-
-  if (keys1.length !== keys2.length) {
-    return false;
-  }
-
-  return keys1.every((key) => {
-    if (!obj2[key]) return false;
-    return (
-      Math.abs(obj1[key].pnl - obj2[key].pnl) < 0.0001 &&
-      Math.abs(obj1[key].pnlPercentage - obj2[key].pnlPercentage) < 0.0001
-    );
-  });
+  return { positionsPnL, totalPnL };
 }

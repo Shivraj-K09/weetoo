@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase/client";
 
 // Helper function to extract UUID from a string
 function extractUUID(str: string): string | null {
@@ -18,8 +18,13 @@ export function useRealTimeCurrency(roomId: string) {
   const [virtualCurrency, setVirtualCurrency] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const subscriptionsRef = useRef<any[]>([]);
 
   useEffect(() => {
+    // Set mounted flag
+    mountedRef.current = true;
+
     if (!roomId) {
       setVirtualCurrency(0);
       setIsLoading(false);
@@ -33,12 +38,6 @@ export function useRealTimeCurrency(roomId: string) {
     // Extract the UUID part from the roomId
     const extractedUUID = extractUUID(roomId) || roomId;
     console.log("[useRealTimeCurrency] Extracted UUID:", extractedUUID);
-
-    // Create Supabase client
-    const supabase = createClient();
-
-    // Track if component is mounted
-    let isMounted = true;
 
     // Fetch virtual currency with retry logic
     const fetchVirtualCurrency = async (retryCount = 0) => {
@@ -62,14 +61,14 @@ export function useRealTimeCurrency(roomId: string) {
           );
 
           // Retry logic for transient errors
-          if (retryCount < 3 && isMounted) {
+          if (retryCount < 3 && mountedRef.current) {
             const delay = Math.pow(2, retryCount) * 1000;
             console.log(`[useRealTimeCurrency] Retrying in ${delay}ms...`);
             setTimeout(() => fetchVirtualCurrency(retryCount + 1), delay);
             return;
           }
 
-          if (isMounted) {
+          if (mountedRef.current) {
             setError(roomError.message);
             setIsLoading(false);
           }
@@ -80,13 +79,13 @@ export function useRealTimeCurrency(roomId: string) {
           "[useRealTimeCurrency] Virtual currency loaded:",
           room?.virtual_currency || 0
         );
-        if (isMounted) {
+        if (mountedRef.current) {
           setVirtualCurrency(room?.virtual_currency || 0);
           setIsLoading(false);
         }
       } catch (err) {
         console.error("[useRealTimeCurrency] Unexpected error:", err);
-        if (isMounted) {
+        if (mountedRef.current) {
           setError("Failed to load virtual currency");
           setIsLoading(false);
         }
@@ -113,7 +112,10 @@ export function useRealTimeCurrency(roomId: string) {
             payload.new.virtual_currency
           );
 
-          if (isMounted && payload.new.virtual_currency !== undefined) {
+          if (
+            mountedRef.current &&
+            payload.new.virtual_currency !== undefined
+          ) {
             setVirtualCurrency(payload.new.virtual_currency || 0);
           }
         }
@@ -122,27 +124,43 @@ export function useRealTimeCurrency(roomId: string) {
         console.log("[useRealTimeCurrency] Room subscription status:", status);
       });
 
+    subscriptionsRef.current.push(roomSubscription);
+
     // Set up real-time subscription for trading_positions table to update currency when positions change
     const positionsSubscription = supabase
       .channel("positions_for_currency")
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*", // Listen for all events (INSERT, UPDATE, DELETE)
           schema: "public",
           table: "trading_positions",
           filter: `room_id=eq.${extractedUUID}`,
         },
         (payload) => {
-          // If a position is closed, refresh the virtual currency
-          if (
-            payload.old.status === "open" &&
-            payload.new.status === "closed"
-          ) {
+          console.log(
+            "[useRealTimeCurrency] Position change detected:",
+            payload.eventType
+          );
+
+          // Refresh currency on any position change
+          if (payload.eventType === "INSERT") {
             console.log(
-              "[useRealTimeCurrency] Position closed, refreshing currency"
+              "[useRealTimeCurrency] New position created, refreshing currency"
             );
             fetchVirtualCurrency();
+          } else if (payload.eventType === "UPDATE") {
+            // If a position is closed or partially closed, refresh the virtual currency
+            if (
+              payload.old.status === "open" &&
+              (payload.new.status === "closed" ||
+                payload.new.status === "partially_closed")
+            ) {
+              console.log(
+                "[useRealTimeCurrency] Position closed/partially closed, refreshing currency"
+              );
+              fetchVirtualCurrency();
+            }
           }
         }
       )
@@ -153,12 +171,88 @@ export function useRealTimeCurrency(roomId: string) {
         );
       });
 
+    subscriptionsRef.current.push(positionsSubscription);
+
+    // Set up real-time subscription for trade_history table to update currency when trades are recorded
+    const tradeHistorySubscription = supabase
+      .channel("trade_history_for_currency")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "trade_history",
+          filter: `room_id=eq.${extractedUUID}`,
+        },
+        () => {
+          console.log(
+            "[useRealTimeCurrency] New trade history entry, refreshing currency"
+          );
+          fetchVirtualCurrency();
+        }
+      )
+      .subscribe((status) => {
+        console.log(
+          "[useRealTimeCurrency] Trade history subscription status:",
+          status
+        );
+      });
+
+    subscriptionsRef.current.push(tradeHistorySubscription);
+
+    // Listen for position closed events
+    const handlePositionClosed = () => {
+      console.log(
+        "[useRealTimeCurrency] Position closed event received, refreshing currency"
+      );
+      fetchVirtualCurrency();
+    };
+
+    window.addEventListener("position-closed", handlePositionClosed);
+
+    // Listen for virtual currency update events
+    const handleVirtualCurrencyUpdate = (event: any) => {
+      if (event.detail?.roomId === roomId) {
+        console.log(
+          "[useRealTimeCurrency] Virtual currency update event received, refreshing currency"
+        );
+        fetchVirtualCurrency();
+      }
+    };
+
+    window.addEventListener(
+      "virtual-currency-update",
+      handleVirtualCurrencyUpdate
+    );
+
+    // Listen for tab visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log(
+          "[useRealTimeCurrency] Tab became visible, refreshing currency"
+        );
+        fetchVirtualCurrency();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     // Cleanup subscriptions on unmount
     return () => {
       console.log("[useRealTimeCurrency] Cleaning up subscriptions");
-      isMounted = false;
-      roomSubscription.unsubscribe();
-      positionsSubscription.unsubscribe();
+      mountedRef.current = false;
+
+      // Unsubscribe from all subscriptions
+      subscriptionsRef.current.forEach((subscription) => {
+        subscription.unsubscribe();
+      });
+
+      window.removeEventListener("position-closed", handlePositionClosed);
+      window.removeEventListener(
+        "virtual-currency-update",
+        handleVirtualCurrencyUpdate
+      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [roomId]);
 
