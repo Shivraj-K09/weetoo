@@ -7,10 +7,10 @@ export async function deleteRoom(roomId: string) {
   try {
     const supabase = await createClient();
 
-    // First, get the room details and current virtual currency balance
+    // First, get the room details
     const { data: roomData, error: roomError } = await supabase
       .from("trading_rooms")
-      .select("*, virtual_currency(balance)")
+      .select("*")
       .eq("id", roomId)
       .single();
 
@@ -19,8 +19,21 @@ export async function deleteRoom(roomId: string) {
       return { success: false, error: roomError.message };
     }
 
+    // Get the virtual currency balance using the RPC function
+    const { data: balanceData, error: balanceError } = await supabase.rpc(
+      "get_room_virtual_currency",
+      {
+        room_id: roomId,
+      }
+    );
+
+    if (balanceError) {
+      console.error("Error fetching virtual currency balance:", balanceError);
+      return { success: false, error: balanceError.message };
+    }
+
     // Calculate final balance from virtual currency
-    const finalBalance = roomData.virtual_currency?.balance || 0;
+    const finalBalance = balanceData || 0;
     const initialBalance = 10000; // Default initial balance
 
     // Calculate profit rate for this room

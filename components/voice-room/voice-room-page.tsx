@@ -22,6 +22,7 @@ import { TradingChart } from "@/components/room/trading-chart";
 import { TradingTabsBottom } from "@/components/room/trading-tabs-bottom";
 import { RoomSkeleton } from "../room/room-skeleton";
 import { usePersistentConnection } from "@/hooks/use-persistent-connection";
+import { VoiceChannel } from "./voice-room-channel";
 
 // Add error boundary and fallback UI
 export default function VoiceRoomPage({ roomData }: { roomData: any }) {
@@ -539,7 +540,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
       <div className="p-4 w-full flex gap-1.5 bg-[#181a20]">
         <div className="h-full text-white rounded-md shadow-sm flex-1 w-full">
           <div className="flex flex-col gap-1.5">
-            {/* Room Header - This includes the voice channel for voice rooms */}
+            {/* Room Header */}
             <RoomHeader
               roomDetails={roomDetails}
               ownerName={ownerName}
@@ -547,6 +548,17 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
               user={user}
               onCloseRoomClick={handleCloseRoomClick}
             />
+
+            {/* Voice Channel - Moved here from room-header.tsx */}
+            {roomDetails.room_category === "voice" && (
+              <div className="bg-[#212631] rounded-md p-3 border border-[#3f445c]">
+                <VoiceChannel
+                  roomId={roomDetails.id}
+                  isOwner={isHost}
+                  ownerId={roomDetails.owner_id}
+                />
+              </div>
+            )}
 
             {/* Price Info Bar */}
             <div className="bg-[#212631] rounded-md w-full">

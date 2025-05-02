@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 // Define privacy type as a union type for better type safety
 type Privacy = "private" | "public";
+type RoomCategory = "regular" | "voice";
 
 // Define the room details type
 interface RoomData {
@@ -18,6 +19,7 @@ interface RoomData {
   max_participants: number;
   owner_id: string;
   participants: string[];
+  room_category: RoomCategory;
   created_at: string;
 }
 
