@@ -803,3 +803,83 @@ export async function partialClosePosition({
     return { success: false, message: "An unexpected error occurred" };
   }
 }
+
+// Get room balance details including locked margin and available balance
+export async function getRoomBalanceDetails(roomId: string) {
+  try {
+    const supabase = await createClient();
+
+    // Check if user is authenticated
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return {
+        success: false,
+        message: "Not authenticated",
+        balance: null,
+      };
+    }
+
+    // Get room balance details from the view
+    const { data: balanceData, error: balanceError } = await supabase
+      .from("room_balance_view")
+      .select("*")
+      .eq("id", roomId)
+      .single();
+
+    if (balanceError) {
+      console.error(
+        "[getRoomBalanceDetails] Error getting room balance:",
+        balanceError
+      );
+      return {
+        success: false,
+        message: balanceError.message,
+        balance: null,
+      };
+    }
+
+    // Calculate unrealized PnL from open positions
+    const { data: positions, error: positionsError } = await supabase
+      .from("trading_positions")
+      .select("current_pnl")
+      .eq("room_id", roomId)
+      .eq("status", "open");
+
+    if (positionsError) {
+      console.error(
+        "[getRoomBalanceDetails] Error getting positions:",
+        positionsError
+      );
+    }
+
+    // Sum up unrealized PnL
+    const unrealizedPnl =
+      positions?.reduce(
+        (sum, position) => sum + (position.current_pnl || 0),
+        0
+      ) || 0;
+
+    // Return the balance details
+    return {
+      success: true,
+      message: "Room balance details retrieved successfully",
+      balance: {
+        holdings: balanceData.virtual_currency,
+        lockedMargin: balanceData.locked_margin || 0,
+        available: balanceData.available_balance || 0,
+        unrealizedPnl: unrealizedPnl,
+        valuation: (balanceData.virtual_currency || 0) + unrealizedPnl,
+      },
+    };
+  } catch (error) {
+    console.error("[getRoomBalanceDetails] Unexpected error:", error);
+    return {
+      success: false,
+      message: "An unexpected error occurred",
+      balance: null,
+    };
+  }
+}

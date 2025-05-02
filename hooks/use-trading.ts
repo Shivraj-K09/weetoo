@@ -11,74 +11,7 @@ import {
   updatePositionPrice,
 } from "@/app/actions/trading-actions";
 import { useVirtualCurrency } from "./use-virtual-currency";
-
-interface Position {
-  id: string;
-  room_id: string;
-  user_id: string;
-  symbol: string;
-  direction: "buy" | "sell";
-  entry_price: number;
-  entry_amount: number;
-  leverage: number;
-  position_size: number;
-  current_price: number;
-  current_pnl: number;
-  pnl_percentage: number;
-  stop_loss?: number;
-  take_profit?: number;
-  status: "open" | "closed" | "partially_closed";
-  created_at: string;
-  updated_at: string;
-}
-
-interface TradeHistory {
-  id: string;
-  position_id: string;
-  room_id: string;
-  user_id: string;
-  symbol: string;
-  direction: "buy" | "sell";
-  entry_price: number;
-  exit_price: number;
-  entry_amount: number;
-  leverage: number;
-  position_size: number;
-  trade_volume: number;
-  pnl: number;
-  pnl_percentage: number;
-  entry_time: string;
-  exit_time: string;
-  created_at: string;
-}
-
-interface UseTrading {
-  isLoading: boolean;
-  positions: Position[];
-  tradeHistory: TradeHistory[];
-  executeTrade: (params: {
-    roomId: string;
-    symbol: string;
-    direction: "buy" | "sell";
-    entryAmount: number;
-    leverage: number;
-    entryPrice: number;
-    stopLoss?: number;
-    takeProfit?: number;
-  }) => Promise<{ success: boolean; message: string; positionId?: string }>;
-  closePosition: (params: {
-    positionId: string;
-    exitPrice: number;
-  }) => Promise<{
-    success: boolean;
-    message: string;
-    pnl?: number;
-    pnlPercentage?: number;
-  }>;
-  refreshPositions: () => Promise<void>;
-  refreshTradeHistory: () => Promise<void>;
-  updatePositionPrices: (currentPrice: number) => Promise<void>;
-}
+import type { Position, TradeHistory } from "@/types";
 
 // Helper function to validate UUID
 function isValidUUID(uuid: string): boolean {
@@ -88,7 +21,7 @@ function isValidUUID(uuid: string): boolean {
   return uuidRegex.test(uuid);
 }
 
-export function useTrading(roomId: string, isOwner = false): UseTrading {
+export function useTrading(roomId: string, isOwner = false) {
   const [isLoading, setIsLoading] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeHistory[]>([]);
@@ -97,6 +30,11 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
     isOwner
   );
   const router = useRouter();
+
+  // Calculate total PnL from all positions
+  const totalPnL = positions.reduce((sum, position) => {
+    return sum + (position.current_pnl || 0);
+  }, 0);
 
   // Validate roomId
   const isValidRoomId = isValidUUID(roomId);
@@ -110,14 +48,18 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
     }
 
     try {
+      setIsLoading(true);
       const result = await getRoomPositions(roomId);
       if (result.success) {
+        console.log("[useTrading] Fetched positions:", result.positions);
         setPositions(result.positions);
       } else {
         console.error("Failed to fetch positions:", result.message);
       }
     } catch (error) {
       console.error("Error fetching positions:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [roomId, isValidRoomId]);
 
@@ -254,6 +196,7 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
           if (isValidRoomId) {
             const result = await getRoomPositions(roomId);
             if (result.success) {
+              console.log("[useTrading] Initial positions:", result.positions);
               setPositions(result.positions);
             } else {
               console.error("Failed to fetch positions:", result.message);
@@ -287,5 +230,6 @@ export function useTrading(roomId: string, isOwner = false): UseTrading {
     refreshPositions,
     refreshTradeHistory,
     updatePositionPrices,
+    totalPnL,
   };
 }

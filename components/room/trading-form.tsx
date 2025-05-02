@@ -13,6 +13,14 @@ import { LeverageDialog } from "./leverage-dialog";
 import { Switch } from "@/components/ui/switch";
 import { executeTrade } from "@/app/actions/trading-actions";
 import { updateVirtualCurrencyDisplay } from "@/utils/update-virtual-currency";
+import { useDetailedBalance } from "@/hooks/use-detailed-balance";
+import { InfoIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Helper function to extract UUID from a string
 function extractUUID(str: string): string | null {
@@ -86,8 +94,17 @@ export const TradingForm = React.memo(function TradingForm({
     isHost
   );
 
+  // Detailed balance hook
+  const { balanceDetails, isLoading: isLoadingBalance } =
+    useDetailedBalance(cleanRoomId);
+
   // Calculate position size
   const positionSize = Number.parseFloat(entryAmount || "0") * leverage;
+
+  // Calculate initial margin (entry amount + fees)
+  const feeRate = orderType === "market" ? 0.0006 : 0.0002;
+  const feeAmount = positionSize * feeRate;
+  const initialMargin = Number.parseFloat(entryAmount || "0") + feeAmount;
 
   // Debug state changes
   useEffect(() => {
@@ -134,7 +151,10 @@ export const TradingForm = React.memo(function TradingForm({
     );
 
     setSelectedPercentage(percentage);
-    const amount = (virtualCurrency * percentage) / 100;
+
+    // Use available balance instead of total holdings for percentage calculation
+    const availableBalance = balanceDetails?.available || virtualCurrency;
+    const amount = (availableBalance * percentage) / 100;
     const formattedAmount = amount.toFixed(2);
     console.log("[DEBUG] Calculated amount:", formattedAmount);
 
@@ -189,8 +209,10 @@ export const TradingForm = React.memo(function TradingForm({
         return;
       }
 
-      if (inputAmount > virtualCurrency) {
-        toast.error("Insufficient virtual currency");
+      // Check against available balance instead of total virtual currency
+      const availableBalance = balanceDetails?.available || virtualCurrency;
+      if (inputAmount > availableBalance) {
+        toast.error("Insufficient available balance");
         return;
       }
 
@@ -418,7 +440,7 @@ export const TradingForm = React.memo(function TradingForm({
               type="number"
               step="0.01"
               min="0"
-              max={virtualCurrency.toString()}
+              max={(balanceDetails?.available || virtualCurrency).toString()}
             />
             <div className="text-xs text-white/75 absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
               USDT
@@ -558,7 +580,9 @@ export const TradingForm = React.memo(function TradingForm({
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">매수수수료</span>
-                <span className="text-xs text-[#00C879]">0.02%</span>
+                <span className="text-xs text-[#00C879]">
+                  {(feeRate * 100).toFixed(2)}%
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">레버리지</span>
@@ -574,9 +598,26 @@ export const TradingForm = React.memo(function TradingForm({
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-white/70">사용 마진</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 cursor-help">
+                        <span className="text-xs text-white/70">초기 마진</span>
+                        <InfoIcon size={12} className="text-white/50" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#1a1e27] border-gray-700 text-white">
+                      <p className="text-xs">
+                        포지션을 열 때 잠기는 금액입니다. 포지션을 닫으면 이
+                        금액이 반환됩니다.
+                        <br />
+                        초기 마진 = 주문수량 + 수수료
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <span className="text-xs text-white">
-                  {entryAmount || "0"} USDT
+                  {initialMargin.toFixed(2)} USDT
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -617,20 +658,35 @@ export const TradingForm = React.memo(function TradingForm({
             <div className="flex justify-between items-center">
               <span className="text-xs text-white/70">평가</span>
               <span className="text-xs text-[#00C879]">
-                {virtualCurrency.toFixed(2)} USDT
+                {(balanceDetails?.valuation || virtualCurrency).toFixed(2)} USDT
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-white/70">보유</span>
               <span className="text-xs text-[#00C879]">
-                {virtualCurrency.toFixed(2)} USDT
+                {(balanceDetails?.holdings || virtualCurrency).toFixed(2)} USDT
               </span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-xs text-white/70">가능</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 cursor-help">
+                      <span className="text-xs text-white/70">가능</span>
+                      <InfoIcon size={12} className="text-white/50" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#1a1e27] border-gray-700 text-white">
+                    <p className="text-xs">
+                      거래에 사용할 수 있는 금액입니다. 총 보유액에서 초기
+                      마진으로 잠긴 금액을 제외한 값입니다.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <span className="text-xs text-[#00C879]">
-                {virtualCurrency.toFixed(2)} USDT
+                {(balanceDetails?.available || virtualCurrency).toFixed(2)} USDT
               </span>
             </div>
           </div>

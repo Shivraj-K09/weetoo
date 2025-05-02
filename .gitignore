@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Mdx
 notes.md
+.md*
+.md/*
+.mdx*
+.mdx/*

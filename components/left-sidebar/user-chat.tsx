@@ -79,6 +79,9 @@ export function UserChat() {
   const userDataRef = useRef<any>(null);
   const messageTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
+  // Add this at the beginning of the UserChat component, right after all the useRef declarations
+  const [hasError, setHasError] = useState(false);
+
   // Set up real-time subscription for new messages
   const setupRealtimeSubscription = useCallback(() => {
     // Clean up existing subscription if any
@@ -155,15 +158,15 @@ export function UserChat() {
             });
           }
         )
-        .subscribe((status) => {
-          console.log("Realtime subscription status:", status);
+        .subscribe((status, err) => {
+          console.log("Realtime subscription status:", status, err);
 
           if (status === "SUBSCRIBED") {
             console.log("Successfully subscribed to messages");
             // Reset retry count on successful subscription
             retryCountRef.current = 0;
           } else if (status === "CHANNEL_ERROR") {
-            console.error("Error subscribing to messages");
+            console.error("Error subscribing to messages:", err);
 
             // Retry logic with exponential backoff
             if (retryCountRef.current < 5) {
@@ -467,6 +470,13 @@ export function UserChat() {
     return () => clearInterval(interval);
   }, [pendingMessages]);
 
+  // Add this function right before the return statement
+  const resetError = () => {
+    setHasError(false);
+    // Attempt to reconnect
+    setupRealtimeSubscription();
+  };
+
   // Fetch initial messages and set up real-time subscription
   useEffect(() => {
     const fetchMessages = async () => {
@@ -544,9 +554,15 @@ export function UserChat() {
         }
 
         // Set up realtime subscription after fetching initial data
-        setupRealtimeSubscription();
+        try {
+          setupRealtimeSubscription();
+        } catch (subError) {
+          console.error("Error setting up realtime subscription:", subError);
+          setHasError(true);
+        }
       } catch (error) {
         console.error("Error in chat initialization:", error);
+        setHasError(true);
       } finally {
         setIsLoading(false);
       }
@@ -723,215 +739,267 @@ export function UserChat() {
   //   setIsOpen(false);
   // };
 
-  return (
-    <section
-      aria-label="Global Chat"
-      className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-border"
-    >
-      {/* Chat header */}
-      <header className="bg-[#c74135] px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-white/20 rounded-full p-1">
-            <Users className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-white">Global Chat</h3>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-              <p className="text-xs text-white/80">
-                Users Online: {onlineUsers.toLocaleString()}
-              </p>
+  // Modify the return statement to include error handling
+  try {
+    return (
+      <section
+        aria-label="Global Chat"
+        className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-border"
+      >
+        {hasError ? (
+          <div className="flex flex-col items-center justify-center h-[400px] p-4 text-center">
+            <div className="mb-4 text-red-500">
+              <X className="h-12 w-12 mx-auto" />
             </div>
+            <h3 className="text-lg font-medium mb-2">Connection Error</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              We're having trouble connecting to the chat service.
+            </p>
+            <button
+              onClick={resetError}
+              className="px-4 py-2 bg-[#c74135] text-white rounded-md flex items-center gap-2 hover:bg-[#b33a2f]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="text-white/80 hover:text-white">
-            <MoreHorizontal className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Chat content */}
-      <div className="relative">
-        {/* Chat messages area */}
-        <div
-          ref={messagesContainerRef}
-          className="h-[400px] overflow-y-auto pb-16 scroll-smooth bg-background"
-        >
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-pulse text-gray-400">
-                Loading messages...
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Messages */}
-              {displayMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`px-4 py-2 ${message.isSystem ? "bg-emerald-600" : ""}`}
-                >
-                  {!message.isSystem ? (
-                    <div className="flex items-start gap-2">
-                      <div className="flex-shrink-0 h-6 w-6 rounded-full overflow-hidden">
-                        {message.avatarUrl ? (
-                          <Image
-                            src={message.avatarUrl || "/placeholder.svg"}
-                            alt={`${message.user}'s avatar`}
-                            width={24}
-                            height={24}
-                            className="h-6 w-6 object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`h-full w-full ${message.color} flex items-center justify-center`}
-                          >
-                            <span className="text-xs font-medium">
-                              {message.avatar}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-xs text-gray-500">
-                            {message.user}
-                          </p>
-                          <span className="text-xs text-gray-400">
-                            {message.time}
-                          </span>
-                        </div>
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-1 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <p className="text-xs">{message.content}</p>
-                        <span className="text-xs opacity-80">
-                          {message.time}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+        ) : (
+          <>
+            {/* Chat header */}
+            <header className="bg-[#c74135] px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-white/20 rounded-full p-1">
+                  <Users className="h-4 w-4 text-white" />
                 </div>
-              ))}
-
-              {/* Pending messages */}
-              {pendingMessages.map((pendingMsg) => (
-                <div key={pendingMsg.id} className="px-4 py-2">
-                  <div className="flex items-start gap-2">
-                    <div className="flex-shrink-0 h-6 w-6 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      <span className="text-xs font-medium text-gray-500">
-                        ...
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p className="text-xs text-gray-400">
-                          {pendingMsg.status === "sending"
-                            ? "Sending..."
-                            : pendingMsg.status === "failed"
-                              ? "Failed to send"
-                              : "Pending..."}
-                        </p>
-                        {pendingMsg.status === "failed" && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => retryMessage(pendingMsg.id)}
-                              className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-0.5"
-                            >
-                              <RefreshCw className="h-3 w-3" /> Retry
-                            </button>
-                            <button
-                              onClick={() => cancelMessage(pendingMsg.id)}
-                              className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
-                            >
-                              <X className="h-3 w-3" /> Cancel
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {pendingMsg.content}
-                      </p>
-                    </div>
+                <div>
+                  <h3 className="text-sm font-medium text-white">
+                    Global Chat
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+                    <p className="text-xs text-white/80">
+                      Users Online: {onlineUsers.toLocaleString()}
+                    </p>
                   </div>
                 </div>
-              ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="text-white/80 hover:text-white">
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+              </div>
+            </header>
 
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </div>
-
-        {/* Input field or login button based on auth state */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white via-white to-transparent pt-8 dark:bg-gradient-to-t dark:from-gray-900 dark:via-gray-900 dark:to-transparent">
-          {isLoggedIn ? (
-            <form
-              onSubmit={handleSendMessage}
-              className="flex items-center gap-2"
-            >
-              <input
-                type="text"
-                placeholder="Type a message..."
-                className="flex-1 rounded-full bg-gray-100 dark:bg-background border dark:border-border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c74135]/20 dark:placeholder:text-white"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                disabled={isSending}
-              />
-
-              <Popover onOpenChange={setIsOpen} open={isOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-[#c74135] p-1.5 rounded-full hover:bg-[#f8e9e8] transition-colors cursor-pointer"
-                    disabled={isSending}
-                  >
-                    <Smile className="h-5 w-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-fit p-0">
-                  <EmojiPicker
-                    className="h-[342px]"
-                    onEmojiSelect={({ emoji }) => {
-                      setMessage((prev) => prev + emoji);
-                      setIsOpen(false);
-                    }}
-                  >
-                    <EmojiPickerSearch />
-                    <EmojiPickerContent />
-                    <EmojiPickerFooter />
-                  </EmojiPicker>
-                </PopoverContent>
-              </Popover>
-
-              <button
-                type="submit"
-                className="p-1.5 rounded-full bg-[#c74135] hover:bg-[#b33a2f] transition-colors cursor-pointer disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                disabled={!message.trim() || isSending}
+            {/* Chat content */}
+            <div className="relative">
+              {/* Chat messages area */}
+              <div
+                ref={messagesContainerRef}
+                className="h-[400px] overflow-y-auto pb-16 scroll-smooth bg-background"
               >
-                {isSending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-pulse text-gray-400">
+                      Loading messages...
+                    </div>
+                  </div>
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <>
+                    {/* Messages */}
+                    {displayMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`px-4 py-2 ${message.isSystem ? "bg-emerald-600" : ""}`}
+                      >
+                        {!message.isSystem ? (
+                          <div className="flex items-start gap-2">
+                            <div className="flex-shrink-0 h-6 w-6 rounded-full overflow-hidden">
+                              {message.avatarUrl ? (
+                                <Image
+                                  src={message.avatarUrl || "/placeholder.svg"}
+                                  alt={`${message.user}'s avatar`}
+                                  width={24}
+                                  height={24}
+                                  className="h-6 w-6 object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className={`h-full w-full ${message.color} flex items-center justify-center`}
+                                >
+                                  <span className="text-xs font-medium">
+                                    {message.avatar}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className="text-xs text-gray-500">
+                                  {message.user}
+                                </p>
+                                <span className="text-xs text-gray-400">
+                                  {message.time}
+                                </span>
+                              </div>
+                              <p className="text-sm">{message.content}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="py-1 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <p className="text-xs">{message.content}</p>
+                              <span className="text-xs opacity-80">
+                                {message.time}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Pending messages */}
+                    {pendingMessages.map((pendingMsg) => (
+                      <div key={pendingMsg.id} className="px-4 py-2">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-shrink-0 h-6 w-6 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                            <span className="text-xs font-medium text-gray-500">
+                              ...
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-xs text-gray-400">
+                                {pendingMsg.status === "sending"
+                                  ? "Sending..."
+                                  : pendingMsg.status === "failed"
+                                    ? "Failed to send"
+                                    : "Pending..."}
+                              </p>
+                              {pendingMsg.status === "failed" && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => retryMessage(pendingMsg.id)}
+                                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-0.5"
+                                  >
+                                    <RefreshCw className="h-3 w-3" /> Retry
+                                  </button>
+                                  <button
+                                    onClick={() => cancelMessage(pendingMsg.id)}
+                                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
+                                  >
+                                    <X className="h-3 w-3" /> Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {pendingMsg.content}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div ref={messagesEndRef} />
+                  </>
                 )}
-              </button>
-            </form>
-          ) : (
-            <button
-              className="w-full bg-[#ffebeb] rounded-full py-3 text-center group hover:bg-[#fde2e2] transition-colors"
-              onClick={() => router.push("/login")}
-            >
-              <span className="text-sm text-[#c74135] flex items-center justify-center gap-1.5">
-                Login to join the conversation
-                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-              </span>
-            </button>
-          )}
+              </div>
+
+              {/* Input field or login button based on auth state */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white via-white to-transparent pt-8 dark:bg-gradient-to-t dark:from-gray-900 dark:via-gray-900 dark:to-transparent">
+                {isLoggedIn ? (
+                  <form
+                    onSubmit={handleSendMessage}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Type a message..."
+                      className="flex-1 rounded-full bg-gray-100 dark:bg-background border dark:border-border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c74135]/20 dark:placeholder:text-white"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      disabled={isSending}
+                    />
+
+                    <Popover onOpenChange={setIsOpen} open={isOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-[#c74135] p-1.5 rounded-full hover:bg-[#f8e9e8] transition-colors cursor-pointer"
+                          disabled={isSending}
+                        >
+                          <Smile className="h-5 w-5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-fit p-0">
+                        <EmojiPicker
+                          className="h-[342px]"
+                          onEmojiSelect={({ emoji }) => {
+                            setMessage((prev) => prev + emoji);
+                            setIsOpen(false);
+                          }}
+                        >
+                          <EmojiPickerSearch />
+                          <EmojiPickerContent />
+                          <EmojiPickerFooter />
+                        </EmojiPicker>
+                      </PopoverContent>
+                    </Popover>
+
+                    <button
+                      type="submit"
+                      className="p-1.5 rounded-full bg-[#c74135] hover:bg-[#b33a2f] transition-colors cursor-pointer disabled:opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      disabled={!message.trim() || isSending}
+                    >
+                      {isSending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    className="w-full bg-[#ffebeb] rounded-full py-3 text-center group hover:bg-[#fde2e2] transition-colors"
+                    onClick={() => router.push("/login")}
+                  >
+                    <span className="text-sm text-[#c74135] flex items-center justify-center gap-1.5">
+                      Login to join the conversation
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    );
+  } catch (error) {
+    console.error("Rendering error in UserChat:", error);
+    setHasError(true);
+    return (
+      <section
+        aria-label="Global Chat"
+        className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-border"
+      >
+        <div className="flex flex-col items-center justify-center h-[400px] p-4 text-center">
+          <div className="mb-4 text-red-500">
+            <X className="h-12 w-12 mx-auto" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">Something went wrong</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            We encountered an error displaying the chat.
+          </p>
+          <button
+            onClick={resetError}
+            className="px-4 py-2 bg-[#c74135] text-white rounded-md flex items-center gap-2 hover:bg-[#b33a2f]"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </button>
         </div>
-      </div>
-    </section>
-  );
+      </section>
+    );
+  }
 }

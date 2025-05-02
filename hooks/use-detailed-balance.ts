@@ -1,86 +1,150 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getDetailedBalance } from "@/app/actions/virtual-currency-actions";
-import { usePositionsPnL } from "./use-position-pnl";
-import type { Position } from "@/types";
+import { useState, useEffect, useCallback } from "react";
+import { getRoomBalanceDetails } from "@/app/actions/trading-actions";
 
-export interface DetailedBalance {
+interface BalanceDetails {
   holdings: number;
-  initialMargin: number;
+  lockedMargin: number;
   available: number;
   unrealizedPnl: number;
   valuation: number;
-  isLoading: boolean;
 }
 
-export function useDetailedBalance(
-  roomId: string,
-  positions: Position[],
-  currentPrice: Record<string, number>
-): DetailedBalance {
-  const [balanceData, setBalanceData] = useState<DetailedBalance>({
-    holdings: 0,
-    initialMargin: 0,
-    available: 0,
-    unrealizedPnl: 0,
-    valuation: 0,
-    isLoading: true,
-  });
+interface UseDetailedBalance {
+  isLoading: boolean;
+  balanceDetails: BalanceDetails;
+  refreshBalance: () => Promise<void>;
+}
 
-  // Get real-time PnL data from positions
-  const { positionsPnL, totalPnL } = usePositionsPnL(positions, currentPrice);
+const defaultBalanceDetails: BalanceDetails = {
+  holdings: 0,
+  lockedMargin: 0,
+  available: 0,
+  unrealizedPnl: 0,
+  valuation: 0,
+};
 
-  // Fetch detailed balance on component mount and when positions change
-  useEffect(() => {
-    if (!roomId) {
-      setBalanceData((prev) => ({ ...prev, isLoading: false }));
-      return;
-    }
+export function useDetailedBalance(roomId: string): UseDetailedBalance {
+  const [isLoading, setIsLoading] = useState(false);
+  const [balanceDetails, setBalanceDetails] = useState<BalanceDetails>(
+    defaultBalanceDetails
+  );
 
-    const fetchDetailedBalance = async () => {
-      try {
-        setBalanceData((prev) => ({ ...prev, isLoading: true }));
-        const result = await getDetailedBalance(roomId);
+  const refreshBalance = useCallback(async () => {
+    if (!roomId) return;
 
-        if (result.success) {
-          setBalanceData({
-            holdings: result.holdings,
-            initialMargin: result.initialMargin,
-            available: result.available,
-            // Use the real-time PnL from usePositionsPnL instead of the one from the server
-            unrealizedPnl: totalPnL,
-            // Recalculate valuation with the real-time PnL
-            valuation: result.holdings + totalPnL,
-            isLoading: false,
-          });
-        } else {
-          console.error(
-            "[useDetailedBalance] Failed to get detailed balance:",
-            result.message
-          );
-          setBalanceData((prev) => ({ ...prev, isLoading: false }));
-        }
-      } catch (error) {
+    setIsLoading(true);
+    try {
+      const result = await getRoomBalanceDetails(roomId);
+
+      if (result.success && result.balance) {
+        console.log("[useDetailedBalance] Fetched balance:", result);
+
+        // Ensure all values are valid numbers
+        const sanitizedBalance = {
+          holdings:
+            typeof result.balance.holdings === "number" &&
+            !isNaN(result.balance.holdings)
+              ? result.balance.holdings
+              : 0,
+          lockedMargin:
+            typeof result.balance.lockedMargin === "number" &&
+            !isNaN(result.balance.lockedMargin)
+              ? result.balance.lockedMargin
+              : 0,
+          available:
+            typeof result.balance.available === "number" &&
+            !isNaN(result.balance.available)
+              ? result.balance.available
+              : 0,
+          unrealizedPnl:
+            typeof result.balance.unrealizedPnl === "number" &&
+            !isNaN(result.balance.unrealizedPnl)
+              ? result.balance.unrealizedPnl
+              : 0,
+          valuation:
+            typeof result.balance.valuation === "number" &&
+            !isNaN(result.balance.valuation)
+              ? result.balance.valuation
+              : 0,
+        };
+
+        setBalanceDetails(sanitizedBalance);
+      } else {
         console.error(
-          "[useDetailedBalance] Error fetching detailed balance:",
-          error
+          "[useDetailedBalance] Failed to get detailed balance:",
+          result.message
         );
-        setBalanceData((prev) => ({ ...prev, isLoading: false }));
+        // Keep the current values on error
+      }
+    } catch (error) {
+      console.error(
+        "[useDetailedBalance] Error fetching detailed balance:",
+        error
+      );
+      // Keep the current values on error
+    } finally {
+      setIsLoading(false);
+    }
+  }, [roomId]);
+
+  // Initial fetch
+  useEffect(() => {
+    refreshBalance();
+  }, [refreshBalance]);
+
+  // Listen for virtual currency updates
+  useEffect(() => {
+    const handleVirtualCurrencyUpdate = (event: CustomEvent) => {
+      if (event.detail?.roomId === roomId) {
+        refreshBalance();
       }
     };
 
-    fetchDetailedBalance();
-  }, [roomId, positions.length]);
+    // Listen for position updates that might affect balance
+    const handlePositionUpdate = (event: CustomEvent) => {
+      if (event.detail?.roomId === roomId) {
+        refreshBalance();
+      }
+    };
 
-  // Update unrealized PnL and valuation when prices change
-  useEffect(() => {
-    setBalanceData((prev) => ({
-      ...prev,
-      unrealizedPnl: totalPnL,
-      valuation: prev.holdings + totalPnL,
-    }));
-  }, [totalPnL]);
+    if (typeof window !== "undefined") {
+      window.addEventListener(
+        "virtual-currency-update",
+        handleVirtualCurrencyUpdate as EventListener
+      );
+      window.addEventListener(
+        "new-position-created",
+        handlePositionUpdate as EventListener
+      );
+      window.addEventListener(
+        "position-closed",
+        handlePositionUpdate as EventListener
+      );
+    }
 
-  return balanceData;
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(
+          "virtual-currency-update",
+          handleVirtualCurrencyUpdate as EventListener
+        );
+        window.removeEventListener(
+          "new-position-created",
+          handlePositionUpdate as EventListener
+        );
+        window.removeEventListener(
+          "position-closed",
+          handlePositionUpdate as EventListener
+        );
+      }
+    };
+  }, [roomId, refreshBalance]);
+
+  return {
+    isLoading,
+    balanceDetails,
+    refreshBalance,
+  };
 }
