@@ -32,13 +32,19 @@ export function updateVirtualCurrencyDisplay(roomId: string): void {
  */
 export function notifyPositionClosed(
   roomId: string,
-  positionId?: string
+  positionId?: string,
+  tradeHistory?: any
 ): void {
   try {
     const event = new CustomEvent("position-closed", {
-      detail: { roomId, positionId },
+      detail: { roomId, positionId, tradeHistory },
     });
     window.dispatchEvent(event);
+
+    // Also show a toast notification if toast is available
+    if (typeof window !== "undefined" && (window as any).toast) {
+      (window as any).toast.info("Host closed a position");
+    }
   } catch (error) {
     console.error("Error notifying position closed:", error);
   }
@@ -49,13 +55,19 @@ export function notifyPositionClosed(
  */
 export function notifyPositionCreated(
   roomId: string,
-  positionId: string
+  positionId: string,
+  positionDetails?: any
 ): void {
   try {
     const event = new CustomEvent("new-position-created", {
-      detail: { roomId, positionId },
+      detail: { roomId, positionId, positionDetails },
     });
     window.dispatchEvent(event);
+
+    // Also show a toast notification if toast is available
+    if (typeof window !== "undefined" && (window as any).toast) {
+      (window as any).toast.info("Host opened a new position");
+    }
   } catch (error) {
     console.error("Error notifying new position created:", error);
   }

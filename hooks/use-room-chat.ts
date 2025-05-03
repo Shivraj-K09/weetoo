@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { sendChatMessage, getChatMessages } from "@/app/actions/chat-actions";
@@ -25,8 +25,10 @@ export function useRoomChat(roomId: string, user: User | null) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isParticipant, setIsParticipant] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const messageIdSetRef = useRef(new Set<string>());
+  const participantCheckAttempts = useRef(0);
+  const maxParticipantCheckAttempts = 5;
 
   // Check if user is a participant in the room
   useEffect(() => {
@@ -49,24 +51,81 @@ export function useRoomChat(roomId: string, user: User | null) {
             "[ROOM CHAT] Error checking participant status:",
             error
           );
+
+          // If we've tried too many times, give up
+          if (participantCheckAttempts.current >= maxParticipantCheckAttempts) {
+            console.error(
+              "[ROOM CHAT] Failed to check participant status after multiple attempts"
+            );
+            return;
+          }
+
+          // Otherwise, try again after a delay
+          participantCheckAttempts.current++;
+          setTimeout(checkParticipantStatus, 2000);
           return;
         }
 
         const isOwner = data.owner_id === user.id;
-        const isInParticipants =
-          Array.isArray(data.participants) &&
-          data.participants.includes(user.id);
+
+        // Ensure participants is always treated as an array
+        const participantsArray = Array.isArray(data.participants)
+          ? data.participants
+          : [];
+        const isInParticipants = participantsArray.includes(user.id);
 
         console.log("[ROOM CHAT] User participant status:", {
           userId: user.id,
           isOwner,
           isInParticipants,
-          participants: data.participants,
+          participants: participantsArray,
         });
 
-        setIsParticipant(isOwner || isInParticipants);
+        // Always set the owner as a participant
+        if (isOwner) {
+          setIsParticipant(true);
+          return;
+        }
+
+        // If the user is in the participants array, they're a participant
+        setIsParticipant(isInParticipants);
+
+        // If user is not a participant but should be, try to fix it
+        if (!isInParticipants && user.id) {
+          console.log(
+            "[ROOM CHAT] User not in participants list, checking join status..."
+          );
+
+          // Check if user has joined the room via the join_room_history table
+          const { data: joinData, error: joinError } = await supabase
+            .from("join_room_history")
+            .select("*")
+            .eq("room_id", roomId)
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (!joinError && joinData && joinData.length > 0) {
+            console.log(
+              "[ROOM CHAT] User has joined this room before, treating as participant"
+            );
+            setIsParticipant(true);
+          }
+        }
       } catch (error) {
         console.error("[ROOM CHAT] Failed to check participant status:", error);
+
+        // If we've tried too many times, give up
+        if (participantCheckAttempts.current >= maxParticipantCheckAttempts) {
+          console.error(
+            "[ROOM CHAT] Failed to check participant status after multiple attempts"
+          );
+          return;
+        }
+
+        // Otherwise, try again after a delay
+        participantCheckAttempts.current++;
+        setTimeout(checkParticipantStatus, 2000);
       }
     };
 
@@ -86,18 +145,27 @@ export function useRoomChat(roomId: string, user: User | null) {
         (payload) => {
           const updatedRoom = payload.new as any;
           const isOwner = updatedRoom.owner_id === user.id;
-          const isInParticipants =
-            Array.isArray(updatedRoom.participants) &&
-            updatedRoom.participants.includes(user.id);
+
+          // Ensure participants is always treated as an array
+          const participantsArray = Array.isArray(updatedRoom.participants)
+            ? updatedRoom.participants
+            : [];
+          const isInParticipants = participantsArray.includes(user.id);
 
           console.log("[ROOM CHAT] Participant status updated:", {
             userId: user.id,
             isOwner,
             isInParticipants,
-            participants: updatedRoom.participants,
+            participants: participantsArray,
           });
 
-          setIsParticipant(isOwner || isInParticipants);
+          // Always set the owner as a participant
+          if (isOwner) {
+            setIsParticipant(true);
+            return;
+          }
+
+          setIsParticipant(isInParticipants);
         }
       )
       .subscribe();
@@ -109,15 +177,21 @@ export function useRoomChat(roomId: string, user: User | null) {
 
   // Fetch initial messages
   useEffect(() => {
-    if (!roomId || !user) return;
-
     const fetchMessages = async () => {
+      if (!roomId) return;
+
       setIsLoading(true);
       try {
         console.log("[ROOM CHAT] Fetching messages for room:", roomId);
         const result = await getChatMessages(roomId);
         if (result.success) {
           console.log("[ROOM CHAT] Messages fetched:", result.messages.length);
+
+          // Update the message ID set with existing messages
+          const messageIdSet = new Set<string>();
+          result.messages.forEach((msg) => messageIdSet.add(msg.id));
+          messageIdSetRef.current = messageIdSet;
+
           setMessages(result.messages);
         } else {
           console.error("[ROOM CHAT] Error fetching messages:", result.message);
@@ -130,7 +204,7 @@ export function useRoomChat(roomId: string, user: User | null) {
     };
 
     fetchMessages();
-  }, [roomId, user]);
+  }, [roomId]);
 
   // Set up real-time subscription for new messages
   useEffect(() => {
@@ -160,18 +234,13 @@ export function useRoomChat(roomId: string, user: User | null) {
           console.log("[ROOM CHAT] New message received:", payload.new);
           const newMessage = payload.new as ChatMessage;
 
-          // Immediately update the messages state with the new message
-          setMessages((prev) => {
-            // Check if message already exists to prevent duplicates
-            const exists = prev.some((msg) => msg.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
-          });
+          // Check if we've already seen this message
+          if (!messageIdSetRef.current.has(newMessage.id)) {
+            messageIdSetRef.current.add(newMessage.id);
 
-          // Scroll to bottom when new message arrives
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-          }, 100);
+            // Update messages without causing a full re-render of parent components
+            setMessages((prev) => [...prev, newMessage]);
+          }
         }
       )
       .subscribe((status) => {
@@ -190,13 +259,8 @@ export function useRoomChat(roomId: string, user: User | null) {
     };
   }, [roomId, user]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Send message function
-  const handleSendMessage = async () => {
+  // Handle sending a message
+  const handleSendMessage = useCallback(async () => {
     if (!message.trim() || !user || !roomId) return;
 
     try {
@@ -213,8 +277,9 @@ export function useRoomChat(roomId: string, user: User | null) {
       setMessage("");
 
       // Optimistically add the message to the UI
+      const optimisticId = `temp-${Date.now()}`;
       const optimisticMessage = {
-        id: `temp-${Date.now()}`,
+        id: optimisticId,
         room_id: roomId,
         user_id: user.id,
         message: messageToSend,
@@ -222,12 +287,10 @@ export function useRoomChat(roomId: string, user: User | null) {
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, optimisticMessage]);
+      // Add to the message ID set to prevent duplication
+      messageIdSetRef.current.add(optimisticId);
 
-      // Scroll to bottom immediately
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
+      setMessages((prev) => [...prev, optimisticMessage]);
 
       // Then send the message to the server
       const result = await sendChatMessage(roomId, messageToSend);
@@ -235,34 +298,12 @@ export function useRoomChat(roomId: string, user: User | null) {
       if (!result.success) {
         console.error("[ROOM CHAT] Failed to send message:", result.message);
         toast.error(result.message || "Failed to send message");
-
-        // If the error is about not being a participant, force a check
-        if (result.message?.includes("participant")) {
-          // Check participant status again
-          const { data, error } = await supabase
-            .from("trading_rooms")
-            .select("participants, owner_id")
-            .eq("id", roomId)
-            .single();
-
-          if (!error) {
-            console.log(
-              "[ROOM CHAT] Current room participants:",
-              data.participants
-            );
-            console.log("[ROOM CHAT] User ID:", user.id);
-            console.log(
-              "[ROOM CHAT] Is user in participants?",
-              data.participants.includes(user.id)
-            );
-          }
-        }
       }
     } catch (error) {
       console.error("[ROOM CHAT] Error sending message:", error);
       toast.error("Failed to send message");
     }
-  };
+  }, [message, user, roomId, isParticipant]);
 
   return {
     messages,
@@ -271,6 +312,5 @@ export function useRoomChat(roomId: string, user: User | null) {
     isLoading,
     isParticipant,
     handleSendMessage,
-    messagesEndRef,
   };
 }

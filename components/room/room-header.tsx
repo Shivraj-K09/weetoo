@@ -8,6 +8,8 @@ import { VirtualCurrencyDisplay } from "@/components/room/virtual-currency-displ
 import { DonationButton } from "@/components/room/donation-button";
 import { DonationNotification } from "@/components/room/donate-notifications";
 import { ProfitRateDisplay } from "@/components/room/profit-rate-display";
+import { Badge } from "@/components/ui/badge";
+import { HostActivityIndicator } from "./host-activity-indicator";
 
 interface RoomHeaderProps {
   roomDetails: any;
@@ -47,8 +49,22 @@ export function RoomHeader({
               </AvatarFallback>
             </Avatar>
             <div className="ml-3">
-              <h2 className="text-lg font-bold">{roomDetails.room_name}</h2>
-              <p className="text-sm text-gray-400">{ownerName}</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold">{roomDetails.room_name}</h2>
+                <HostActivityIndicator
+                  roomId={roomDetails.id}
+                  ownerId={roomDetails.owner_id}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-400">{ownerName}</p>
+                <Badge
+                  variant="outline"
+                  className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px] py-0 px-1.5"
+                >
+                  호스트
+                </Badge>
+              </div>
               <div className="flex items-center mt-1 text-xs">
                 <span className="text-yellow-500 mr-2">
                   {roomDetails.current_participants}/
@@ -122,7 +138,7 @@ export function RoomHeader({
         </div>
 
         {/* Right side - Add refresh button here */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {onRefreshRoom && (
             <Button
               onClick={onRefreshRoom}
@@ -142,11 +158,7 @@ export function RoomHeader({
 
           {/* Virtual Currency Display (only for owner) */}
           <div className="ml-auto mr-4">
-            <VirtualCurrencyDisplay
-              roomId={roomDetails.id}
-              isOwner={isOwner}
-              currentPrice={roomDetails.current_price || 0}
-            />
+            <VirtualCurrencyDisplay roomId={roomDetails.id} isOwner={isOwner} />
           </div>
 
           {/* Donation Button (only for participants) */}

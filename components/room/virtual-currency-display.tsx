@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/utils/format-utils";
 import { supabase } from "@/lib/supabase/client";
+import { Skeleton } from "../ui/skeleton";
 
 interface VirtualCurrencyDisplayProps {
   roomId: string;
@@ -182,12 +183,14 @@ export function VirtualCurrencyDisplay({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center space-x-2 text-sm cursor-help">
+          <div className="flex flex-col items-center space-y-1 text-sm cursor-help">
             <span className="font-medium">Available:</span>
             <span>
-              {isLoadingBalance || isLoadingVC
-                ? "Loading..."
-                : safeFormatCurrency(balanceDetails.available)}
+              {isLoadingBalance || isLoadingVC ? (
+                <Skeleton className="h-5 w-19 bg-muted-foreground" />
+              ) : (
+                safeFormatCurrency(balanceDetails.available)
+              )}
             </span>
           </div>
         </TooltipTrigger>

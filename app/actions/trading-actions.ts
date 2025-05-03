@@ -132,6 +132,20 @@ export async function executeTrade({
 
     console.log("[executeTrade] Room found:", room);
 
+    // Only allow the room owner to execute trades
+    if (userId !== room.owner_id) {
+      console.log(
+        "[executeTrade] User is not the room owner. User ID:",
+        userId,
+        "Owner ID:",
+        room.owner_id
+      );
+      return {
+        success: false,
+        message: "Only the room owner can execute trades",
+      };
+    }
+
     // Calculate position size - CRITICAL FIX: Use the exact entry amount provided by the user
     const positionSize = entryAmount * leverage;
     console.log(
@@ -197,6 +211,12 @@ export async function executeTrade({
         detail: { roomId: extractedUUID, positionId: data },
       });
       window.dispatchEvent(event);
+
+      // Also trigger a refresh of positions for all participants
+      const refreshEvent = new CustomEvent("refresh-positions", {
+        detail: { roomId: extractedUUID },
+      });
+      window.dispatchEvent(refreshEvent);
     }
 
     return {
@@ -243,6 +263,30 @@ export async function closePosition({
 
     if (positionError || !position) {
       return { success: false, message: "Position not found" };
+    }
+
+    // ADD THIS CODE BLOCK to check if the user is the room owner
+    // Get the room owner ID
+    const roomOwnerId = position.trading_rooms?.owner_id;
+
+    // Only allow the room owner to close positions
+    const {
+      data: { session: sessionClose },
+    } = await supabase.auth.getSession();
+
+    const userIdClose = sessionClose?.user?.id;
+
+    if (userIdClose !== roomOwnerId) {
+      console.log(
+        "[closePosition] User is not the room owner. User ID:",
+        userIdClose,
+        "Owner ID:",
+        roomOwnerId
+      );
+      return {
+        success: false,
+        message: "Only the room owner can close positions",
+      };
     }
 
     // If exitPrice is not provided, use current market price from position
@@ -359,6 +403,12 @@ export async function closePosition({
         detail: { roomId },
       });
       window.dispatchEvent(currencyEvent);
+
+      // Trigger a trade history refresh for all participants
+      const historyEvent = new CustomEvent("refresh-trade-history", {
+        detail: { roomId },
+      });
+      window.dispatchEvent(historyEvent);
     }
 
     return {
@@ -695,6 +745,30 @@ export async function partialClosePosition({
       return { success: false, message: "Position not found" };
     }
 
+    // ADD THIS CODE BLOCK to check if the user is the room owner
+    // Get the room owner ID
+    const roomOwnerId = position.trading_rooms?.owner_id;
+
+    // Only allow the room owner to partially close positions
+    const {
+      data: { session: sessionPartial },
+    } = await supabase.auth.getSession();
+
+    const userIdPartial = sessionPartial?.user?.id;
+
+    if (userIdPartial !== roomOwnerId) {
+      console.log(
+        "[partialClosePosition] User is not the room owner. User ID:",
+        userIdPartial,
+        "Owner ID:",
+        roomOwnerId
+      );
+      return {
+        success: false,
+        message: "Only the room owner can modify positions",
+      };
+    }
+
     // Use provided exit price if available, otherwise use current price or entry price
     const currentPrice =
       exitPrice || position.current_price || position.entry_price;
@@ -714,7 +788,7 @@ export async function partialClosePosition({
         ((currentPrice - position.entry_price) / position.entry_price) *
         closeAmount;
     } else {
-      // For short positions: (entry_price - current_price) / entry_price * closeAmount
+      // For short positions: (entry_price - current_price) / entry_price * close_amount
       pnl =
         ((position.entry_price - currentPrice) / position.entry_price) *
         closeAmount;

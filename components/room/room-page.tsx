@@ -37,8 +37,9 @@ import {
   hasHandledRefresh,
   clearRefreshHandled,
 } from "@/utils/room-persistence";
+import { AutoJoin } from "./auto-join";
+import { AutoJoinRoom } from "./auto-join-room";
 
-// Add error boundary and fallback UI
 export default function RoomPage({ roomData }: { roomData: any }) {
   const params = useParams();
   const router = useRouter();
@@ -823,6 +824,32 @@ export default function RoomPage({ roomData }: { roomData: any }) {
               onRefreshRoom={refreshRoom}
             />
 
+            {/* Auto-join component to ensure user is added to participants */}
+            {user && roomDetails && (
+              <AutoJoinRoom roomId={roomDetails.id} userId={user.id} />
+            )}
+
+            {!isHost && (
+              <div className="bg-[#212631] rounded-md w-full mb-1.5 px-4 py-2 border border-yellow-500/30 flex items-center justify-center">
+                <div className="text-yellow-400 text-sm flex items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-2"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  관전 모드 - 호스트의 거래를 실시간으로 지켜보고 있습니다
+                </div>
+              </div>
+            )}
+
             {/* Price Info Bar */}
             <div className="bg-[#212631] rounded-md w-full">
               <PriceInfoBar
@@ -854,13 +881,13 @@ export default function RoomPage({ roomData }: { roomData: any }) {
               <TradingMarketPlace />
             </div>
 
-            {/* Increased height to 16rem for the tabs container */}
             <div className="bg-[#212631] w-full h-[22rem] border border-[#3f445c]">
               <TradingTabsBottom
                 roomId={roomDetails.id}
                 isHost={isHost}
                 symbol={selectedSymbol || roomDetails.trading_pairs[0]}
                 currentPrice={currentPriceNumber}
+                virtualCurrency="KOR"
               />
             </div>
           </div>

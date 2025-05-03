@@ -1,13 +1,13 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
 export async function joinRoom(roomId: string, password?: string) {
   try {
     // Always use service role to bypass RLS for this operation
-    const supabase = await createServerClient(true);
+    const supabase = await createClient(true);
 
     // Check if user is authenticated
     const {
@@ -76,22 +76,37 @@ export async function joinRoom(roomId: string, password?: string) {
     participants.push(userId);
     console.log("New participants list:", participants);
 
-    // Use a direct SQL update to ensure the array is properly updated
-    // This bypasses any potential issues with the RLS policies
-    const { error: updateError } = await supabase.rpc(
-      "add_participant_to_room",
-      {
-        room_id: roomId,
-        user_id: userId,
-      }
-    );
+    // DIRECT UPDATE: Update the participants array directly
+    const { error: directUpdateError } = await supabase
+      .from("trading_rooms")
+      .update({
+        participants: participants,
+        current_participants: participants.length,
+      })
+      .eq("id", roomId);
 
-    if (updateError) {
-      console.error("Failed to join room:", updateError);
-      return {
-        success: false,
-        message: "Failed to join room: " + updateError.message,
-      };
+    if (directUpdateError) {
+      console.error(
+        "Failed to update participants directly:",
+        directUpdateError
+      );
+
+      // Try the RPC method as fallback
+      const { error: updateError } = await supabase.rpc(
+        "add_participant_to_room",
+        {
+          room_id: roomId,
+          user_id: userId,
+        }
+      );
+
+      if (updateError) {
+        console.error("Failed to join room:", updateError);
+        return {
+          success: false,
+          message: "Failed to join room: " + updateError.message,
+        };
+      }
     }
 
     // Verify the update was successful
@@ -122,7 +137,7 @@ export async function joinRoom(roomId: string, password?: string) {
 export async function leaveRoom(roomId: string) {
   try {
     // Always use service role to bypass RLS for this operation
-    const supabase = await createServerClient(true);
+    const supabase = await createClient(true);
 
     // Check if user is authenticated
     const {
@@ -170,21 +185,40 @@ export async function leaveRoom(roomId: string) {
       };
     }
 
-    // Use the RPC function to remove the participant
-    const { error: updateError } = await supabase.rpc(
-      "remove_participant_from_room",
-      {
-        room_id: roomId,
-        user_id: userId,
-      }
-    );
+    // Remove user from participants array
+    const updatedParticipants = participants.filter((id) => id !== userId);
 
-    if (updateError) {
-      console.error("Failed to leave room:", updateError);
-      return {
-        success: false,
-        message: "Failed to leave room: " + updateError.message,
-      };
+    // DIRECT UPDATE: Update the participants array directly
+    const { error: directUpdateError } = await supabase
+      .from("trading_rooms")
+      .update({
+        participants: updatedParticipants,
+        current_participants: updatedParticipants.length,
+      })
+      .eq("id", roomId);
+
+    if (directUpdateError) {
+      console.error(
+        "Failed to update participants directly:",
+        directUpdateError
+      );
+
+      // Try the RPC method as fallback
+      const { error: updateError } = await supabase.rpc(
+        "remove_participant_from_room",
+        {
+          room_id: roomId,
+          user_id: userId,
+        }
+      );
+
+      if (updateError) {
+        console.error("Failed to leave room:", updateError);
+        return {
+          success: false,
+          message: "Failed to leave room: " + updateError.message,
+        };
+      }
     }
 
     // Verify the update was successful
@@ -208,6 +242,64 @@ export async function leaveRoom(roomId: string) {
     return { success: true, message: "Successfully left room" };
   } catch (error) {
     console.error("Unexpected error in leaveRoom:", error);
+    return { success: false, message: "An unexpected error occurred" };
+  }
+}
+
+// Add a new function to force add a user to a room
+export async function forceAddUserToRoom(roomId: string, userId: string) {
+  try {
+    // Always use service role to bypass RLS for this operation
+    const supabase = await createClient(true);
+
+    // Fetch room details with service role
+    const { data: room, error: roomError } = await supabase
+      .from("trading_rooms")
+      .select("*")
+      .eq("id", roomId)
+      .single();
+
+    if (roomError || !room) {
+      console.error("Room not found or error:", roomError);
+      return { success: false, message: "Room not found" };
+    }
+
+    // Ensure participants is an array
+    const participants = Array.isArray(room.participants)
+      ? [...room.participants]
+      : [];
+
+    // Check if user is already a participant
+    if (participants.includes(userId)) {
+      console.log("User already in participants list:", userId);
+      return { success: true, message: "Already a member of this room" };
+    }
+
+    // Add user to participants array
+    participants.push(userId);
+    console.log("New participants list:", participants);
+
+    // Update the participants array directly
+    const { error: updateError } = await supabase
+      .from("trading_rooms")
+      .update({
+        participants: participants,
+        current_participants: participants.length,
+      })
+      .eq("id", roomId);
+
+    if (updateError) {
+      console.error("Failed to force add user to room:", updateError);
+      return {
+        success: false,
+        message: "Failed to add user to room: " + updateError.message,
+      };
+    }
+
+    revalidatePath(`/rooms/${roomId}`);
+    return { success: true, message: "Successfully added user to room" };
+  } catch (error) {
+    console.error("Unexpected error in forceAddUserToRoom:", error);
     return { success: false, message: "An unexpected error occurred" };
   }
 }

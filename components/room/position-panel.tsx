@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PositionDetails } from "./position-details";
-import { Loader2, InfoIcon } from "lucide-react";
+import { Loader2, InfoIcon, Crown } from "lucide-react";
 import {
   updateVirtualCurrencyDisplay,
   notifyPositionClosed,
@@ -44,9 +44,10 @@ function extractUUID(str: string): string | null {
 }
 
 // Extend the Position type to ensure it has the properties we need
-interface Position extends PositionType {
+interface Position extends Omit<PositionType, "user_id"> {
   initial_margin?: number;
   order_type?: "market" | "limit";
+  user_id: string; // Make this required
 }
 
 interface PositionsPanelProps {
@@ -54,6 +55,8 @@ interface PositionsPanelProps {
   currentPrice: number;
   hideTitle?: boolean;
   symbol?: string;
+  hostId?: string;
+  connectionStatus?: "connected" | "connecting" | "disconnected";
 }
 
 export function PositionsPanel({
@@ -61,6 +64,8 @@ export function PositionsPanel({
   currentPrice,
   hideTitle = false,
   symbol,
+  hostId,
+  connectionStatus: initialConnectionStatus,
 }: PositionsPanelProps) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,6 +77,10 @@ export function PositionsPanel({
     {}
   );
   const [filter, setFilter] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<
+    "connected" | "connecting" | "disconnected"
+  >("connecting");
 
   // State for close position dialog
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
@@ -108,6 +117,7 @@ export function PositionsPanel({
         data
       );
       setPositions((data as Position[]) || []);
+      setLastUpdate(new Date());
     } catch (err: any) {
       console.error("[PositionsPanel] Unexpected error:", err);
       setError(err.message);
@@ -147,58 +157,73 @@ export function PositionsPanel({
           );
 
           if (payload.eventType === "INSERT") {
-            if (payload.new.status === "open") {
+            if (
+              payload.new &&
+              "status" in payload.new &&
+              payload.new.status === "open"
+            ) {
               console.log("[PositionsPanel] Adding new position:", payload.new);
-              setPositions((current) => [payload.new as Position, ...current]);
-              toast.success("New position opened");
+              // Refresh all positions instead of just adding the new one
+              fetchPositions();
+
+              // Enhanced notification with more details
+              const direction =
+                payload.new.direction === "buy" ? "Long" : "Short";
+              const symbol = payload.new.symbol;
+              const size =
+                typeof payload.new.position_size === "number"
+                  ? payload.new.position_size.toFixed(2)
+                  : "0.00";
+              const isHostPosition = payload.new.user_id === hostId;
+
+              toast.success(
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    {isHostPosition
+                      ? "호스트가 새 포지션을 열었습니다"
+                      : "새 포지션이 열렸습니다"}
+                  </span>
+                  <span className="text-xs mt-1">
+                    {symbol} {direction} ${size}
+                  </span>
+                </div>,
+                {
+                  duration: 4000,
+                  position: "top-right",
+                }
+              );
             }
           } else if (payload.eventType === "UPDATE") {
-            if (payload.new.status === "open") {
-              console.log("[PositionsPanel] Updating position:", payload.new);
-              setPositions((current) =>
-                current.map((pos) =>
-                  pos.id === payload.new.id ? { ...pos, ...payload.new } : pos
-                )
-              );
-            } else {
-              // Position closed or partially closed
+            // Refresh all positions on any update
+            fetchPositions();
+          } else if (payload.eventType === "DELETE") {
+            if (payload.old && "id" in payload.old) {
               console.log(
-                "[PositionsPanel] Removing closed position:",
+                "[PositionsPanel] Removing deleted position:",
                 payload.old.id
               );
               setPositions((current) =>
                 current.filter((pos) => pos.id !== payload.old.id)
               );
+              setLastUpdate(new Date());
 
               // If this was the selected position, deselect it
               if (selectedPositionId === payload.old.id) {
                 setSelectedPositionId(null);
               }
-
-              toast.success(
-                payload.new.status === "closed"
-                  ? "Position closed"
-                  : "Position partially closed"
-              );
-            }
-          } else if (payload.eventType === "DELETE") {
-            console.log(
-              "[PositionsPanel] Removing deleted position:",
-              payload.old.id
-            );
-            setPositions((current) =>
-              current.filter((pos) => pos.id !== payload.old.id)
-            );
-
-            // If this was the selected position, deselect it
-            if (selectedPositionId === payload.old.id) {
-              setSelectedPositionId(null);
             }
           }
         }
       )
       .subscribe((status) => {
         console.log("[PositionsPanel] Subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          setConnectionStatus("connected");
+        } else if (status === "TIMED_OUT" || status === "CHANNEL_ERROR") {
+          setConnectionStatus("disconnected");
+        } else {
+          setConnectionStatus("connecting");
+        }
       });
 
     // Listen for new position events from other components
@@ -221,7 +246,7 @@ export function PositionsPanel({
       supabase.removeChannel(subscription);
       window.removeEventListener("new-position-created", handleNewPosition);
     };
-  }, [cleanRoomId, selectedPositionId]);
+  }, [cleanRoomId, selectedPositionId, hostId]);
 
   // Filter positions by symbol if provided
   const filteredPositions = symbol
@@ -355,12 +380,64 @@ export function PositionsPanel({
     return (
       <div className="bg-[#212631] p-4 rounded-md">
         {!hideTitle && (
-          <h2 className="text-lg font-semibold mb-4">Positions</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Positions</h2>
+            <div className="flex items-center gap-2">
+              <div className="animate-pulse flex items-center">
+                <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                <span className="text-xs text-gray-400">
+                  Loading positions...
+                </span>
+              </div>
+            </div>
+          </div>
         )}
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-800 text-gray-200">
+              <tr>
+                <th className="px-4 py-2 text-left">Symbol</th>
+                <th className="px-4 py-2 text-left">Side</th>
+                <th className="px-4 py-2 text-left">Size</th>
+                <th className="px-4 py-2 text-left">Entry</th>
+                <th className="px-4 py-2 text-left">Initial Margin</th>
+                <th className="px-4 py-2 text-right">PNL</th>
+                <th className="px-4 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(3)].map((_, i) => (
+                <tr key={i} className="border-b border-gray-700">
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-16" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-12" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-20" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-20" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-16" />
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <Skeleton className="h-5 w-20 ml-auto" />
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <Skeleton className="h-8 w-16 ml-auto" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 text-center text-xs text-gray-400">
+          <p>Connecting to real-time updates...</p>
         </div>
       </div>
     );
@@ -370,7 +447,14 @@ export function PositionsPanel({
     <div className="bg-[#212631] p-4 rounded-md">
       {!hideTitle && (
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Positions</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Positions</h2>
+            {lastUpdate && (
+              <span className="text-xs text-gray-400">
+                Updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -397,6 +481,26 @@ export function PositionsPanel({
               Short
             </Button>
           </div>
+          {connectionStatus && (
+            <div className="ml-2 flex items-center">
+              <div
+                className={`h-2 w-2 rounded-full mr-1 ${
+                  connectionStatus === "connected"
+                    ? "bg-green-500"
+                    : connectionStatus === "connecting"
+                      ? "bg-yellow-500 animate-pulse"
+                      : "bg-red-500"
+                }`}
+              ></div>
+              <span className="text-xs text-gray-400">
+                {connectionStatus === "connected"
+                  ? "Live"
+                  : connectionStatus === "connecting"
+                    ? "Connecting..."
+                    : "Disconnected"}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -408,15 +512,18 @@ export function PositionsPanel({
           onClosePosition={handleClosePosition}
           onPartialClose={handlePartialClose}
           isClosing={isClosing}
+          isHostPosition={selectedPosition.user_id === hostId}
         />
       ) : (
         <>
           {filteredPositions.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
-              No open positions
+              {hostId
+                ? "No positions are currently open. When the host opens positions, they will be displayed here."
+                : "No open positions"}
             </div>
           ) : (
-            <div className="overflow-x-auto overflow-y-auto h-[17rem] no-scrollbar">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-800 text-gray-200">
                   <tr>
@@ -479,6 +586,7 @@ export function PositionsPanel({
                       const pnlPercentage = pnlInfo ? pnlInfo.pnlPercentage : 0;
 
                       const isProfitable = pnl > 0;
+                      const isHostPosition = position.user_id === hostId;
 
                       // Calculate initial margin with fallback
                       const feeRate =
@@ -494,9 +602,33 @@ export function PositionsPanel({
                       return (
                         <tr
                           key={position.id}
-                          className="border-b border-gray-700 hover:bg-gray-800"
+                          className={`border-b border-gray-700 hover:bg-gray-800 ${
+                            isHostPosition ? "bg-yellow-900/10 relative" : ""
+                          }`}
+                          onClick={() => setSelectedPositionId(position.id)}
                         >
-                          <td className="px-4 py-2">{position.symbol}</td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-1">
+                              {position.symbol}
+                              {isHostPosition && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span>
+                                        <Crown
+                                          size={14}
+                                          className="text-yellow-500 ml-1"
+                                        />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">Host position</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-4 py-2">
                             <span
                               className={
@@ -532,7 +664,10 @@ export function PositionsPanel({
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => openCloseDialog(position)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openCloseDialog(position);
+                              }}
                               disabled={isClosing[position.id]}
                             >
                               {isClosing[position.id] ? (
@@ -553,6 +688,12 @@ export function PositionsPanel({
             </div>
           )}
         </>
+      )}
+      {isLoading && positions.length > 0 && (
+        <div className="fixed bottom-4 right-4 bg-[#212631] border border-[#3f445c] rounded-md px-4 py-2 shadow-lg z-50 flex items-center gap-2">
+          <div className="animate-spin h-4 w-4 border-2 border-[#3f445c] border-t-white rounded-full"></div>
+          <span className="text-sm">Refreshing positions...</span>
+        </div>
       )}
 
       {/* Close Position Dialog */}

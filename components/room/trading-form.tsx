@@ -162,18 +162,48 @@ export const TradingForm = React.memo(function TradingForm({
   };
 
   // Handle margin mode change
-  const handleMarginModeChange = useCallback((mode: "cross" | "isolated") => {
-    console.log("[DEBUG] Margin mode changing to:", mode);
-    setMarginMode(mode);
-    toast.success(`Margin mode changed to ${mode}`);
-  }, []);
+  const handleMarginModeChange = useCallback(
+    (mode: "cross" | "isolated") => {
+      console.log("[DEBUG] Margin mode changing to:", mode);
+      setMarginMode(mode);
+      toast.success(`Margin mode changed to ${mode}`);
+
+      // Emit event for margin mode change
+      if (isHost) {
+        window.dispatchEvent(
+          new CustomEvent("host-trading", {
+            detail: {
+              action: "margin_change",
+              mode: mode,
+            },
+          })
+        );
+      }
+    },
+    [isHost]
+  );
 
   // Handle leverage change
-  const handleLeverageChange = useCallback((newLeverage: number) => {
-    console.log("[DEBUG] Leverage changing to:", newLeverage);
-    setLeverage(newLeverage);
-    toast.success(`Leverage changed to ${newLeverage}x`);
-  }, []);
+  const handleLeverageChange = useCallback(
+    (newLeverage: number) => {
+      console.log("[DEBUG] Leverage changing to:", newLeverage);
+      setLeverage(newLeverage);
+      toast.success(`Leverage changed to ${newLeverage}x`);
+
+      // Emit event for leverage change
+      if (isHost) {
+        window.dispatchEvent(
+          new CustomEvent("host-trading", {
+            detail: {
+              action: "leverage_change",
+              leverage: newLeverage,
+            },
+          })
+        );
+      }
+    },
+    [isHost]
+  );
 
   // Calculate liquidation price (simplified)
   const calculateLiquidationPrice = (
@@ -199,6 +229,13 @@ export const TradingForm = React.memo(function TradingForm({
   const handleSubmit = async (direction: "buy" | "sell") => {
     console.log("[DEBUG] handleSubmit called with direction:", direction);
     try {
+      // ADD THIS CHECK at the beginning of the function
+      if (!isHost) {
+        console.log("[DEBUG] Non-host attempted to trade, blocking action");
+        toast.error("Only the room host can execute trades");
+        return;
+      }
+
       setIsSubmitting(true);
       setDirection(direction);
 
@@ -208,6 +245,17 @@ export const TradingForm = React.memo(function TradingForm({
         toast.error("Please enter a valid amount");
         return;
       }
+
+      // This will notify other components that the host is placing a trade
+      const hostTradingEvent = new CustomEvent("host-trading", {
+        detail: {
+          action: "placing_order",
+          direction,
+          symbol,
+          amount: inputAmount,
+        },
+      });
+      window.dispatchEvent(hostTradingEvent);
 
       // Check against available balance instead of total virtual currency
       const availableBalance = balanceDetails?.available || virtualCurrency;
@@ -238,6 +286,19 @@ export const TradingForm = React.memo(function TradingForm({
         toast.success(
           `${direction === "buy" ? "Long" : "Short"} position opened successfully`
         );
+
+        // Add this line to emit another event indicating the trade is complete:
+        window.dispatchEvent(
+          new CustomEvent("host-trading", {
+            detail: {
+              action: "order_complete",
+              success: true,
+              direction,
+              symbol,
+              positionId: result.positionId,
+            },
+          })
+        );
         updateVirtualCurrencyDisplay(roomId);
 
         // Emit a custom event to notify other components about the new position
@@ -259,6 +320,18 @@ export const TradingForm = React.memo(function TradingForm({
         });
       } else {
         toast.error(`Failed to open position: ${result.message}`);
+
+        // Add this line to emit an event for failed trades:
+        window.dispatchEvent(
+          new CustomEvent("host-trading", {
+            detail: {
+              action: "order_failed",
+              direction,
+              symbol,
+              error: result.message,
+            },
+          })
+        );
       }
     } catch (error) {
       console.error("Error executing trade:", error);
@@ -281,10 +354,29 @@ export const TradingForm = React.memo(function TradingForm({
 
   return (
     <div className="bg-[#212631] p-2 rounded max-w-[290px] w-full h-[45rem] border border-[#3f445c] overflow-y-auto no-scrollbar">
+      {!isHost && (
+        <div className="mb-2 px-2 py-1.5 bg-[#1a1e27] border border-yellow-500/30 rounded text-xs text-yellow-400 flex items-center justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-3.5 w-3.5 mr-1.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          관전 모드 - 호스트만 거래할 수 있습니다
+        </div>
+      )}
       <div className="flex gap-1.5 w-full">
         <button
-          className="flex items-center w-full cursor-pointer justify-between gap-2 px-4 py-2 bg-[#1a1e27] text-white rounded-md border border-white/10 hover:border-orange-500/50 transition-all duration-300"
-          onClick={() => setMarginModeDialogOpen(true)}
+          className={`flex items-center w-full cursor-pointer justify-between gap-2 px-4 py-2 bg-[#1a1e27] text-white rounded-md border border-white/10 hover:border-orange-500/50 transition-all duration-300 ${!isHost ? "opacity-80 cursor-not-allowed hover:border-white/10" : ""}`}
+          onClick={() => isHost && setMarginModeDialogOpen(true)}
         >
           <span className="text-sm font-medium">
             {marginMode === "cross" ? "교차" : "격리"}
@@ -307,8 +399,8 @@ export const TradingForm = React.memo(function TradingForm({
         </button>
 
         <button
-          className="flex w-full items-center cursor-pointer justify-between gap-2 px-4 py-2 bg-[#1a1e27] text-white rounded-md border border-white/10 hover:border-orange-500/50 transition-all duration-300"
-          onClick={() => setLeverageDialogOpen(true)}
+          className={`flex w-full items-center cursor-pointer justify-between gap-2 px-4 py-2 bg-[#1a1e27] text-white rounded-md border border-white/10 hover:border-orange-500/50 transition-all duration-300 ${!isHost ? "opacity-80 cursor-not-allowed hover:border-white/10" : ""}`}
+          onClick={() => isHost && setLeverageDialogOpen(true)}
         >
           <span className="text-sm font-medium">{leverage}x</span>
           <svg
@@ -386,6 +478,7 @@ export const TradingForm = React.memo(function TradingForm({
                     }}
                     type="number"
                     step="0.01"
+                    readOnly={!isHost}
                   />
                   <div className="absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
                     <button
@@ -441,6 +534,7 @@ export const TradingForm = React.memo(function TradingForm({
               step="0.01"
               min="0"
               max={(balanceDetails?.available || virtualCurrency).toString()}
+              readOnly={!isHost}
             />
             <div className="text-xs text-white/75 absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
               USDT
@@ -458,8 +552,8 @@ export const TradingForm = React.memo(function TradingForm({
                     selectedPercentage === percent
                       ? "text-[#f97316]"
                       : "text-white/70 hover:text-white"
-                  } min-w-[40px] text-center`}
-                  onClick={() => handlePercentageSelect(percent)}
+                  } min-w-[40px] text-center ${!isHost ? "opacity-60 cursor-not-allowed" : ""}`}
+                  onClick={() => isHost && handlePercentageSelect(percent)}
                 >
                   {percent}%
                 </button>
@@ -502,8 +596,11 @@ export const TradingForm = React.memo(function TradingForm({
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={useStopLoss}
-                      onCheckedChange={setUseStopLoss}
+                      onCheckedChange={(checked) =>
+                        isHost && setUseStopLoss(checked)
+                      }
                       className="data-[state=checked]:bg-[#FF5252]"
+                      disabled={!isHost}
                     />
                   </div>
                 </div>
@@ -518,6 +615,7 @@ export const TradingForm = React.memo(function TradingForm({
                         type="number"
                         step="0.01"
                         min="0"
+                        readOnly={!isHost}
                       />
                       <div className="text-xs text-[#FF5252] absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
                         USDT
@@ -539,8 +637,11 @@ export const TradingForm = React.memo(function TradingForm({
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={useTakeProfit}
-                      onCheckedChange={setUseTakeProfit}
+                      onCheckedChange={(checked) =>
+                        isHost && setUseTakeProfit(checked)
+                      }
                       className="data-[state=checked]:bg-[#00C879]"
+                      disabled={!isHost}
                     />
                   </div>
                 </div>
@@ -555,6 +656,7 @@ export const TradingForm = React.memo(function TradingForm({
                         type="number"
                         step="0.01"
                         min="0"
+                        readOnly={!isHost}
                       />
                       <div className="text-xs text-[#00C879] absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
                         USDT
@@ -636,20 +738,53 @@ export const TradingForm = React.memo(function TradingForm({
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-0.5">
-            <Button
-              className="bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => handleSubmit("buy")}
-              disabled={isLoading || !isHost}
-            >
-              {isLoading ? "처리 중..." : "매수 / Long"}
-            </Button>
-            <Button
-              className="bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium"
-              onClick={() => handleSubmit("sell")}
-              disabled={isLoading || !isHost}
-            >
-              {isLoading ? "처리 중..." : "매도 / Short"}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full">
+                    <Button
+                      className={`w-full bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                      onClick={() => handleSubmit("buy")}
+                      disabled={isLoading || !isHost}
+                    >
+                      {isLoading ? "처리 중..." : "매수 / Long"}
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                {!isHost && (
+                  <TooltipContent
+                    side="bottom"
+                    className="bg-[#1a1e27] border-gray-700 text-white"
+                  >
+                    <p>Only the host can execute trades in this room</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full">
+                    <Button
+                      className={`w-full bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                      onClick={() => handleSubmit("sell")}
+                      disabled={isLoading || !isHost}
+                    >
+                      {isLoading ? "처리 중..." : "매도 / Short"}
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                {!isHost && (
+                  <TooltipContent
+                    side="bottom"
+                    className="bg-[#1a1e27] border-gray-700 text-white"
+                  >
+                    <p>Only the host can execute trades in this room</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 

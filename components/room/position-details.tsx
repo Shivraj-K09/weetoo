@@ -43,6 +43,7 @@ interface PositionDetailsProps {
   onClosePosition: (positionId: string) => Promise<void>;
   onPartialClose: (positionId: string, percentage: number) => Promise<void>;
   isClosing: { [positionId: string]: boolean };
+  isHostPosition?: boolean; // Add this new prop
 }
 
 export function PositionDetails({
@@ -52,6 +53,7 @@ export function PositionDetails({
   onClosePosition,
   onPartialClose,
   isClosing,
+  isHostPosition = false, // Add default value
 }: PositionDetailsProps) {
   const [partialClosePercentage, setPartialClosePercentage] = useState(50);
   const [fundingFee, setFundingFee] = useState<number | null>(
@@ -96,6 +98,10 @@ export function PositionDetails({
 
   // Add quick-select buttons for partial close
   const quickSelectOptions = [25, 50, 75, 100];
+
+  // You can use the isHostPosition prop to conditionally render elements or change behavior
+  // For example:
+  // const actionLabel = isHostPosition ? "Close Host Position" : "Close Position";
 
   return (
     <div className="bg-[#1E222D] p-4 rounded-md">

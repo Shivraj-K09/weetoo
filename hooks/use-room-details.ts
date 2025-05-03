@@ -19,8 +19,12 @@ interface RoomData {
   max_participants: number;
   owner_id: string;
   participants: string[];
-  room_category: RoomCategory;
   created_at: string;
+  room_category?: RoomCategory;
+  initial_balance?: number;
+  final_balance?: number;
+  room_profit_rate?: number;
+  is_included_in_user_rate?: boolean;
 }
 
 interface User {
@@ -323,6 +327,14 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
         console.log("[ROOM DETAILS] Room data fetched successfully:", data.id);
         setRoomDetails(data);
         fetchAttemptsRef.current = 0; // Reset counter on success
+
+        // ADD THIS LOG to help with debugging
+        console.log(
+          "[ROOM DETAILS] Room owner ID:",
+          data.owner_id,
+          "Current user ID:",
+          currentUserId
+        );
 
         // Set the selected symbol
         if (data.trading_pairs && data.trading_pairs.length > 0) {

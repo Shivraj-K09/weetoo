@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 // Define the Position type
 interface Position {
@@ -24,6 +25,12 @@ interface Position {
   created_at: string;
   updated_at: string;
 }
+
+// Define payload type for type safety
+type PositionPayload = RealtimePostgresChangesPayload<{
+  [key: string]: any;
+  status?: string;
+}>;
 
 export function useRealTimePositions(roomId: string) {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -51,8 +58,12 @@ export function useRealTimePositions(roomId: string) {
     const pendingUpdates = new Map();
     let updateTimeout: NodeJS.Timeout | null = null;
 
+    // Enhanced batching with adaptive timing
     const processBatchUpdates = () => {
       if (!mountedRef.current) return;
+
+      // Track performance
+      const startTime = performance.now();
 
       setPositions((current) => {
         // Create a map of current positions for faster lookup
@@ -87,16 +98,30 @@ export function useRealTimePositions(roomId: string) {
       // Clear pending updates
       pendingUpdates.clear();
       updateTimeout = null;
+
+      // Measure performance and adjust batch timing
+      const endTime = performance.now();
+      const processingTime = endTime - startTime;
+
+      // Log performance metrics
+      console.log(
+        `[useRealTimePositions] Batch update processed in ${processingTime.toFixed(2)}ms with ${pendingUpdates.size} updates`
+      );
     };
 
+    // Adaptive batching based on update frequency
     const queueUpdate = (id: string, position: Position | null) => {
       pendingUpdates.set(id, position);
 
-      // Process updates immediately for better responsiveness
+      // If we have many updates coming in rapidly, increase the batch delay
+      // to avoid too many renders
+      const batchDelay =
+        pendingUpdates.size > 10 ? 100 : pendingUpdates.size > 5 ? 75 : 50;
+
       if (updateTimeout) {
         clearTimeout(updateTimeout);
       }
-      updateTimeout = setTimeout(processBatchUpdates, 50); // Reduced from 100ms to 50ms for faster updates
+      updateTimeout = setTimeout(processBatchUpdates, batchDelay);
     };
 
     // Initial fetch of positions with retry logic
@@ -112,6 +137,12 @@ export function useRealTimePositions(roomId: string) {
           .eq("room_id", roomId)
           .eq("status", "open")
           .order("created_at", { ascending: false });
+
+        console.log(
+          "[useRealTimePositions] Fetched positions:",
+          data?.length || 0,
+          data
+        );
 
         if (error) {
           console.error(
@@ -166,19 +197,25 @@ export function useRealTimePositions(roomId: string) {
           table: "trading_positions",
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: PositionPayload) => {
           console.log(
             "[useRealTimePositions] Real-time update received:",
             payload.eventType,
-            (payload.new as Position)?.status
+            payload.new && "status" in payload.new
+              ? payload.new.status
+              : "unknown"
           );
 
           // Handle different event types
           if (payload.eventType === "INSERT") {
             // Only add if status is "open"
-            if (payload.new.status === "open") {
+            if (
+              payload.new &&
+              "status" in payload.new &&
+              payload.new.status === "open"
+            ) {
               // Queue new position
-              queueUpdate(payload.new.id, payload.new as Position);
+              queueUpdate(payload.new.id, payload.new as unknown as Position);
 
               // Only show toast for new positions
               toast.success("New position opened", {
@@ -188,7 +225,11 @@ export function useRealTimePositions(roomId: string) {
           } else if (payload.eventType === "UPDATE") {
             // Check if status changed from open to closed or partially_closed
             if (
+              payload.old &&
+              "status" in payload.old &&
               payload.old.status === "open" &&
+              payload.new &&
+              "status" in payload.new &&
               (payload.new.status === "closed" ||
                 payload.new.status === "partially_closed")
             ) {
@@ -213,18 +254,33 @@ export function useRealTimePositions(roomId: string) {
                 },
               });
               window.dispatchEvent(closeEvent);
-            } else if (payload.new.status === "open") {
+            } else if (
+              payload.new &&
+              "status" in payload.new &&
+              payload.new.status === "open"
+            ) {
               // Only update if still open
-              queueUpdate(payload.new.id, payload.new as Position);
+              queueUpdate(payload.new.id, payload.new as unknown as Position);
             }
           } else if (payload.eventType === "DELETE") {
             // Queue position removal
-            queueUpdate(payload.old.id, null);
+            if (payload.old && "id" in payload.old) {
+              queueUpdate(payload.old.id, null);
+            }
           }
         }
       )
       .subscribe((status) => {
         console.log("[useRealTimePositions] Subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          console.log(
+            "[useRealTimePositions] Successfully subscribed to position changes"
+          );
+        } else if (status === "CHANNEL_ERROR") {
+          console.error(
+            "[useRealTimePositions] Error subscribing to position changes"
+          );
+        }
       });
 
     subscriptionRef.current = subscription;

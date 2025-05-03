@@ -149,6 +149,9 @@ export function useTradeHistory(roomId: string) {
   const handlePositionClosed = useCallback(
     (event: any) => {
       if (event.detail?.roomId === roomId) {
+        console.log(
+          "[useTradeHistory] Position closed event detected, refreshing trade history"
+        );
         // If we have the trade history in the event, add it directly
         if (event.detail?.tradeHistory) {
           addTradeHistory(event.detail.tradeHistory);
@@ -161,17 +164,36 @@ export function useTradeHistory(roomId: string) {
     [roomId, addTradeHistory, fetchTradeHistory]
   );
 
+  const handleRefreshHistory = useCallback(
+    (event: any) => {
+      if (event.detail?.roomId === roomId) {
+        console.log("[useTradeHistory] Refresh history event detected");
+        fetchTradeHistory(roomId);
+      }
+    },
+    [roomId, fetchTradeHistory]
+  );
+
   useEffect(() => {
     if (!roomId) return;
+    console.log("[useTradeHistory] Initial fetch for room:", roomId);
     fetchTradeHistory(roomId);
 
     // Listen for position closed events to refresh trade history
     window.addEventListener("position-closed", handlePositionClosed);
 
+    // Listen for explicit refresh requests
+    window.addEventListener("refresh-trade-history", handleRefreshHistory);
+
+    // Listen for new position events
+    window.addEventListener("new-position-created", handleRefreshHistory);
+
     return () => {
       window.removeEventListener("position-closed", handlePositionClosed);
+      window.removeEventListener("refresh-trade-history", handleRefreshHistory);
+      window.removeEventListener("new-position-created", handleRefreshHistory);
     };
-  }, [roomId, fetchTradeHistory, handlePositionClosed]);
+  }, [roomId, fetchTradeHistory, handlePositionClosed, handleRefreshHistory]);
 
   return { tradeHistory, isLoading, error };
 }

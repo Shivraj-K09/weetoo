@@ -4,6 +4,13 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRoomTradeHistory } from "@/app/actions/trading-actions";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Crown } from "lucide-react";
 
 interface Trade {
   id: string;
@@ -26,9 +33,10 @@ interface Trade {
 
 interface TradeHistoryProps {
   roomId: string;
+  hostId?: string; // Add this line
 }
 
-export function TradeHistory({ roomId }: TradeHistoryProps) {
+export function TradeHistory({ roomId, hostId }: TradeHistoryProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -36,12 +44,16 @@ export function TradeHistory({ roomId }: TradeHistoryProps) {
   const fetchTradeHistory = async () => {
     try {
       setIsLoading(true);
+      console.log("[TradeHistory] Fetching trade history for room:", roomId);
       const result = await getRoomTradeHistory(roomId);
       if (result.success) {
+        console.log("[TradeHistory] Fetched trades:", result.trades.length);
         setTrades(result.trades);
+      } else {
+        console.error("[TradeHistory] Failed to fetch trades:", result.message);
       }
     } catch (error) {
-      console.error("Error fetching trade history:", error);
+      console.error("[TradeHistory] Error fetching trade history:", error);
     } finally {
       setIsLoading(false);
     }
@@ -50,6 +62,15 @@ export function TradeHistory({ roomId }: TradeHistoryProps) {
   // Initial fetch
   useEffect(() => {
     fetchTradeHistory();
+
+    // Set up a refresh interval to keep the trade history updated
+    const intervalId = setInterval(() => {
+      fetchTradeHistory();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [roomId]);
 
   // Listen for position closed events
@@ -60,13 +81,29 @@ export function TradeHistory({ roomId }: TradeHistoryProps) {
         console.log(
           "[TradeHistory] Position closed event detected, refreshing trade history"
         );
-        fetchTradeHistory();
+
+        // Add a small delay to ensure the database has been updated
+        setTimeout(() => {
+          fetchTradeHistory();
+        }, 500);
       }
     };
 
     window.addEventListener("position-closed", handlePositionClosed);
+
+    // Also listen for new position events to refresh history
+    const handleNewPosition = () => {
+      console.log(
+        "[TradeHistory] New position created, refreshing trade history"
+      );
+      fetchTradeHistory();
+    };
+
+    window.addEventListener("new-position-created", handleNewPosition);
+
     return () => {
       window.removeEventListener("position-closed", handlePositionClosed);
+      window.removeEventListener("new-position-created", handleNewPosition);
     };
   }, [roomId]);
 
@@ -85,7 +122,7 @@ export function TradeHistory({ roomId }: TradeHistoryProps) {
       {trades.length === 0 ? (
         <div className="text-center py-8 text-gray-400">No trade history</div>
       ) : (
-        <div className="overflow-x-auto overflow-y-auto h-[17rem] no-scrollbar">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-800 text-gray-200">
               <tr>
@@ -103,13 +140,35 @@ export function TradeHistory({ roomId }: TradeHistoryProps) {
                 const timeAgo = formatDistanceToNow(new Date(trade.exit_time), {
                   addSuffix: true,
                 });
+                const isHostTrade = trade.user_id === hostId;
 
                 return (
                   <tr
                     key={trade.id}
-                    className="border-b border-gray-700 hover:bg-gray-800"
+                    className={`border-b border-gray-700 hover:bg-gray-800 ${isHostTrade ? "bg-yellow-900/10" : ""}`}
                   >
-                    <td className="px-4 py-2">{trade.symbol}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1">
+                        {trade.symbol}
+                        {isHostTrade && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Crown
+                                    size={14}
+                                    className="text-yellow-500 ml-1"
+                                  />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Host trade</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2">
                       <span
                         className={

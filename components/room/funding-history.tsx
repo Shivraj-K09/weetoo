@@ -4,6 +4,13 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getFundingPaymentHistory } from "@/app/actions/funding-calculations";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Crown } from "lucide-react";
 
 interface FundingPayment {
   id: string;
@@ -21,9 +28,18 @@ interface FundingPayment {
 interface FundingHistoryProps {
   roomId: string;
   userId: string;
+  hideTitle?: boolean;
+  symbol?: string;
+  hostId?: string; // Add this line
 }
 
-export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
+export function FundingHistory({
+  roomId,
+  userId,
+  hideTitle = false,
+  symbol,
+  hostId,
+}: FundingHistoryProps) {
   const [payments, setPayments] = useState<FundingPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,7 +49,11 @@ export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
       setIsLoading(true);
       const result = await getFundingPaymentHistory(roomId, userId);
       if (result.success && result.data) {
-        setPayments(result.data);
+        // Filter by symbol if provided
+        const filteredData = symbol
+          ? result.data.filter((payment) => payment.symbol === symbol)
+          : result.data;
+        setPayments(filteredData);
       }
     } catch (error) {
       console.error("Error fetching funding history:", error);
@@ -45,7 +65,7 @@ export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
   // Initial fetch
   useEffect(() => {
     fetchFundingHistory();
-  }, [roomId, userId]);
+  }, [roomId, userId, symbol]);
 
   // Listen for funding applied events
   useEffect(() => {
@@ -63,7 +83,7 @@ export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
     return () => {
       window.removeEventListener("funding-applied", handleFundingApplied);
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, symbol]);
 
   if (isLoading) {
     return (
@@ -77,6 +97,9 @@ export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
 
   return (
     <div className="bg-[#212631] p-4 rounded-md">
+      {!hideTitle && (
+        <h2 className="text-lg font-semibold mb-4">Funding History</h2>
+      )}
       {payments.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
           No funding payments yet
@@ -102,13 +125,35 @@ export function FundingHistory({ roomId, userId }: FundingHistoryProps) {
                   { addSuffix: true }
                 );
                 const formattedRate = `${(payment.funding_rate * 100).toFixed(4)}%`;
+                const isHostPayment = payment.user_id === hostId;
 
                 return (
                   <tr
                     key={payment.id}
-                    className="border-b border-gray-700 hover:bg-gray-800"
+                    className={`border-b border-gray-700 hover:bg-gray-800 ${isHostPayment ? "bg-yellow-900/10" : ""}`}
                   >
-                    <td className="px-4 py-2">{payment.symbol}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1">
+                        {payment.symbol}
+                        {isHostPayment && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Crown
+                                    size={14}
+                                    className="text-yellow-500 ml-1"
+                                  />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Host payment</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2">
                       <span
                         className={

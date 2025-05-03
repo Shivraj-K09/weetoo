@@ -41,8 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # Mdx
-notes.md
-.md*
-.md/*
-.mdx*
-.mdx/*
+*.md
+*.mdx
+**/*.md
+**/*.mdx
