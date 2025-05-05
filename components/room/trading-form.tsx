@@ -100,11 +100,38 @@ export const TradingForm = React.memo(function TradingForm({
 
   // Calculate position size
   const positionSize = Number.parseFloat(entryAmount || "0") * leverage;
+  console.log("[Formula] Position Size = Entry Amount * Leverage", {
+    entryAmount: Number.parseFloat(entryAmount || "0"),
+    leverage,
+    result: positionSize,
+  });
 
-  // Calculate initial margin (entry amount + fees)
+  // Calculate initial margin using the correct formula
   const feeRate = orderType === "market" ? 0.0006 : 0.0002;
-  const feeAmount = positionSize * feeRate;
-  const initialMargin = Number.parseFloat(entryAmount || "0") + feeAmount;
+  const entryPrice = currentPrice;
+
+  // Interpret entryAmount as quantity (number of units)
+  const quantity = Number.parseFloat(entryAmount || "0");
+
+  // Calculate margin requirement and fee
+  const marginRequirement = (quantity * entryPrice) / leverage;
+  const tradingFee = quantity * entryPrice * feeRate;
+
+  // Calculate initial margin
+  const initialMargin = marginRequirement + tradingFee;
+
+  console.log(
+    "[Formula] Initial Margin = (Quantity × Entry Price ÷ Leverage) + (Quantity × Entry Price × Fee Rate)",
+    {
+      quantity,
+      entryPrice,
+      leverage,
+      feeRate,
+      marginRequirement,
+      tradingFee,
+      result: initialMargin,
+    }
+  );
 
   // Debug state changes
   useEffect(() => {
@@ -157,6 +184,14 @@ export const TradingForm = React.memo(function TradingForm({
     const amount = (availableBalance * percentage) / 100;
     const formattedAmount = amount.toFixed(2);
     console.log("[DEBUG] Calculated amount:", formattedAmount);
+    console.log(
+      "[Formula] Percentage Amount = Available Balance * Percentage / 100",
+      {
+        availableBalance,
+        percentage,
+        result: amount,
+      }
+    );
 
     setEntryAmount(formattedAmount);
   };
@@ -218,10 +253,30 @@ export const TradingForm = React.memo(function TradingForm({
       // For long positions: entry_price * (1 - (1 / leverage) * (1 / maintenance_margin))
       liquidationPrice =
         entryPrice * (1 - (1 / leverageMultiplier) * (1 / maintenanceMargin));
+      console.log(
+        "[Formula] Long Liquidation Price = Entry Price * (1 - (1 / Leverage) * (1 / Maintenance Margin))",
+        {
+          entryPrice,
+          leverageMultiplier,
+          maintenanceMargin,
+          formula: `${entryPrice} * (1 - (1 / ${leverageMultiplier}) * (1 / ${maintenanceMargin}))`,
+          result: liquidationPrice,
+        }
+      );
     } else {
       // For short positions: entry_price * (1 + (1 / leverage) * (1 / maintenance_margin))
       liquidationPrice =
         entryPrice * (1 + (1 / leverageMultiplier) * (1 / maintenanceMargin));
+      console.log(
+        "[Formula] Short Liquidation Price = Entry Price * (1 + (1 / Leverage) * (1 / Maintenance Margin))",
+        {
+          entryPrice,
+          leverageMultiplier,
+          maintenanceMargin,
+          formula: `${entryPrice} * (1 + (1 / ${leverageMultiplier}) * (1 / ${maintenanceMargin}))`,
+          result: liquidationPrice,
+        }
+      );
     }
     return liquidationPrice.toFixed(2);
   };
@@ -713,7 +768,8 @@ export const TradingForm = React.memo(function TradingForm({
                         포지션을 열 때 잠기는 금액입니다. 포지션을 닫으면 이
                         금액이 반환됩니다.
                         <br />
-                        초기 마진 = 주문수량 + 수수료
+                        초기 마진 = (수량 × 진입가격 ÷ 레버리지) + (수량 ×
+                        진입가격 × 수수료율)
                       </p>
                     </TooltipContent>
                   </Tooltip>

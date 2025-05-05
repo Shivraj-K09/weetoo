@@ -40,13 +40,15 @@ export async function deleteRoom(roomId: string) {
     const roomProfitRate =
       ((finalBalance - initialBalance) / initialBalance) * 100;
 
+    // Calculate profit (amount above initial balance)
+    const profit = Math.max(0, finalBalance - initialBalance);
+
     // Update the room with final values before deletion
     const { error: updateError } = await supabase
       .from("trading_rooms")
       .update({
         final_balance: finalBalance,
         room_profit_rate: roomProfitRate,
-        is_included_in_user_rate: false, // Mark as not included yet
       })
       .eq("id", roomId);
 
@@ -55,19 +57,21 @@ export async function deleteRoom(roomId: string) {
       return { success: false, error: updateError.message };
     }
 
-    // Update the user's cumulative profit rate
-    const { error: profitRateError } = await supabase.rpc(
-      "update_user_profit_rate",
+    // Update all user rankings before deleting the room
+    const { error: rankingError } = await supabase.rpc(
+      "update_all_user_rankings",
       {
         p_room_id: roomId,
         p_user_id: roomData.owner_id,
         p_room_profit_rate: roomProfitRate,
+        p_profit: profit,
       }
     );
 
-    if (profitRateError) {
-      console.error("Error updating profit rate:", profitRateError);
-      // Continue with deletion even if profit rate update fails
+    if (rankingError) {
+      console.error("Error updating user rankings:", rankingError);
+      // Continue with deletion even if ranking update fails
+      // We log the error but don't stop the process
     }
 
     // Reset the virtual currency to zero
@@ -82,6 +86,14 @@ export async function deleteRoom(roomId: string) {
     if (deleteError) {
       console.error("Error deleting room:", deleteError);
       return { success: false, error: deleteError.message };
+    }
+
+    // Dispatch a custom event to notify the UI that a room was closed
+    if (typeof window !== "undefined") {
+      const event = new CustomEvent("room-closed", {
+        detail: { roomId: roomId },
+      });
+      window.dispatchEvent(event);
     }
 
     return { success: true };

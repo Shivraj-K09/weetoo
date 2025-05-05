@@ -39,6 +39,7 @@ import {
 } from "@/utils/room-persistence";
 import { AutoJoin } from "./auto-join";
 import { AutoJoinRoom } from "./auto-join-room";
+import { useRoomStore } from "@/lib/store/room-store";
 
 export default function RoomPage({ roomData }: { roomData: any }) {
   const params = useParams();
@@ -587,10 +588,16 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     return () => {
       if (!mountedRef.current) return;
 
-      console.log("Cleaning up room subscriptions");
+      console.log("Cleaning up room subscriptions and state");
       window.removeEventListener("beforeunload", handleUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      supabase.removeChannel(roomSubscription);
+
+      // Clean up all Supabase channels
+      supabase.removeAllChannels();
+
+      // Reset room state
+      const { resetRoomState } = useRoomStore.getState();
+      resetRoomState();
     };
   }, [
     roomId,

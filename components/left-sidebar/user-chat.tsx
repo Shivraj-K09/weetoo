@@ -86,7 +86,12 @@ export function UserChat() {
   const setupRealtimeSubscription = useCallback(() => {
     // Clean up existing subscription if any
     if (realtimeChannelRef.current) {
-      realtimeChannelRef.current.unsubscribe();
+      console.log("Cleaning up existing subscription");
+      try {
+        realtimeChannelRef.current.unsubscribe();
+      } catch (e) {
+        console.error("Error unsubscribing from channel:", e);
+      }
       realtimeChannelRef.current = null;
     }
 
@@ -96,11 +101,27 @@ export function UserChat() {
       retryTimeoutRef.current = null;
     }
 
-    console.log("Setting up realtime subscription for messages");
+    // Check if we have a valid Supabase client
+    if (!supabase) {
+      console.error("Supabase client is not initialized");
+      return;
+    }
+
+    // Don't try to reconnect if the tab is not visible
+    if (document.visibilityState !== "visible") {
+      console.log("Tab is not visible, postponing subscription setup");
+      return;
+    }
+
+    console.log("Setting up realtime subscription for messages", {
+      userId,
+      isLoggedIn,
+      channelName: "chat_messages",
+    });
 
     try {
       // Create a new subscription with standard configuration
-      realtimeChannelRef.current = supabase
+      const channel = supabase
         .channel("chat_messages", {
           config: {
             broadcast: { self: true },
@@ -115,7 +136,12 @@ export function UserChat() {
             table: "global_chat_messages",
           },
           async (payload) => {
-            // Rest of the handler remains the same
+            // Only process messages if the tab is visible
+            if (document.visibilityState !== "visible") {
+              console.log("Tab is not visible, skipping message processing");
+              return;
+            }
+
             console.log("Received new message:", payload);
             const newMessage = payload.new as Message;
 
@@ -157,57 +183,89 @@ export function UserChat() {
               return [...prevMessages, newMessage];
             });
           }
-        )
-        .subscribe((status, err) => {
-          console.log("Realtime subscription status:", status, err);
+        );
 
-          if (status === "SUBSCRIBED") {
-            console.log("Successfully subscribed to messages");
-            // Reset retry count on successful subscription
-            retryCountRef.current = 0;
-          } else if (status === "CHANNEL_ERROR") {
-            console.error("Error subscribing to messages:", err);
+      // Store the channel reference
+      realtimeChannelRef.current = channel;
 
-            // Retry logic with exponential backoff
-            if (retryCountRef.current < 5) {
-              const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
-              console.log(
-                `Retrying message subscription in ${delay}ms (attempt ${retryCountRef.current + 1})`
-              );
+      // Subscribe to the channel
+      channel.subscribe((status, err) => {
+        console.log("Realtime subscription status:", status, err);
 
-              retryTimeoutRef.current = setTimeout(() => {
-                retryCountRef.current++;
-                setupRealtimeSubscription();
-              }, delay);
-            }
-          } else if (status === "TIMED_OUT") {
-            console.error("Channel connection timed out");
+        if (status === "SUBSCRIBED") {
+          console.log("Successfully subscribed to messages");
+          // Reset retry count on successful subscription
+          retryCountRef.current = 0;
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("Error subscribing to messages:", err);
+          console.error("Error details:", {
+            status,
+            error: err,
+            userId,
+            isLoggedIn,
+            retryCount: retryCountRef.current,
+          });
 
-            // Retry immediately on timeout
+          // Only retry if the tab is visible
+          if (
+            document.visibilityState === "visible" &&
+            retryCountRef.current < 5
+          ) {
+            const delay = Math.min(1000 * 2 ** retryCountRef.current, 30000);
+            console.log(
+              `Retrying message subscription in ${delay}ms (attempt ${retryCountRef.current + 1})`
+            );
+
+            retryTimeoutRef.current = setTimeout(() => {
+              retryCountRef.current++;
+              setupRealtimeSubscription();
+            }, delay);
+          }
+        } else if (status === "TIMED_OUT") {
+          console.error("Channel connection timed out");
+
+          // Only retry if the tab is visible
+          if (document.visibilityState === "visible") {
             retryTimeoutRef.current = setTimeout(() => {
               setupRealtimeSubscription();
             }, 1000);
-          } else if (status === "CLOSED") {
-            console.log("Channel closed, attempting to reconnect");
+          }
+        } else if (status === "CLOSED") {
+          console.log("Channel closed, attempting to reconnect");
 
-            // Retry with a short delay
+          // Only retry if the tab is visible
+          if (document.visibilityState === "visible") {
             retryTimeoutRef.current = setTimeout(() => {
               setupRealtimeSubscription();
             }, 2000);
           }
-        });
+        }
+      });
     } catch (error) {
       console.error("Error setting up realtime subscription:", error);
+      console.error("Error details:", {
+        error,
+        userId,
+        isLoggedIn,
+        retryCount: retryCountRef.current,
+      });
 
-      // Retry after error
-      retryTimeoutRef.current = setTimeout(() => {
-        setupRealtimeSubscription();
-      }, 5000);
+      // Only retry if the tab is visible
+      if (document.visibilityState === "visible") {
+        retryTimeoutRef.current = setTimeout(() => {
+          setupRealtimeSubscription();
+        }, 5000);
+      }
     }
   }, [userAvatars, userId]);
 
-  // Add this function after the setupRealtimeSubscription function
+  // Add a connection health check function
   const checkConnectionHealth = useCallback(() => {
+    // Only check health if the tab is visible
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+
     if (!realtimeChannelRef.current) {
       console.log("No channel reference, creating new subscription");
       setupRealtimeSubscription();
@@ -229,6 +287,36 @@ export function UserChat() {
       setupRealtimeSubscription();
     }
   }, [setupRealtimeSubscription]);
+
+  // Add visibility change handler
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("Page became visible, checking connection");
+        // Small delay before checking connection to allow browser to stabilize
+        setTimeout(() => {
+          checkConnectionHealth();
+        }, 1000);
+      } else {
+        console.log("Page is hidden, cleaning up connection");
+        // Clean up the connection when the tab is hidden
+        if (realtimeChannelRef.current) {
+          try {
+            realtimeChannelRef.current.unsubscribe();
+          } catch (e) {
+            console.error("Error unsubscribing from channel:", e);
+          }
+          realtimeChannelRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkConnectionHealth]);
 
   // Function to generate a unique ID for pending messages
   const generatePendingId = () => {
@@ -620,43 +708,6 @@ export function UserChat() {
       }
     };
   }, []);
-
-  // Replace the visibility change effect with this improved version
-  useEffect(() => {
-    // Handle page visibility changes
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("Tab is now visible, checking connection status");
-        checkConnectionHealth();
-      }
-    };
-
-    // Add event listener for visibility changes
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    // Set up a periodic connection check
-    const healthCheckInterval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        checkConnectionHealth();
-      }
-    }, 30000); // Check every 30 seconds when visible
-
-    // Set up a forced reconnection every 10 minutes to prevent stale connections
-    const forcedReconnectInterval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        console.log(
-          "Performing scheduled reconnection to prevent stale connection"
-        );
-        setupRealtimeSubscription();
-      }
-    }, 600000); // Every 10 minutes
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(healthCheckInterval);
-      clearInterval(forcedReconnectInterval);
-    };
-  }, [checkConnectionHealth, setupRealtimeSubscription]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

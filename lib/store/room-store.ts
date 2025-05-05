@@ -28,6 +28,7 @@ interface RoomState {
 
   // Actions
   setRoomId: (roomId: string) => void;
+  resetRoomState: () => void;
   fetchRoomDetails: (roomId: string) => Promise<void>;
   fetchPositions: (roomId: string) => Promise<void>;
   fetchTradeHistory: (roomId: string) => Promise<void>;
@@ -75,6 +76,35 @@ export const useRoomStore = create<RoomState>()(
       // Actions
       setRoomId: (roomId) => {
         set({ roomId });
+      },
+
+      resetRoomState: () => {
+        const { cleanupSubscriptions } = get();
+        cleanupSubscriptions();
+
+        set({
+          roomId: null,
+          roomDetails: null,
+          positions: [],
+          tradeHistory: [],
+          virtualCurrency: 0,
+          currentPrice: 0,
+          selectedSymbol: "",
+          isLoading: {
+            room: false,
+            positions: false,
+            tradeHistory: false,
+            virtualCurrency: false,
+          },
+          error: {
+            room: null,
+            positions: null,
+            tradeHistory: null,
+            virtualCurrency: null,
+          },
+          connectionStatus: "disconnected",
+          subscriptions: [],
+        });
       },
 
       fetchRoomDetails: async (roomId) => {

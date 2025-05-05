@@ -9,6 +9,7 @@ import { RoomSkeleton } from "./room-skeleton";
 import { PasswordModal } from "./password-modal";
 import { resetSupabaseClient } from "@/lib/supabase/utils";
 import type { Room, UserProfile } from "@/types/index";
+import { useRoomStore } from "@/lib/store/room-store";
 
 interface RoomsListProps {
   rooms: Room[];
@@ -132,95 +133,32 @@ export function RoomsList({
   const openRoom = useCallback(
     async (room: Room) => {
       try {
-        // Check if this is the same room that was recently opened
-        const isSameRoom = lastOpenedRoomRef.current === room.id;
-        const timeSinceLastOpen = Date.now() - roomOpenTimeRef.current;
+        setOpeningRoom(true);
+        const openingToastId = toast.loading("Opening room...");
 
-        // If trying to open the same room within 5 seconds, show a message
-        if (isSameRoom && timeSinceLastOpen < 5000) {
-          toast.info("This room is already open or was recently opened");
-          setOpeningRoom(false);
-          return;
-        }
+        // Reset room state before opening new room
+        const { resetRoomState } = useRoomStore.getState();
+        resetRoomState();
 
-        // Show a toast that we're opening the room
-        const openingToastId = `opening-room-${room.id}`;
-        toast.loading("Opening room...", { id: openingToastId });
+        // Clean up any existing Supabase connections
+        supabase.removeAllChannels();
 
-        // Clean up before opening a new room
-        await prepareForNewRoom();
+        // Small delay to ensure cleanup is complete
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Update the last opened room reference
-        lastOpenedRoomRef.current = room.id;
-        roomOpenTimeRef.current = Date.now();
-
-        // Generate room slug
-        const roomSlug = `${room.id}-${room.title
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^\w-]+/g, "")}`;
-
-        // Store the room being opened in localStorage to help with state management
-        localStorage.setItem("lastOpenedRoom", room.id);
-
-        // Set a timestamp to track when the room was opened
-        localStorage.setItem("roomOpenedAt", Date.now().toString());
-
-        // Add a cache-busting timestamp to prevent browser caching
-        const timestamp = Date.now();
-
-        // Conditional routing based on room category
-        let roomUrl = "";
-        if (room.roomCategory === "voice") {
-          // For voice rooms, redirect to the voice-room route
-          roomUrl = `${window.location.origin}/voice-room/${roomSlug}?t=${timestamp}`;
-        } else {
-          // For regular rooms, use the existing rooms route
-          roomUrl = `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
-        }
-
-        // Try to open in a popup first
-        let roomWindow = window.open(
-          roomUrl,
+        // Open the room in a new window
+        const roomWindow = window.open(
+          `/rooms/${room.id}`,
           `room_${room.id}`,
-          `width=${screen.width},height=${screen.height},top=0,left=0`
+          "width=1200,height=800"
         );
 
-        // If popup is blocked, try opening in a new tab
         if (!roomWindow) {
-          toast.dismiss(openingToastId);
-          toast.warning("Popup blocked. Opening in new tab instead.", {
+          toast.error("Failed to open room. Please allow popups.", {
             id: openingToastId,
           });
-          roomWindow = window.open(roomUrl, "_blank");
-
-          // If still blocked, show instructions
-          if (!roomWindow) {
-            toast.dismiss(openingToastId);
-            toast.error(
-              "Unable to open room. Please allow popups or click the link below.",
-              {
-                id: openingToastId,
-                duration: 5000,
-              }
-            );
-
-            // Create a clickable link for the user
-            const linkToast = toast.message(
-              <div>
-                <p className="mb-2">Click here to open the room:</p>
-                <a
-                  href={roomUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 underline"
-                >
-                  Open Room
-                </a>
-              </div>,
-              { duration: 10000 }
-            );
-          }
+          setOpeningRoom(false);
+          return;
         } else {
           // Dismiss the toast if window opened successfully
           toast.dismiss(openingToastId);
@@ -233,8 +171,10 @@ export function RoomsList({
           const checkWindowClosed = setInterval(() => {
             if (roomWindow?.closed) {
               clearInterval(checkWindowClosed);
-              // Force a refresh of the Supabase connection when window is closed
-              resetSupabaseClient();
+              // Reset room state when window is closed
+              resetRoomState();
+              // Clean up Supabase connections
+              supabase.removeAllChannels();
               // Small delay before reconnecting
               setTimeout(() => {
                 // Reconnect to Supabase
