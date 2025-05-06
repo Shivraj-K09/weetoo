@@ -311,7 +311,13 @@ export function RoomsList({
           // Public room, dismiss loading toast and open the room
           clearTimeout(timeoutId);
           toast.dismiss(loadingToastId);
-          openRoom(room);
+          try {
+            await openRoom(room);
+          } catch (error) {
+            console.error("[ROOMS LIST] Error opening public room:", error);
+            toast.error("Failed to open room. Please try again.");
+            setOpeningRoom(false);
+          }
         }
       } catch (error) {
         console.error("[ROOMS LIST] Error accessing room:", error);
