@@ -150,8 +150,21 @@ export function RoomsList({
         const roomWindow = window.open(
           `/rooms/${room.id}`,
           `room_${room.id}`,
-          "width=1200,height=800"
+          `width=${screen.width},height=${screen.height},top=0,left=0,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes,fullscreen=yes`
         );
+
+        if (roomWindow) {
+          // Try to maximize the window after it opens
+          try {
+            roomWindow.moveTo(0, 0);
+            roomWindow.resizeTo(screen.width, screen.height);
+            if (roomWindow.document.documentElement.requestFullscreen) {
+              roomWindow.document.documentElement.requestFullscreen();
+            }
+          } catch (e) {
+            console.log("Could not maximize window:", e);
+          }
+        }
 
         if (!roomWindow) {
           toast.error("Failed to open room. Please allow popups.", {
