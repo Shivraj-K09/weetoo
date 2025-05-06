@@ -274,3 +274,37 @@ export interface UserProfitRate {
   total_rooms_opened: number;
   last_updated: string;
 }
+
+// Trading record interface
+export interface TradingRecord {
+  id: string;
+  room_id: string;
+  record_date: string;
+  is_daily: boolean;
+  buy_count: number;
+  buy_profit_percentage: number;
+  sell_count: number;
+  sell_profit_percentage: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Response from the server action
+export interface TradingRecordsResponse {
+  success: boolean;
+  message: string;
+  daily?: TradingRecord;
+  total?: TradingRecord;
+}
+
+// Formatted trading records for display
+export interface FormattedTradingRecords {
+  daily: {
+    buy: { count: number; percentage: number };
+    sell: { count: number; percentage: number };
+  };
+  total: {
+    buy: { count: number; percentage: number };
+    sell: { count: number; percentage: number };
+  };
+}

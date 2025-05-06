@@ -49,6 +49,7 @@ interface Position extends Omit<PositionType, "user_id"> {
   order_type?: "market" | "limit";
   user_id: string; // Make this required
   leverage: number; // Make sure leverage is included
+  quantity?: number; // Add quantity field
 }
 
 interface PositionsPanelProps {
@@ -377,28 +378,6 @@ export function PositionsPanel({
     };
   }, []);
 
-  // Calculate initial margin using the CORRECT formula
-  const calculateInitialMargin = (position: Position): number => {
-    const feeRate = position.order_type === "market" ? 0.0006 : 0.0002;
-
-    // Calculate quantity (in BTC) from position size and entry price
-    const quantity = position.position_size / position.entry_price;
-
-    // Calculate notional value
-    const notionalValue = quantity * position.entry_price;
-
-    // Calculate margin requirement
-    const marginRequirement = notionalValue / position.leverage;
-
-    // Calculate trading fee
-    const tradingFee = notionalValue * feeRate;
-
-    // Calculate initial margin
-    const initialMargin = marginRequirement + tradingFee;
-
-    return initialMargin;
-  };
-
   if (isLoading && positions.length === 0) {
     return (
       <div className="bg-[#212631] p-4 rounded-md">
@@ -422,6 +401,7 @@ export function PositionsPanel({
               <tr>
                 <th className="px-4 py-2 text-left">Symbol</th>
                 <th className="px-4 py-2 text-left">Side</th>
+                <th className="px-4 py-2 text-left">Quantity</th>
                 <th className="px-4 py-2 text-left">Size</th>
                 <th className="px-4 py-2 text-left">Entry</th>
                 <th className="px-4 py-2 text-left">Initial Margin</th>
@@ -437,6 +417,9 @@ export function PositionsPanel({
                   </td>
                   <td className="px-4 py-2">
                     <Skeleton className="h-5 w-12" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-16" />
                   </td>
                   <td className="px-4 py-2">
                     <Skeleton className="h-5 w-20" />
@@ -552,6 +535,7 @@ export function PositionsPanel({
                   <tr>
                     <th className="px-4 py-2 text-left">Symbol</th>
                     <th className="px-4 py-2 text-left">Side</th>
+                    <th className="px-4 py-2 text-left">Quantity</th>
                     <th className="px-4 py-2 text-left">Size</th>
                     <th className="px-4 py-2 text-left">Entry</th>
                     <th className="px-4 py-2 text-left">
@@ -570,15 +554,16 @@ export function PositionsPanel({
                                 Leverage) + (Quantity × Entry Price × Fee Rate)
                                 <br />
                                 <br />
-                                Example with 1 BTC at $94,392.47 with 10x
+                                Example with 0.01 BTC at $93,759.12 with 10x
                                 leverage:
                                 <br />
-                                Position Value: (1 × $94,392.47) ÷ 10 =
-                                $9,439.25
+                                Position Value: 0.01 × $93,759.12 = $937.59
                                 <br />
-                                Trading Fee: 1 × $94,392.47 × 0.0006 = $56.64
+                                Base Margin: $937.59 ÷ 10 = $93.76
                                 <br />
-                                Initial Margin: $9,439.25 + $56.64 = $9,495.89
+                                Trading Fee: $937.59 × 0.0006 = $0.56
+                                <br />
+                                Initial Margin: $93.76 + $0.56 = $94.32
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -622,27 +607,13 @@ export function PositionsPanel({
                       const isProfitable = pnl > 0;
                       const isHostPosition = position.user_id === hostId;
 
-                      // Get the stored initial margin from the database
-                      const storedMargin = position.initial_margin || 0;
-
-                      // Calculate the correct margin
-                      const calculatedMargin = calculateInitialMargin(position);
-
-                      // Calculate quantity in BTC
+                      // Get the quantity (either from the stored value or calculate it)
                       const quantity =
+                        position.quantity ||
                         position.position_size / position.entry_price;
 
-                      // Calculate the expected margin using the formula
-                      const expectedMargin =
-                        (quantity * position.entry_price) / position.leverage +
-                        quantity *
-                          position.entry_price *
-                          (position.order_type === "market" ? 0.0006 : 0.0002);
-
-                      const marginDifference = Math.abs(
-                        expectedMargin - storedMargin
-                      );
-                      const hasMarginDiscrepancy = marginDifference > 0.01;
+                      // Calculate position value
+                      const positionValue = quantity * position.entry_price;
 
                       return (
                         <tr
@@ -686,7 +657,10 @@ export function PositionsPanel({
                             </span>
                           </td>
                           <td className="px-4 py-2">
-                            ${position.position_size.toFixed(2)}
+                            {quantity.toFixed(8)} BTC
+                          </td>
+                          <td className="px-4 py-2">
+                            ${positionValue.toFixed(2)}
                           </td>
                           <td className="px-4 py-2">
                             $
@@ -700,51 +674,30 @@ export function PositionsPanel({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div>
-                                    ${Number(expectedMargin).toFixed(2)}
-                                    {hasMarginDiscrepancy && (
-                                      <span className="ml-1 text-yellow-500 text-xs">
-                                        *
-                                      </span>
-                                    )}
+                                    $
+                                    {Number(position.initial_margin).toFixed(2)}
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-xs">
-                                    Initial Margin = (Quantity × Entry Price ÷
-                                    Leverage) + (Quantity × Entry Price × Fee
-                                    Rate)
+                                    Position Value: {quantity.toFixed(8)} × $
+                                    {position.entry_price.toFixed(2)} = $
+                                    {positionValue.toFixed(2)}
                                     <br />
-                                    <br />
-                                    Quantity: {quantity.toFixed(8)} BTC
-                                    <br />
-                                    Entry Price: $
-                                    {position.entry_price.toFixed(2)}
-                                    <br />
-                                    Leverage: {position.leverage}x
-                                    <br />
-                                    Fee Rate:{" "}
-                                    {position.order_type === "market"
-                                      ? "0.06%"
-                                      : "0.02%"}
-                                    <br />
-                                    <br />
-                                    Position Value: ({quantity.toFixed(8)} × $
-                                    {position.entry_price.toFixed(2)}) ÷{" "}
-                                    {position.leverage} = $
+                                    Base Margin: ${positionValue.toFixed(
+                                      2
+                                    )} ÷ {position.leverage} = $
                                     {(
-                                      (quantity * position.entry_price) /
-                                      position.leverage
+                                      positionValue / position.leverage
                                     ).toFixed(2)}
                                     <br />
-                                    Trading Fee: {quantity.toFixed(8)} × $
-                                    {position.entry_price.toFixed(2)} ×{" "}
+                                    Fee: ${positionValue.toFixed(2)} ×{" "}
                                     {position.order_type === "market"
-                                      ? "0.0006"
-                                      : "0.0002"}{" "}
+                                      ? "0.06%"
+                                      : "0.02%"}{" "}
                                     = $
                                     {(
-                                      quantity *
-                                      position.entry_price *
+                                      positionValue *
                                       (position.order_type === "market"
                                         ? 0.0006
                                         : 0.0002)
@@ -752,18 +705,17 @@ export function PositionsPanel({
                                     <br />
                                     Initial Margin: $
                                     {(
-                                      (quantity * position.entry_price) /
-                                      position.leverage
+                                      positionValue / position.leverage
                                     ).toFixed(2)}{" "}
                                     + $
                                     {(
-                                      quantity *
-                                      position.entry_price *
+                                      positionValue *
                                       (position.order_type === "market"
                                         ? 0.0006
                                         : 0.0002)
                                     ).toFixed(2)}{" "}
-                                    = ${expectedMargin.toFixed(2)}
+                                    = $
+                                    {Number(position.initial_margin).toFixed(2)}
                                   </p>
                                 </TooltipContent>
                               </Tooltip>

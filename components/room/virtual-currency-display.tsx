@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVirtualCurrency } from "@/hooks/use-virtual-currency";
+import { useTrading } from "@/hooks/use-trading";
 import { useDetailedBalance } from "@/hooks/use-detailed-balance";
 import {
   Tooltip,
@@ -25,6 +26,7 @@ export function VirtualCurrencyDisplay({
     roomId,
     isOwner
   );
+  const { positions, totalPnL } = useTrading(roomId, isOwner);
   const { balanceDetails, isLoading: isLoadingBalance } =
     useDetailedBalance(roomId);
   const [isClient, setIsClient] = useState(false);
@@ -142,7 +144,7 @@ export function VirtualCurrencyDisplay({
   }, [roomId]);
 
   // Calculate total initial margin from real-time positions using the CORRECT formula:
-  // Initial Margin = (Position Size ÷ Leverage) + (Position Size × Fee Rate)
+  // Initial Margin = (Position Value ÷ Leverage) + (Position Value × Fee Rate)
   const totalInitialMargin = realTimePositions.reduce((sum, position) => {
     // Use the stored initial_margin value if available
     if (position.initial_margin !== undefined && position.initial_margin > 0) {
@@ -153,10 +155,32 @@ export function VirtualCurrencyDisplay({
     const feeRate = position.order_type === "market" ? 0.0006 : 0.0002;
     const leverage = position.leverage || 1; // Default to 1x if not specified
 
-    // Calculate margin requirement and trading fee
-    const marginRequirement = position.position_size / leverage;
-    const tradingFee = position.position_size * feeRate;
-    const calculatedMargin = marginRequirement + tradingFee;
+    // Get quantity (either from stored value or calculate it)
+    const quantity =
+      position.quantity || position.position_size / position.entry_price;
+
+    // Calculate position value
+    const positionValue = quantity * position.entry_price;
+
+    // Calculate base margin and trading fee
+    const baseMargin = positionValue / leverage;
+    const tradingFee = positionValue * feeRate;
+    const calculatedMargin = baseMargin + tradingFee;
+
+    console.log(
+      `[VirtualCurrencyDisplay] Margin calculation for position ${position.id}:`,
+      {
+        quantity,
+        entry_price: position.entry_price,
+        positionValue,
+        leverage,
+        baseMargin,
+        feeRate,
+        tradingFee,
+        calculatedMargin,
+        storedMargin: position.initial_margin,
+      }
+    );
 
     return sum + calculatedMargin;
   }, 0);
@@ -254,10 +278,10 @@ export function VirtualCurrencyDisplay({
 
           <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
             <p>
-              Initial Margin = (Position Size ÷ Leverage) + (Position Size × Fee
-              Rate)
+              Initial Margin = (Position Value ÷ Leverage) + (Position Value ×
+              Fee Rate)
             </p>
-            <p>Position Size is the amount in USDT you're trading</p>
+            <p>Position Value = Quantity × Entry Price</p>
             <p>Market Orders: 0.06% fee | Limit Orders: 0.02% fee</p>
           </div>
 
@@ -266,18 +290,23 @@ export function VirtualCurrencyDisplay({
               <div className="text-sm font-medium mb-1">Position Margins:</div>
               <div className="max-h-40 overflow-y-auto">
                 {realTimePositions.map((position) => {
-                  // Calculate margin for each position
+                  // Get quantity (either from stored value or calculate it)
+                  const quantity =
+                    position.quantity ||
+                    position.position_size / position.entry_price;
+
+                  // Calculate position value
+                  const positionValue = quantity * position.entry_price;
+
+                  // Calculate margin components
                   const feeRate =
                     position.order_type === "market" ? 0.0006 : 0.0002;
-                  const leverage = position.leverage || 1;
+                  const baseMargin = positionValue / position.leverage;
+                  const tradingFee = positionValue * feeRate;
 
                   // Use stored initial_margin if available, otherwise calculate
                   const margin =
-                    position.initial_margin !== undefined &&
-                    position.initial_margin > 0
-                      ? position.initial_margin
-                      : position.position_size / leverage +
-                        position.position_size * feeRate;
+                    position.initial_margin || baseMargin + tradingFee;
 
                   return (
                     <div

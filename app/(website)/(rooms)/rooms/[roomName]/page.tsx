@@ -11,8 +11,8 @@ interface RoomPageProps {
 }
 
 export default async function Page({ params }: RoomPageProps) {
-  // Properly handle params
-  const roomName = params.roomName;
+  // Properly handle params by awaiting it
+  const { roomName } = await Promise.resolve(params);
 
   // The roomId is the entire part before the first hyphen that follows the UUID
   // This regex matches a UUID pattern
