@@ -138,12 +138,6 @@ export function useRealTimePositions(roomId: string) {
           .eq("status", "open")
           .order("created_at", { ascending: false });
 
-        console.log(
-          "[useRealTimePositions] Fetched positions:",
-          data?.length || 0,
-          data
-        );
-
         if (error) {
           console.error(
             "[useRealTimePositions] Error fetching positions:",
@@ -169,6 +163,22 @@ export function useRealTimePositions(roomId: string) {
           "[useRealTimePositions] Initial positions loaded:",
           data?.length || 0
         );
+        if (data && data.length > 0) {
+          console.log(
+            "[useRealTimePositions] Position details:",
+            data.map((pos) => ({
+              id: pos.id,
+              entry_amount: pos.entry_amount,
+              position_size: pos.position_size,
+              order_type: (pos as any).order_type,
+              initial_margin: (pos as any).initial_margin,
+              calculated_margin:
+                pos.entry_amount +
+                pos.position_size *
+                  ((pos as any).order_type === "market" ? 0.0006 : 0.0002),
+            }))
+          );
+        }
         if (mountedRef.current) {
           setPositions(data || []);
           positionsRef.current = data || [];
@@ -272,15 +282,6 @@ export function useRealTimePositions(roomId: string) {
       )
       .subscribe((status) => {
         console.log("[useRealTimePositions] Subscription status:", status);
-        if (status === "SUBSCRIBED") {
-          console.log(
-            "[useRealTimePositions] Successfully subscribed to position changes"
-          );
-        } else if (status === "CHANNEL_ERROR") {
-          console.error(
-            "[useRealTimePositions] Error subscribing to position changes"
-          );
-        }
       });
 
     subscriptionRef.current = subscription;

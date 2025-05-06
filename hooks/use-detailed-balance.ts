@@ -2,6 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getRoomBalanceDetails } from "@/app/actions/trading-actions";
+import { supabase } from "@/lib/supabase/client";
+
+interface Position {
+  id: string;
+  symbol: string;
+  direction: "buy" | "sell";
+  initialMargin: number;
+  leverage: number;
+  entry_price: number;
+  position_size: number;
+}
 
 interface BalanceDetails {
   holdings: number;
@@ -9,6 +20,7 @@ interface BalanceDetails {
   available: number;
   unrealizedPnl: number;
   valuation: number;
+  positions: Position[];
 }
 
 interface UseDetailedBalance {
@@ -23,6 +35,7 @@ const defaultBalanceDetails: BalanceDetails = {
   available: 0,
   unrealizedPnl: 0,
   valuation: 0,
+  positions: [],
 };
 
 export function useDetailedBalance(roomId: string): UseDetailedBalance {
@@ -31,12 +44,47 @@ export function useDetailedBalance(roomId: string): UseDetailedBalance {
     defaultBalanceDetails
   );
 
+  // Function to fetch positions
+  const fetchPositions = useCallback(async () => {
+    if (!roomId) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from("trading_positions")
+        .select("*")
+        .eq("room_id", roomId)
+        .eq("status", "open");
+
+      if (error) {
+        console.error("[useDetailedBalance] Error fetching positions:", error);
+        return [];
+      }
+
+      return (data || []).map((pos) => ({
+        id: pos.id,
+        symbol: pos.symbol,
+        direction: pos.direction,
+        initialMargin: pos.initial_margin || 0,
+        leverage: pos.leverage || 1,
+        entry_price: pos.entry_price || 0,
+        position_size: pos.position_size || 0,
+      }));
+    } catch (err) {
+      console.error("[useDetailedBalance] Error fetching positions:", err);
+      return [];
+    }
+  }, [roomId]);
+
   const refreshBalance = useCallback(async () => {
     if (!roomId) return;
 
     setIsLoading(true);
     try {
+      // Fetch balance details from server
       const result = await getRoomBalanceDetails(roomId);
+
+      // Fetch positions
+      const positions = await fetchPositions();
 
       if (result.success && result.balance) {
         console.log("[useDetailedBalance] Fetched balance:", result);
@@ -68,6 +116,7 @@ export function useDetailedBalance(roomId: string): UseDetailedBalance {
             !isNaN(result.balance.valuation)
               ? result.balance.valuation
               : 0,
+          positions: positions,
         };
 
         setBalanceDetails(sanitizedBalance);
@@ -76,7 +125,11 @@ export function useDetailedBalance(roomId: string): UseDetailedBalance {
           "[useDetailedBalance] Failed to get detailed balance:",
           result.message
         );
-        // Keep the current values on error
+        // Keep the current values but update positions
+        setBalanceDetails((prev) => ({
+          ...prev,
+          positions: positions,
+        }));
       }
     } catch (error) {
       console.error(
@@ -87,7 +140,7 @@ export function useDetailedBalance(roomId: string): UseDetailedBalance {
     } finally {
       setIsLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, fetchPositions]);
 
   // Initial fetch
   useEffect(() => {
@@ -139,6 +192,41 @@ export function useDetailedBalance(roomId: string): UseDetailedBalance {
           handlePositionUpdate as EventListener
         );
       }
+    };
+  }, [roomId, refreshBalance]);
+
+  // Set up real-time subscription for positions
+  useEffect(() => {
+    if (!roomId) return;
+
+    console.log(
+      "[useDetailedBalance] Setting up subscription for room:",
+      roomId
+    );
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel(`positions_${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "trading_positions",
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => {
+          // Refresh balance when positions change
+          refreshBalance();
+        }
+      )
+      .subscribe((status) => {
+        console.log("[useDetailedBalance] Subscription status:", status);
+      });
+
+    return () => {
+      console.log("[useDetailedBalance] Cleaning up subscription");
+      supabase.removeChannel(subscription);
     };
   }, [roomId, refreshBalance]);
 

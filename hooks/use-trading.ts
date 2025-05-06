@@ -25,10 +25,11 @@ export function useTrading(roomId: string, isOwner = false) {
   const [isLoading, setIsLoading] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeHistory[]>([]);
-  const { subtractVirtualCurrency, addVirtualCurrency } = useVirtualCurrency(
-    roomId,
-    isOwner
-  );
+  const {
+    subtractVirtualCurrency,
+    addVirtualCurrency,
+    getVirtualCurrencyBalance,
+  } = useVirtualCurrency(roomId, isOwner);
   const router = useRouter();
 
   // Calculate total PnL from all positions
@@ -103,9 +104,23 @@ export function useTrading(roomId: string, isOwner = false) {
 
       setIsLoading(true);
       try {
-        // First subtract the entry amount from virtual currency
-        // Note: This is now handled properly in the execute_trade SQL function
-        // We don't need to manually subtract it here, but we'll check if there's enough balance
+        // Calculate the actual cost in USDT based on the current price and quantity
+        const actualCostInUSDT = params.entryAmount * (params.entryPrice || 1);
+
+        // Check if we have enough balance
+        const balanceInfo = await getVirtualCurrencyBalance();
+        if (actualCostInUSDT > balanceInfo.availableBalance) {
+          toast.error(
+            "Insufficient funds. You don't have enough balance to enter this position."
+          );
+          console.log(
+            "[DEBUG] Insufficient funds. Required:",
+            actualCostInUSDT,
+            "Available:",
+            balanceInfo.availableBalance
+          );
+          return { success: false, message: "Insufficient funds" };
+        }
 
         const result = await executeTrade(params);
         if (result.success) {
@@ -125,7 +140,7 @@ export function useTrading(roomId: string, isOwner = false) {
         setIsLoading(false);
       }
     },
-    [refreshPositions, router]
+    [refreshPositions, router, getVirtualCurrencyBalance]
   );
 
   // Close a position

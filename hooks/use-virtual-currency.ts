@@ -1,137 +1,159 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase/client";
 import {
-  getRoomVirtualCurrency,
-  updateRoomVirtualCurrency,
-} from "@/app/actions/virtual-currency-actions";
-import { toast } from "sonner";
+  getVirtualCurrencyBalance,
+  getVirtualCurrencyBalanceAsync,
+} from "@/utils/get-virtual-currency";
 
-// Helper function to extract UUID from a string
-function extractUUID(str: string): string | null {
-  if (!str) return null;
+export function useVirtualCurrency(roomId: string, isOwner = false) {
+  const [virtualCurrency, setVirtualCurrency] = useState<number>(
+    getVirtualCurrencyBalance(roomId)
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  const uuidRegex =
-    /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
-  const match = str.match(uuidRegex);
-  return match ? match[1] : null;
-}
-
-export function useVirtualCurrency(roomId: string, isOwner: boolean) {
-  const [virtualCurrency, setVirtualCurrency] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch virtual currency on component mount
+  // Fetch virtual currency on mount
   useEffect(() => {
-    console.log(
-      "[useVirtualCurrency] Effect running with roomId:",
-      roomId,
-      "isOwner:",
-      isOwner
-    );
-
-    if (!roomId || !isOwner) {
-      console.log(
-        "[useVirtualCurrency] No roomId or not owner, setting currency to 0"
-      );
-      setVirtualCurrency(0);
-      setIsLoading(false);
-      return;
-    }
-
     const fetchVirtualCurrency = async () => {
       try {
-        console.log(
-          "[useVirtualCurrency] Fetching virtual currency for roomId:",
-          roomId
-        );
         setIsLoading(true);
-        const result = await getRoomVirtualCurrency(roomId);
 
-        if (result.success) {
-          console.log(
-            "[useVirtualCurrency] Successfully fetched virtual currency:",
-            result.amount
-          );
-          setVirtualCurrency(result.amount);
-        } else {
-          console.error(
-            "[useVirtualCurrency] Failed to get virtual currency:",
-            result.message
-          );
-          // Don't show toast for permission errors (non-owners)
-          if (
-            (result.message ?? "") !== "Not authenticated" &&
-            !(result.message ?? "").includes("permission")
-          ) {
-            toast.error("Failed to load virtual currency");
-          }
-        }
+        // Get the detailed balance
+        const balanceInfo = await getVirtualCurrencyBalanceAsync(roomId);
+
+        // Update state with available balance
+        setVirtualCurrency(balanceInfo.availableBalance);
       } catch (error) {
-        console.error(
-          "[useVirtualCurrency] Error fetching virtual currency:",
-          error
-        );
+        console.error("Error fetching virtual currency:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchVirtualCurrency();
-  }, [roomId, isOwner]);
 
-  // Function to update virtual currency
-  const updateVirtualCurrency = async (newAmount: number): Promise<boolean> => {
-    try {
-      console.log(
-        "[useVirtualCurrency] Updating virtual currency to:",
-        newAmount
-      );
-      const result = await updateRoomVirtualCurrency(roomId, newAmount);
+    // Set up real-time subscription for virtual currency changes
+    const channel = supabase
+      .channel(`virtual_currency_${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "virtual_currency",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload: {
+          new: { amount?: number } | Record<string, any> | null;
+          old: Record<string, any> | null;
+        }) => {
+          console.log("Virtual currency changed:", payload);
+          // Use type assertion to tell TypeScript that amount exists
+          if (
+            payload.new &&
+            "amount" in payload.new &&
+            typeof payload.new.amount === "number"
+          ) {
+            setVirtualCurrency(payload.new.amount);
+          }
+        }
+      )
+      .subscribe();
 
-      if (result.success) {
-        console.log(
-          "[useVirtualCurrency] Successfully updated virtual currency"
-        );
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId]);
+
+  // Update virtual currency
+  const updateVirtualCurrency = useCallback(
+    async (newAmount: number) => {
+      try {
+        // Only allow updates if user is the owner
+        if (!isOwner) {
+          console.warn("Non-owner attempted to update virtual currency");
+          return false;
+        }
+
+        const { error } = await supabase
+          .from("virtual_currency")
+          .upsert({ room_id: roomId, amount: newAmount });
+
+        if (error) {
+          console.error("Error updating virtual currency:", error);
+          return false;
+        }
+
         setVirtualCurrency(newAmount);
         return true;
-      } else {
-        console.error(
-          "[useVirtualCurrency] Failed to update virtual currency:",
-          result.message
-        );
-        toast.error(result.message || "Failed to update virtual currency");
+      } catch (error) {
+        console.error("Error updating virtual currency:", error);
         return false;
       }
+    },
+    [roomId, isOwner]
+  );
+
+  // Add to virtual currency
+  const addVirtualCurrency = useCallback(
+    async (amount: number) => {
+      try {
+        // Only allow updates if user is the owner
+        if (!isOwner) {
+          console.warn("Non-owner attempted to add virtual currency");
+          return false;
+        }
+
+        const newAmount = virtualCurrency + amount;
+        return await updateVirtualCurrency(newAmount);
+      } catch (error) {
+        console.error("Error adding virtual currency:", error);
+        return false;
+      }
+    },
+    [virtualCurrency, updateVirtualCurrency, isOwner]
+  );
+
+  // Subtract from virtual currency
+  const subtractVirtualCurrency = useCallback(
+    async (amount: number) => {
+      try {
+        // Only allow updates if user is the owner
+        if (!isOwner) {
+          console.warn("Non-owner attempted to subtract virtual currency");
+          return false;
+        }
+
+        if (amount > virtualCurrency) {
+          console.warn("Attempted to subtract more than available");
+          return false;
+        }
+
+        const newAmount = virtualCurrency - amount;
+        return await updateVirtualCurrency(newAmount);
+      } catch (error) {
+        console.error("Error subtracting virtual currency:", error);
+        return false;
+      }
+    },
+    [virtualCurrency, updateVirtualCurrency, isOwner]
+  );
+
+  // Get virtual currency balance (returns an object with balance details)
+  const getBalance = useCallback(async () => {
+    try {
+      const balanceInfo = await getVirtualCurrencyBalanceAsync(roomId);
+      return balanceInfo;
     } catch (error) {
-      console.error(
-        "[useVirtualCurrency] Error updating virtual currency:",
-        error
-      );
-      toast.error("An error occurred while updating virtual currency");
-      return false;
+      console.error("Error getting virtual currency balance:", error);
+      return {
+        availableBalance: virtualCurrency,
+        totalBalance: virtualCurrency,
+        lockedBalance: 0,
+      };
     }
-  };
-
-  // Function to add to virtual currency
-  const addVirtualCurrency = async (amount: number): Promise<boolean> => {
-    console.log("[useVirtualCurrency] Adding to virtual currency:", amount);
-    return updateVirtualCurrency(virtualCurrency + amount);
-  };
-
-  // Function to subtract from virtual currency
-  const subtractVirtualCurrency = async (amount: number): Promise<boolean> => {
-    console.log(
-      "[useVirtualCurrency] Subtracting from virtual currency:",
-      amount
-    );
-    if (virtualCurrency < amount) {
-      toast.error("Insufficient virtual currency");
-      return false;
-    }
-    return updateVirtualCurrency(virtualCurrency - amount);
-  };
+  }, [roomId, virtualCurrency]);
 
   return {
     virtualCurrency,
@@ -139,5 +161,6 @@ export function useVirtualCurrency(roomId: string, isOwner: boolean) {
     updateVirtualCurrency,
     addVirtualCurrency,
     subtractVirtualCurrency,
+    getVirtualCurrencyBalance: getBalance,
   };
 }

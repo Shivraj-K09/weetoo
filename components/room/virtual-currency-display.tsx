@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useVirtualCurrency } from "@/hooks/use-virtual-currency";
-import { useTrading } from "@/hooks/use-trading";
 import { useDetailedBalance } from "@/hooks/use-detailed-balance";
 import {
   Tooltip,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/utils/format-utils";
 import { supabase } from "@/lib/supabase/client";
-import { Skeleton } from "../ui/skeleton";
 
 interface VirtualCurrencyDisplayProps {
   roomId: string;
@@ -27,18 +25,28 @@ export function VirtualCurrencyDisplay({
     roomId,
     isOwner
   );
-  const { positions, totalPnL } = useTrading(roomId, isOwner);
   const { balanceDetails, isLoading: isLoadingBalance } =
     useDetailedBalance(roomId);
   const [isClient, setIsClient] = useState(false);
   const [realTimePositions, setRealTimePositions] = useState<any[]>([]);
   const [realTimePnL, setRealTimePnL] = useState(0);
 
-  // Safe formatting function to prevent NaN display
+  // Safe formatting function to prevent NaN display and handle small decimals
   const safeFormatCurrency = (value: any) => {
     if (value === undefined || value === null || isNaN(value)) {
       return formatCurrency(0);
     }
+
+    // For very small values (less than 0.01), show more decimal places
+    if (Math.abs(value) > 0 && Math.abs(value) < 0.01) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      }).format(value);
+    }
+
     return formatCurrency(value);
   };
 
@@ -133,10 +141,24 @@ export function VirtualCurrencyDisplay({
     };
   }, [roomId]);
 
-  // Calculate total initial margin from real-time positions
+  // Calculate total initial margin from real-time positions using the CORRECT formula:
+  // Initial Margin = (Position Size ÷ Leverage) + (Position Size × Fee Rate)
   const totalInitialMargin = realTimePositions.reduce((sum, position) => {
-    // Use the stored initial_margin value directly
-    return sum + (position.initial_margin || 0);
+    // Use the stored initial_margin value if available
+    if (position.initial_margin !== undefined && position.initial_margin > 0) {
+      return sum + position.initial_margin;
+    }
+
+    // Calculate the margin using the correct formula
+    const feeRate = position.order_type === "market" ? 0.0006 : 0.0002;
+    const leverage = position.leverage || 1; // Default to 1x if not specified
+
+    // Calculate margin requirement and trading fee
+    const marginRequirement = position.position_size / leverage;
+    const tradingFee = position.position_size * feeRate;
+    const calculatedMargin = marginRequirement + tradingFee;
+
+    return sum + calculatedMargin;
   }, 0);
 
   // Calculate holdings (total funds including locked margin)
@@ -183,14 +205,12 @@ export function VirtualCurrencyDisplay({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex flex-col items-center space-y-1 text-sm cursor-help">
+          <div className="flex items-center space-x-2 text-sm cursor-help">
             <span className="font-medium">Available:</span>
             <span>
-              {isLoadingBalance || isLoadingVC ? (
-                <Skeleton className="h-5 w-19 bg-muted-foreground" />
-              ) : (
-                safeFormatCurrency(balanceDetails.available)
-              )}
+              {isLoadingBalance || isLoadingVC
+                ? "Loading..."
+                : safeFormatCurrency(balanceDetails.available)}
             </span>
           </div>
         </TooltipTrigger>
@@ -231,6 +251,52 @@ export function VirtualCurrencyDisplay({
               {safeFormatCurrency(calculatedHoldings + realTimePnL)}
             </div>
           </div>
+
+          <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+            <p>
+              Initial Margin = (Position Size ÷ Leverage) + (Position Size × Fee
+              Rate)
+            </p>
+            <p>Position Size is the amount in USDT you're trading</p>
+            <p>Market Orders: 0.06% fee | Limit Orders: 0.02% fee</p>
+          </div>
+
+          {realTimePositions.length > 0 && (
+            <div className="mt-2 pt-2 border-t">
+              <div className="text-sm font-medium mb-1">Position Margins:</div>
+              <div className="max-h-40 overflow-y-auto">
+                {realTimePositions.map((position) => {
+                  // Calculate margin for each position
+                  const feeRate =
+                    position.order_type === "market" ? 0.0006 : 0.0002;
+                  const leverage = position.leverage || 1;
+
+                  // Use stored initial_margin if available, otherwise calculate
+                  const margin =
+                    position.initial_margin !== undefined &&
+                    position.initial_margin > 0
+                      ? position.initial_margin
+                      : position.position_size / leverage +
+                        position.position_size * feeRate;
+
+                  return (
+                    <div
+                      key={position.id}
+                      className="grid grid-cols-2 gap-1 text-xs py-1"
+                    >
+                      <div>
+                        {position.symbol}{" "}
+                        {position.direction === "buy" ? "Long" : "Short"}:
+                      </div>
+                      <div className="text-right">
+                        {safeFormatCurrency(margin)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

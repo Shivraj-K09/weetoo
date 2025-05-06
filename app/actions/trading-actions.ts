@@ -42,6 +42,7 @@ interface ExecuteTradeParams {
   stopLoss?: number;
   takeProfit?: number;
   orderType?: OrderType; // Added orderType parameter
+  quantity?: number; // Add this parameter for direct BTC quantity input
 }
 
 interface ClosePositionParams {
@@ -67,6 +68,7 @@ export async function executeTrade({
   stopLoss,
   takeProfit,
   orderType = "market", // Default to market order
+  quantity,
 }: ExecuteTradeParams) {
   try {
     console.log("[AMOUNT_DEBUG] executeTrade Starting with params:", {
@@ -79,6 +81,7 @@ export async function executeTrade({
       stopLoss,
       takeProfit,
       orderType, // Log the order type
+      quantity,
     });
 
     // Extract the UUID part from the roomId if needed
@@ -146,22 +149,49 @@ export async function executeTrade({
       };
     }
 
-    // Calculate position size - CRITICAL FIX: Use the exact entry amount provided by the user
-    const positionSize = entryAmount * leverage;
-    console.log(
-      "[AMOUNT_DEBUG] Position size calculation: entryAmount:",
-      entryAmount,
-      "* leverage:",
-      leverage,
-      "=",
-      positionSize
-    );
+    // Calculate position size based on entry amount and leverage
+    // If quantity is provided, use it to calculate position size
+    let positionSize: number;
+    let actualQuantity: number;
 
-    // Check if there's enough virtual currency
-    if (entryAmount > (room.virtual_currency || 0)) {
+    if (quantity !== undefined) {
+      // If quantity (in BTC) is provided directly, calculate position size based on that
+      actualQuantity = quantity;
+      positionSize = quantity * entryPrice * leverage;
+      console.log(
+        "[AMOUNT_DEBUG] Position size calculation from BTC quantity: quantity:",
+        quantity,
+        "* entryPrice:",
+        entryPrice,
+        "* leverage:",
+        leverage,
+        "=",
+        positionSize
+      );
+    } else {
+      // Traditional calculation based on USDT amount
+      positionSize = entryAmount * leverage;
+      actualQuantity = entryAmount / entryPrice;
+      console.log(
+        "[AMOUNT_DEBUG] Position size calculation from USDT: entryAmount:",
+        entryAmount,
+        "* leverage:",
+        leverage,
+        "=",
+        positionSize
+      );
+    }
+
+    // Check if there's enough virtual currency based on the actual cost
+    const actualCost =
+      quantity !== undefined
+        ? quantity * entryPrice // If quantity is provided directly (in BTC)
+        : entryAmount; // If amount is provided directly (in USDT)
+
+    if (actualCost > (room.virtual_currency || 0)) {
       console.log(
         "[executeTrade] Insufficient virtual currency. Required:",
-        entryAmount,
+        actualCost,
         "Available:",
         room.virtual_currency
       );
@@ -192,6 +222,7 @@ export async function executeTrade({
       p_stop_loss: stopLoss || null,
       p_take_profit: takeProfit || null,
       p_order_type: orderType, // Pass the order type to the function
+      p_quantity: actualQuantity, // Pass the actual quantity in BTC
     });
 
     if (error) {

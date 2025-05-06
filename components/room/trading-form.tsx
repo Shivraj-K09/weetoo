@@ -63,7 +63,7 @@ export const TradingForm = React.memo(function TradingForm({
   const [orderType, setOrderType] = useState<"limit" | "market">("market");
   const [leverage, setLeverage] = useState(1);
   const [marginMode, setMarginMode] = useState<"cross" | "isolated">("cross");
-  const [entryAmount, setEntryAmount] = useState("1000");
+  const [quantity, setQuantity] = useState("1"); // This is the direct quantity input
   const [limitPrice, setLimitPrice] = useState(currentPrice.toString());
   const [playSound, setPlaySound] = useState(false);
   const [direction, setDirection] = useState<"buy" | "sell">("buy");
@@ -98,45 +98,39 @@ export const TradingForm = React.memo(function TradingForm({
   const { balanceDetails, isLoading: isLoadingBalance } =
     useDetailedBalance(cleanRoomId);
 
-  // Calculate position size
-  const positionSize = Number.parseFloat(entryAmount || "0") * leverage;
-  console.log("[Formula] Position Size = Entry Amount * Leverage", {
-    entryAmount: Number.parseFloat(entryAmount || "0"),
+  // Parse quantity as number
+  const quantityValue = Number.parseFloat(quantity || "0");
+
+  // Define feeRate
+  const feeRate = 0.0005; // 0.05%
+
+  // Calculate initial margin - this is the amount that will be deducted from the user's balance
+  // For BTC, we need to multiply by the current price to get the USDT value
+  const initialMargin = quantityValue * currentPrice;
+  console.log("[Formula] Initial Margin = Quantity × Current Price", {
+    quantity: quantityValue,
+    currentPrice,
+    result: initialMargin,
+  });
+
+  // Calculate position size with leverage
+  const positionSize = quantityValue * leverage;
+  console.log("[Formula] Position Size = Quantity × Leverage", {
+    quantity: quantityValue,
     leverage,
     result: positionSize,
   });
 
-  // Calculate initial margin using the correct formula
-  const feeRate = orderType === "market" ? 0.0006 : 0.0002;
-  const entryPrice = currentPrice;
+  // Get available balance
+  const availableBalance = balanceDetails?.available || virtualCurrency;
 
-  // Interpret entryAmount as quantity (number of units)
-  const quantity = Number.parseFloat(entryAmount || "0");
-
-  // Calculate margin requirement and fee
-  const marginRequirement = (quantity * entryPrice) / leverage;
-  const tradingFee = quantity * entryPrice * feeRate;
-
-  // Calculate initial margin
-  const initialMargin = marginRequirement + tradingFee;
-
-  console.log(
-    "[Formula] Initial Margin = (Quantity × Entry Price ÷ Leverage) + (Quantity × Entry Price × Fee Rate)",
-    {
-      quantity,
-      entryPrice,
-      leverage,
-      feeRate,
-      marginRequirement,
-      tradingFee,
-      result: initialMargin,
-    }
-  );
+  // Check if user has enough balance
+  const hasEnoughBalance = initialMargin <= availableBalance;
 
   // Debug state changes
   useEffect(() => {
-    console.log("[DEBUG] entryAmount changed:", entryAmount);
-  }, [entryAmount]);
+    console.log("[DEBUG] quantity changed:", quantity);
+  }, [quantity]);
 
   useEffect(() => {
     console.log("[DEBUG] selectedPercentage changed:", selectedPercentage);
@@ -181,19 +175,12 @@ export const TradingForm = React.memo(function TradingForm({
 
     // Use available balance instead of total holdings for percentage calculation
     const availableBalance = balanceDetails?.available || virtualCurrency;
+
+    // Calculate quantity directly from percentage of available balance
     const amount = (availableBalance * percentage) / 100;
     const formattedAmount = amount.toFixed(2);
-    console.log("[DEBUG] Calculated amount:", formattedAmount);
-    console.log(
-      "[Formula] Percentage Amount = Available Balance * Percentage / 100",
-      {
-        availableBalance,
-        percentage,
-        result: amount,
-      }
-    );
-
-    setEntryAmount(formattedAmount);
+    console.log("[DEBUG] Calculated quantity:", formattedAmount);
+    setQuantity(formattedAmount);
   };
 
   // Handle margin mode change
@@ -284,7 +271,7 @@ export const TradingForm = React.memo(function TradingForm({
   const handleSubmit = async (direction: "buy" | "sell") => {
     console.log("[DEBUG] handleSubmit called with direction:", direction);
     try {
-      // ADD THIS CHECK at the beginning of the function
+      // Check if user is host
       if (!isHost) {
         console.log("[DEBUG] Non-host attempted to trade, blocking action");
         toast.error("Only the room host can execute trades");
@@ -295,29 +282,39 @@ export const TradingForm = React.memo(function TradingForm({
       setDirection(direction);
 
       // Validate input
-      const inputAmount = Number.parseFloat(entryAmount);
-      if (isNaN(inputAmount) || inputAmount <= 0) {
-        toast.error("Please enter a valid amount");
+      const inputQuantity = Number.parseFloat(quantity);
+      if (isNaN(inputQuantity) || inputQuantity <= 0) {
+        toast.error("Please enter a valid quantity");
         return;
       }
 
-      // This will notify other components that the host is placing a trade
+      // Calculate the actual cost in USDT based on the current price
+      const actualCostInUSDT = inputQuantity * currentPrice;
+
+      // Check against available balance
+      if (actualCostInUSDT > availableBalance) {
+        toast.error(
+          "Insufficient funds. You don't have enough balance to enter this position."
+        );
+        console.log(
+          "[DEBUG] Insufficient funds. Required:",
+          actualCostInUSDT,
+          "Available:",
+          availableBalance
+        );
+        return;
+      }
+
+      // Notify other components that the host is placing a trade
       const hostTradingEvent = new CustomEvent("host-trading", {
         detail: {
           action: "placing_order",
           direction,
           symbol,
-          amount: inputAmount,
+          quantity: inputQuantity,
         },
       });
       window.dispatchEvent(hostTradingEvent);
-
-      // Check against available balance instead of total virtual currency
-      const availableBalance = balanceDetails?.available || virtualCurrency;
-      if (inputAmount > availableBalance) {
-        toast.error("Insufficient available balance");
-        return;
-      }
 
       // Play sound if enabled
       if (playSound) {
@@ -330,9 +327,10 @@ export const TradingForm = React.memo(function TradingForm({
         roomId,
         symbol,
         direction,
-        entryAmount: inputAmount,
+        entryAmount: inputQuantity, // Use quantity directly as entryAmount
         leverage,
         entryPrice: currentPrice,
+        quantity: inputQuantity, // Pass the quantity directly
       });
 
       console.log("[DEBUG] Trade execution result:", result);
@@ -342,7 +340,7 @@ export const TradingForm = React.memo(function TradingForm({
           `${direction === "buy" ? "Long" : "Short"} position opened successfully`
         );
 
-        // Add this line to emit another event indicating the trade is complete:
+        // Emit event indicating the trade is complete
         window.dispatchEvent(
           new CustomEvent("host-trading", {
             detail: {
@@ -362,9 +360,9 @@ export const TradingForm = React.memo(function TradingForm({
             roomId: cleanRoomId, // Use the clean room ID
             positionId: result.positionId,
             direction,
-            entryAmount: inputAmount,
+            quantity: inputQuantity,
             leverage,
-            positionSize: inputAmount * leverage,
+            positionSize: inputQuantity * leverage,
           },
         });
         window.dispatchEvent(newPositionEvent);
@@ -376,7 +374,7 @@ export const TradingForm = React.memo(function TradingForm({
       } else {
         toast.error(`Failed to open position: ${result.message}`);
 
-        // Add this line to emit an event for failed trades:
+        // Emit event for failed trades
         window.dispatchEvent(
           new CustomEvent("host-trading", {
             detail: {
@@ -401,10 +399,12 @@ export const TradingForm = React.memo(function TradingForm({
     orderType,
     leverage,
     marginMode,
-    entryAmount,
+    quantity,
     limitPrice,
     selectedPercentage,
     virtualCurrency,
+    availableBalance,
+    hasEnoughBalance,
   });
 
   return (
@@ -576,25 +576,31 @@ export const TradingForm = React.memo(function TradingForm({
           <Label className="text-xs text-white/60">주문수량</Label>
           <div className="relative">
             <Input
-              className="h-8 text-white focus-visible:ring-0 focus-visible:border-[#f97316] border border-white/30 rounded text-xs pr-24 bg-transparent selection:bg-[#f97316] selection:text-white"
-              value={entryAmount}
+              className={`h-8 text-white focus-visible:ring-0 focus-visible:border-[#f97316] border ${
+                !hasEnoughBalance && quantityValue > 0
+                  ? "border-red-500"
+                  : "border-white/30"
+              } rounded text-xs pr-24 bg-transparent selection:bg-[#f97316] selection:text-white`}
+              value={quantity}
               onChange={(e) => {
-                console.log(
-                  "[DEBUG] Entry amount changing to:",
-                  e.target.value
-                );
-                setEntryAmount(e.target.value);
+                console.log("[DEBUG] Quantity changing to:", e.target.value);
+                setQuantity(e.target.value);
               }}
               type="number"
               step="0.01"
               min="0"
-              max={(balanceDetails?.available || virtualCurrency).toString()}
               readOnly={!isHost}
             />
             <div className="text-xs text-white/75 absolute right-0 top-0 h-full flex items-center gap-3 pr-3">
-              USDT
+              수량
             </div>
           </div>
+          {!hasEnoughBalance && quantityValue > 0 && (
+            <div className="text-xs text-red-500 mt-1">
+              잔액 부족. 최대 {availableBalance.toFixed(2)} 까지 주문
+              가능합니다.
+            </div>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -751,7 +757,7 @@ export const TradingForm = React.memo(function TradingForm({
               <div className="flex justify-between items-center">
                 <span className="text-xs text-white/70">포지션 크기</span>
                 <span className="text-xs text-white">
-                  {positionSize.toFixed(2)} USDT
+                  {positionSize.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -767,9 +773,6 @@ export const TradingForm = React.memo(function TradingForm({
                       <p className="text-xs">
                         포지션을 열 때 잠기는 금액입니다. 포지션을 닫으면 이
                         금액이 반환됩니다.
-                        <br />
-                        초기 마진 = (수량 × 진입가격 ÷ 레버리지) + (수량 ×
-                        진입가격 × 수수료율)
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -799,22 +802,33 @@ export const TradingForm = React.memo(function TradingForm({
                 <TooltipTrigger asChild>
                   <div className="w-full">
                     <Button
-                      className={`w-full bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                      className={`w-full bg-[#00C879] hover:bg-[#00C879]/90 text-white py-2.5 rounded text-sm font-medium ${
+                        !isHost || !hasEnoughBalance
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
                       onClick={() => handleSubmit("buy")}
-                      disabled={isLoading || !isHost}
+                      disabled={isLoading || !isHost || !hasEnoughBalance}
                     >
                       {isLoading ? "처리 중..." : "매수 / Long"}
                     </Button>
                   </div>
                 </TooltipTrigger>
-                {!isHost && (
+                {!isHost ? (
                   <TooltipContent
                     side="bottom"
                     className="bg-[#1a1e27] border-gray-700 text-white"
                   >
                     <p>Only the host can execute trades in this room</p>
                   </TooltipContent>
-                )}
+                ) : !hasEnoughBalance ? (
+                  <TooltipContent
+                    side="bottom"
+                    className="bg-[#1a1e27] border-gray-700 text-white"
+                  >
+                    <p>Insufficient funds to enter this position</p>
+                  </TooltipContent>
+                ) : null}
               </Tooltip>
             </TooltipProvider>
 
@@ -823,22 +837,33 @@ export const TradingForm = React.memo(function TradingForm({
                 <TooltipTrigger asChild>
                   <div className="w-full">
                     <Button
-                      className={`w-full bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+                      className={`w-full bg-[#FF5252] hover:bg-[#FF5252]/90 text-white py-2.5 rounded text-sm font-medium ${
+                        !isHost || !hasEnoughBalance
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
                       onClick={() => handleSubmit("sell")}
-                      disabled={isLoading || !isHost}
+                      disabled={isLoading || !isHost || !hasEnoughBalance}
                     >
                       {isLoading ? "처리 중..." : "매도 / Short"}
                     </Button>
                   </div>
                 </TooltipTrigger>
-                {!isHost && (
+                {!isHost ? (
                   <TooltipContent
                     side="bottom"
                     className="bg-[#1a1e27] border-gray-700 text-white"
                   >
                     <p>Only the host can execute trades in this room</p>
                   </TooltipContent>
-                )}
+                ) : !hasEnoughBalance ? (
+                  <TooltipContent
+                    side="bottom"
+                    className="bg-[#1a1e27] border-gray-700 text-white"
+                  >
+                    <p>Insufficient funds to enter this position</p>
+                  </TooltipContent>
+                ) : null}
               </Tooltip>
             </TooltipProvider>
           </div>
