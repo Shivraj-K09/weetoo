@@ -32,9 +32,8 @@ export function CreatePostClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add captcha state
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+  // reCAPTCHA token state
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
@@ -56,7 +55,7 @@ export function CreatePostClient() {
       if (result.error) {
         throw new Error(result.error);
       }
-      return result.url || null;
+      return result.url;
     } catch (error) {
       console.error("Error uploading image:", error);
       setError("Failed to upload image. Please try again.");
@@ -65,15 +64,16 @@ export function CreatePostClient() {
     }
   };
 
-  // Add captcha handlers
-  const handleCaptchaVerify = (token: string) => {
-    setCaptchaToken(token);
-    setIsCaptchaVerified(true);
+  // Handle reCAPTCHA verification
+  const handleRecaptchaVerify = (token: string) => {
+    console.log("reCAPTCHA token received:", token.substring(0, 10) + "...");
+    setRecaptchaToken(token);
   };
 
-  const handleCaptchaExpire = () => {
-    setCaptchaToken(null);
-    setIsCaptchaVerified(false);
+  // Handle reCAPTCHA expiration
+  const handleRecaptchaExpire = () => {
+    console.log("reCAPTCHA token expired");
+    setRecaptchaToken(null);
   };
 
   // Handle form submission
@@ -91,8 +91,8 @@ export function CreatePostClient() {
       return;
     }
 
-    if (!captchaToken) {
-      toast.error("Please complete the CAPTCHA verification");
+    if (!recaptchaToken) {
+      toast.error("Please wait a moment while we verify your request");
       return;
     }
 
@@ -111,18 +111,18 @@ export function CreatePostClient() {
         "featuredImages",
         JSON.stringify(postData.featuredImages)
       );
-      formData.append("captchaToken", captchaToken);
+      formData.append("recaptchaToken", recaptchaToken); // Use recaptchaToken instead of captchaToken
 
       // Submit the form
       console.log("Calling createPost server action");
       const result = await createPost(formData);
       console.log("Server action result:", result);
 
-      if (result?.error) {
-        throw new Error(result.error);
+      if (!result) {
+        throw new Error("No response from server");
       }
 
-      if (result?.success) {
+      if (result.success) {
         toast.success(
           result.message || "Your post has been published successfully!"
         );
@@ -180,11 +180,16 @@ export function CreatePostClient() {
             updatePostData={updatePostData}
             onPreview={togglePreview}
             onSave={() => Promise.resolve()}
-            onImageUpload={handleImageUpload}
-            captchaVerified={isCaptchaVerified}
-            onCaptchaVerify={handleCaptchaVerify}
-            onCaptchaExpire={handleCaptchaExpire}
+            onImageUpload={(file: File) =>
+              handleImageUpload(file) as Promise<string | null>
+            }
+            onCaptchaVerify={handleRecaptchaVerify}
+            onCaptchaExpire={handleRecaptchaExpire}
             onPublish={handlePublish}
+            isPublishing={isSaving}
+            isPreviewMode={isPreviewMode}
+            boardType="free-board"
+            recaptchaToken={recaptchaToken}
           />
         )}
       </div>

@@ -1,6 +1,7 @@
 import { supabase } from "./client";
 
 // Add a helper function to reset the Supabase client
+// Updated to be more conservative and not log users out
 export function resetSupabaseClient() {
   try {
     console.log("[SUPABASE] Starting client reset");
@@ -8,14 +9,6 @@ export function resetSupabaseClient() {
     // Remove all channels
     supabase.removeAllChannels();
     console.log("[SUPABASE] All channels removed");
-
-    // Refresh the auth session
-    supabase.auth
-      .refreshSession()
-      .then(() => console.log("[SUPABASE] Auth session refreshed"))
-      .catch((err) =>
-        console.error("[SUPABASE] Error refreshing auth session:", err)
-      );
 
     // Create a new channel to force reconnection
     const reconnectChannel = supabase.channel("system:reconnect");
@@ -25,6 +18,11 @@ export function resetSupabaseClient() {
       // If subscription is successful, we're good to go
       if (status === "SUBSCRIBED") {
         console.log("[SUPABASE] Successfully reconnected");
+
+        // Remove the channel after successful reconnection
+        setTimeout(() => {
+          supabase.removeChannel(reconnectChannel);
+        }, 1000);
       }
 
       // If there's an error, try one more time
@@ -48,6 +46,7 @@ export function resetSupabaseClient() {
 
 // Add a function to completely reinitialize the Supabase client
 // This is a more aggressive reset that can be used if the regular reset fails
+// DO NOT USE THIS FUNCTION - it's kept for reference only
 export async function reinitializeSupabaseClient() {
   try {
     console.log("[SUPABASE] Reinitializing client");
@@ -55,41 +54,18 @@ export async function reinitializeSupabaseClient() {
     // First, remove all channels
     supabase.removeAllChannels();
 
-    // Sign out and back in to force a complete reset
-    const { data: session } = await supabase.auth.getSession();
+    // Create a new channel to force reconnection
+    const reconnectChannel = supabase.channel("system:reconnect-force");
+    reconnectChannel.subscribe((status) => {
+      console.log("[SUPABASE] Force reconnection status:", status);
+      if (status === "SUBSCRIBED") {
+        // Remove the channel once we're successfully reconnected
+        setTimeout(() => supabase.removeChannel(reconnectChannel), 1000);
+      }
+    });
 
-    if (session && session.session) {
-      // Store the current session
-      const currentSession = session.session;
-
-      // Sign out
-      await supabase.auth.signOut({ scope: "local" });
-
-      // Small delay to ensure signout completes
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Sign back in with the session
-      await supabase.auth.setSession({
-        access_token: currentSession.access_token,
-        refresh_token: currentSession.refresh_token,
-      });
-
-      // Create a new channel to force reconnection
-      const reconnectChannel = supabase.channel("system:reconnect-force");
-      reconnectChannel.subscribe((status) => {
-        console.log("[SUPABASE] Force reconnection status:", status);
-        if (status === "SUBSCRIBED") {
-          // Remove the channel once we're successfully reconnected
-          setTimeout(() => supabase.removeChannel(reconnectChannel), 1000);
-        }
-      });
-
-      console.log("[SUPABASE] Client reinitialized successfully");
-      return true;
-    }
-
-    console.log("[SUPABASE] No session to reinitialize");
-    return false;
+    console.log("[SUPABASE] Client reinitialized successfully");
+    return true;
   } catch (error) {
     console.error("[SUPABASE] Failed to reinitialize Supabase client:", error);
     return false;
@@ -97,6 +73,7 @@ export async function reinitializeSupabaseClient() {
 }
 
 // Add a new function to completely reset the client
+// DO NOT USE THIS FUNCTION - it's kept for reference only
 export async function forceResetSupabaseClient() {
   try {
     console.log("[SUPABASE] Force resetting client");
@@ -104,48 +81,29 @@ export async function forceResetSupabaseClient() {
     // Remove all channels
     supabase.removeAllChannels();
 
-    // Get current session
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentSession = sessionData.session;
-
-    if (!currentSession) {
-      console.log("[SUPABASE] No active session found, just removing channels");
-      // No session to reset, but we've removed channels which may help
-      return true;
-    }
-
-    // Store session data
-    const accessToken = currentSession.access_token;
-    const refreshToken = currentSession.refresh_token;
-
-    // Sign out completely
-    await supabase.auth.signOut({ scope: "local" });
-
-    // Wait for signout to complete
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Attempt to set session directly
-    const { error } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+    // Create a new channel to force reconnection
+    const reconnectChannel = supabase.channel("system:force-reconnect");
+    reconnectChannel.subscribe((status) => {
+      console.log("[SUPABASE] Force reconnect status:", status);
+      if (status === "SUBSCRIBED") {
+        // Remove the channel once we're successfully reconnected
+        setTimeout(() => supabase.removeChannel(reconnectChannel), 1000);
+      }
     });
-
-    if (error) {
-      console.error("[SUPABASE] Error resetting session:", error);
-      return false;
-    }
 
     console.log("[SUPABASE] Client force reset successful");
     return true;
   } catch (error) {
     console.error("[SUPABASE] Force reset failed:", error);
+
+    // Even if there's an error, try to create a new channel to force reconnection
+    supabase.channel("error-reconnect").subscribe();
+
     return false;
   }
 }
 
 // Add a function to keep connections alive during page visibility changes
-
-// Add this function to the file:
 /**
  * Keeps Supabase connections alive even when the page is not visible
  * This is especially important for trading applications where real-time
@@ -206,4 +164,27 @@ export function keepConnectionsAlive() {
       createKeepAliveFrame();
     }
   });
+}
+
+// Add a new function to clear all toast notifications
+// Add this new function:
+
+export function clearAllToasts() {
+  if (typeof window !== "undefined") {
+    // This is a hack to access the toast dismiss function if it's available
+    // It assumes you're using a toast library that attaches to window
+    if (
+      "toast" in window &&
+      typeof (window as any).toast?.dismiss === "function"
+    ) {
+      (window as any).toast.dismiss();
+    }
+    // For sonner toast specifically
+    if (
+      "Sonner" in window &&
+      typeof (window as any).Sonner?.dismiss === "function"
+    ) {
+      (window as any).Sonner.dismiss();
+    }
+  }
 }

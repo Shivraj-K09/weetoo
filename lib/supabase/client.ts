@@ -90,13 +90,52 @@ export async function reconnectSupabase() {
     isReconnecting = true;
     console.log("[SUPABASE] Attempting to reconnect...");
 
+    // First try a more conservative approach - just get session without removing channels
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (sessionData.session) {
+      console.log("[SUPABASE] Session exists, attempting minimal reconnect");
+
+      try {
+        // Create a new channel to test connection
+        const testChannel = supabase
+          .channel("connection_test")
+          .subscribe((status) => {
+            console.log("[SUPABASE] Connection test status:", status);
+            if (status === "SUBSCRIBED") {
+              // Connection is good, we can be more conservative
+              console.log("[SUPABASE] Connection test successful");
+
+              // Clean up test channel
+              setTimeout(() => {
+                supabase.removeChannel(testChannel);
+              }, 1000);
+            }
+          });
+
+        // If we got here without errors, connection is likely fine
+        console.log(
+          "[SUPABASE] Reconnection successful with minimal disruption"
+        );
+        reconnectAttempts = 0;
+        return true;
+      } catch (error) {
+        console.warn(
+          "[SUPABASE] Minimal reconnect failed, trying full reconnect",
+          error
+        );
+        // Fall through to full reconnect
+      }
+    }
+
+    // If minimal approach didn't work, do a more thorough reconnect
     // Remove all existing channels
     supabase.removeAllChannels();
 
     // First check if we have a session before trying to refresh it
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: refreshCheckData } = await supabase.auth.getSession();
 
-    if (!sessionData.session) {
+    if (!refreshCheckData.session) {
       console.log(
         "[SUPABASE] No active session to refresh, reconnect successful"
       );

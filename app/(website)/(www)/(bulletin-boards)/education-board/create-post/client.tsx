@@ -32,9 +32,8 @@ export default function EducationPostClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add captcha state
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+  // reCAPTCHA token state
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
@@ -65,18 +64,19 @@ export default function EducationPostClient() {
     }
   };
 
-  // Add captcha handlers
-  const handleCaptchaVerify = (token: string) => {
-    setCaptchaToken(token);
-    setIsCaptchaVerified(true);
+  // Handle reCAPTCHA verification
+  const handleRecaptchaVerify = (token: string) => {
+    console.log("reCAPTCHA token received:", token.substring(0, 10) + "...");
+    setRecaptchaToken(token);
   };
 
-  const handleCaptchaExpire = () => {
-    setCaptchaToken(null);
-    setIsCaptchaVerified(false);
+  // Handle reCAPTCHA expiration
+  const handleRecaptchaExpire = () => {
+    console.log("reCAPTCHA token expired");
+    setRecaptchaToken(null);
   };
 
-  // Modify handlePublish to include captcha token
+  // Modify handlePublish to include reCAPTCHA token
   const handlePublish = async () => {
     console.log("Publish button clicked");
 
@@ -91,8 +91,8 @@ export default function EducationPostClient() {
       return;
     }
 
-    if (!captchaToken) {
-      toast.error("Please complete the CAPTCHA verification");
+    if (!recaptchaToken) {
+      toast.error("Please wait a moment while we verify your request");
       return;
     }
 
@@ -111,18 +111,18 @@ export default function EducationPostClient() {
         "featuredImages",
         JSON.stringify(postData.featuredImages)
       );
-      formData.append("captchaToken", captchaToken);
+      formData.append("recaptchaToken", recaptchaToken); // Use recaptchaToken
 
       // Submit the form
       console.log("Calling createPost server action");
       const result = await createPost(formData);
       console.log("Server action result:", result);
 
-      if (result?.error) {
-        throw new Error(result.error);
+      if (!result) {
+        throw new Error("No response from server");
       }
 
-      if (result?.success) {
+      if (result.success) {
         toast.success(
           result.message || "Your post has been published successfully!"
         );
@@ -145,6 +145,11 @@ export default function EducationPostClient() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    // Placeholder for save functionality
+    toast.info("Saving post (not implemented yet)");
   };
 
   return (
@@ -179,12 +184,15 @@ export default function EducationPostClient() {
             postData={postData}
             updatePostData={updatePostData}
             onPreview={togglePreview}
-            onSave={() => Promise.resolve()}
+            onSave={handleSave}
             onImageUpload={handleImageUpload}
-            captchaVerified={isCaptchaVerified}
-            onCaptchaVerify={handleCaptchaVerify}
-            onCaptchaExpire={handleCaptchaExpire}
+            onCaptchaVerify={handleRecaptchaVerify}
+            onCaptchaExpire={handleRecaptchaExpire}
             onPublish={handlePublish}
+            isPublishing={isSaving}
+            isPreviewMode={isPreviewMode}
+            boardType="education-board"
+            recaptchaToken={recaptchaToken}
           />
         )}
       </div>

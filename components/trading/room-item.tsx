@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { GlobeIcon, LockIcon, MessageSquareIcon, MicIcon } from "lucide-react";
 import type { Room } from "@/types/index";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase/client";
 
 interface RoomItemProps {
   room: Room;
@@ -110,6 +111,21 @@ export function RoomItem({ room, index, onClick }: RoomItemProps) {
           onClick={(e) => {
             e.stopPropagation(); // Prevent the main onClick from firing
 
+            // First, clean up any existing connections
+            supabase.removeAllChannels();
+
+            // Force refresh the auth session
+            supabase.auth
+              .refreshSession()
+              .then(() =>
+                console.log(
+                  "[ROOM ITEM] Auth session refreshed for direct access"
+                )
+              )
+              .catch((err) =>
+                console.error("[ROOM ITEM] Error refreshing auth session:", err)
+              );
+
             // Generate room slug
             const roomSlug = `${room.id}-${room.title
               .toLowerCase()
@@ -122,7 +138,7 @@ export function RoomItem({ room, index, onClick }: RoomItemProps) {
             // Determine the URL based on room category
             const roomUrl =
               room.roomCategory === "voice"
-                ? `${window.location.origin}/voice-rooms/${roomSlug}?t=${timestamp}`
+                ? `${window.location.origin}/voice-room/${roomSlug}?t=${timestamp}`
                 : `${window.location.origin}/rooms/${roomSlug}?t=${timestamp}`;
 
             // Open in a new tab

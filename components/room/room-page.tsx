@@ -37,10 +37,10 @@ import {
   hasHandledRefresh,
   clearRefreshHandled,
 } from "@/utils/room-persistence";
-import { AutoJoin } from "./auto-join";
 import { AutoJoinRoom } from "./auto-join-room";
 import { useRoomStore } from "@/lib/store/room-store";
 
+// Add error boundary and fallback UI
 export default function RoomPage({ roomData }: { roomData: any }) {
   const params = useParams();
   const router = useRouter();
@@ -48,7 +48,9 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const authCheckedRef = useRef(false);
   const authRetryCountRef = useRef(0);
   const maxAuthRetries = 5;
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null | NodeJS.Timeout[]>(
+    []
+  );
   const forceRenderRef = useRef(0);
   const isRefreshRef = useRef(false);
   const mountedRef = useRef(false);
@@ -205,7 +207,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     try {
       // Clear any existing timeout
       if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
+        if (Array.isArray(loadingTimeoutRef.current)) {
+          loadingTimeoutRef.current.forEach((id) => clearTimeout(id));
+        } else {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        loadingTimeoutRef.current = null;
       }
 
       // Reset loading states
@@ -278,30 +285,106 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
     // Clear any existing timeout when component re-renders
     if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
+      if (Array.isArray(loadingTimeoutRef.current)) {
+        (loadingTimeoutRef.current as NodeJS.Timeout[]).forEach((id) =>
+          clearTimeout(id)
+        );
+      } else {
+        clearTimeout(loadingTimeoutRef.current as NodeJS.Timeout);
+      }
+      loadingTimeoutRef.current = null;
     }
 
-    // Set a new timeout - reduced to 10 seconds for faster feedback
+    // Set a new timeout - with progressive feedback
     loadingTimeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
 
       if (isLoading || authLoading) {
-        console.error("[ROOM PAGE] Loading timeout reached after 10 seconds");
-        setLoadTimeout(true);
+        console.warn(
+          "[ROOM PAGE] Initial loading period elapsed, attempting recovery..."
+        );
+
+        // Show a toast but keep trying to recover
+        toast.loading("Connecting to trading room...", {
+          id: "room-page-loading",
+          duration: 8000,
+        });
 
         // Try to recover automatically
         retryAuth().then((success) => {
-          if (!success && mountedRef.current) {
-            console.log("[ROOM PAGE] Auto-recovery failed");
+          if (success && mountedRef.current) {
+            toast.success("Connection established!", {
+              id: "room-page-loading",
+            });
+          } else if (mountedRef.current) {
+            console.warn(
+              "[ROOM PAGE] First recovery attempt failed, continuing..."
+            );
+
+            // Set an extended timeout for a second recovery attempt
+            const extendedTimeoutId = setTimeout(() => {
+              if (!mountedRef.current) return;
+
+              if (isLoading || authLoading) {
+                console.error(
+                  "[ROOM PAGE] Extended loading timeout reached, final recovery attempt"
+                );
+
+                toast.loading("Making final connection attempt...", {
+                  id: "room-page-loading",
+                  duration: 5000,
+                });
+
+                // Final retry with more aggressive approach
+                reconnectSupabase().then(async (reconnected) => {
+                  if (reconnected && mountedRef.current) {
+                    const authSuccess = await retryAuth();
+                    if (authSuccess && mountedRef.current) {
+                      toast.success("Connected successfully!", {
+                        id: "room-page-loading",
+                      });
+                      forceComponentUpdate();
+                    } else if (mountedRef.current) {
+                      setLoadTimeout(true);
+                      toast.error("Connection timed out. Please try again.", {
+                        id: "room-page-loading",
+                      });
+                    }
+                  } else if (mountedRef.current) {
+                    setLoadTimeout(true);
+                    toast.error("Connection timed out. Please try again.", {
+                      id: "room-page-loading",
+                    });
+                  }
+                });
+              }
+            }, 15000); // Additional 15 seconds
+
+            // Store both timeout IDs for cleanup
+            loadingTimeoutRef.current = [
+              loadingTimeoutRef.current as NodeJS.Timeout,
+              extendedTimeoutId,
+            ];
           }
         });
       }
-    }, 10000); // 10 seconds timeout (reduced from 15)
+    }, 10000); // Initial 10 seconds
 
     return () => {
+      // Clear all timeouts
       if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
+        if (Array.isArray(loadingTimeoutRef.current)) {
+          (loadingTimeoutRef.current as NodeJS.Timeout[]).forEach((id) =>
+            clearTimeout(id)
+          );
+        } else {
+          clearTimeout(loadingTimeoutRef.current as NodeJS.Timeout);
+        }
+        loadingTimeoutRef.current = null;
       }
+
+      // Clear any loading toasts
+      toast.dismiss("room-page-loading");
     };
   }, [isLoading, authLoading, retryAuth, forceRender]);
 
@@ -588,16 +671,10 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     return () => {
       if (!mountedRef.current) return;
 
-      console.log("Cleaning up room subscriptions and state");
+      console.log("Cleaning up room subscriptions");
       window.removeEventListener("beforeunload", handleUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-
-      // Clean up all Supabase channels
-      supabase.removeAllChannels();
-
-      // Reset room state
-      const { resetRoomState } = useRoomStore.getState();
-      resetRoomState();
+      supabase.removeChannel(roomSubscription);
     };
   }, [
     roomId,

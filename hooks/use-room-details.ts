@@ -58,10 +58,7 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
       try {
         console.log("[ROOM DETAILS] Checking current user session");
 
-        // First try to refresh the session
-        await supabase.auth.refreshSession();
-
-        // Then get the current session
+        // Get the current session without refreshing first
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -196,16 +193,33 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
       clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set a new timeout to prevent infinite loading
+    // Set a new timeout with progressive feedback
     loadingTimeoutRef.current = setTimeout(() => {
       if (isLoading) {
-        console.error("[ROOM DETAILS] Loading timeout reached");
-        setIsLoading(false);
-        toast.error(
-          "Failed to load room details. Please try refreshing the page."
+        console.log(
+          "[ROOM DETAILS] Initial loading period elapsed, continuing to wait..."
         );
+        // Show a toast but keep trying
+        toast.loading("Still loading room data...", {
+          id: "room-loading",
+          duration: 10000,
+        });
+
+        // Set a second more extended timeout
+        const extendedTimeoutId = setTimeout(() => {
+          if (isLoading) {
+            console.error("[ROOM DETAILS] Extended loading timeout reached");
+            setIsLoading(false);
+            toast.error("Room loading timeout. Please try again.", {
+              id: "room-loading",
+            });
+          }
+        }, 20000); // Additional 20 seconds (35 total)
+
+        // Store the extended timeout ID for cleanup
+        loadingTimeoutRef.current = extendedTimeoutId;
       }
-    }, 15000); // 15 seconds timeout
+    }, 15000); // Initial 15 seconds timeout
 
     // If room data is provided directly, use it
     if (roomData) {
@@ -273,6 +287,10 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
 
     // If no room data provided, fetch it
     const fetchRoomDetails = async () => {
+      // Track if this fetch attempt has been aborted
+      const abortController = new AbortController();
+      const isAborted = { current: false };
+
       try {
         setIsLoading(true);
         fetchAttemptsRef.current += 1;
@@ -287,16 +305,57 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
           `[ROOM DETAILS] Fetching room details for ID: ${roomId} (Attempt ${fetchAttemptsRef.current}/${maxFetchAttempts})`
         );
 
-        // Add a timeout to prevent infinite loading
+        // Add progressive timeouts to prevent infinite loading
         const timeoutId = setTimeout(() => {
-          console.error("[ROOM DETAILS] Fetch timeout - redirecting to home");
-          setIsLoading(false);
-          router.push("/");
-        }, 15000); // 15 seconds timeout
+          console.warn("[ROOM DETAILS] Initial fetch timeout, continuing...");
 
-        // Force refresh auth session before fetching room data
-        await supabase.auth.refreshSession();
+          toast.loading("Still connecting to room...", {
+            id: "fetch-timeout",
+            duration: 10000,
+          });
 
+          // Add a second extended timeout
+          const extendedTimeoutId = setTimeout(() => {
+            if (!isAborted.current) {
+              console.error(
+                "[ROOM DETAILS] Extended fetch timeout - giving user options"
+              );
+              setIsLoading(false);
+
+              toast.error(
+                "Room is taking longer than expected to load. Would you like to continue waiting or go back?",
+                {
+                  id: "fetch-timeout",
+                  duration: 15000,
+                  action: {
+                    label: "Keep Waiting",
+                    onClick: () => {
+                      setIsLoading(true);
+                      toast.loading("Continuing to wait...", {
+                        id: "fetch-timeout",
+                        duration: 20000,
+                      });
+                      fetchRoomDetails();
+                    },
+                  },
+                  cancel: {
+                    label: "Go Back",
+                    onClick: () => {
+                      router.push("/");
+                    },
+                  },
+                }
+              );
+            }
+          }, 20000); // Additional 20 seconds
+
+          // Clean up both timeouts on abort
+          abortController.signal.addEventListener("abort", () => {
+            clearTimeout(extendedTimeoutId);
+          });
+        }, 15000); // Initial 15 seconds
+
+        // Get room data without forcing a refresh first
         const { data, error } = await supabase
           .from("trading_rooms")
           .select("*")
@@ -307,19 +366,29 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
         clearTimeout(timeoutId);
 
         if (error) {
-          console.error("[ROOM DETAILS] Error fetching room details:", error);
-
-          // If we've tried too many times, give up
-          if (fetchAttemptsRef.current >= maxFetchAttempts) {
-            toast.error("Failed to load room details after multiple attempts");
-            router.push("/");
-            return;
+          if (error instanceof Error && error.name === "AbortError") {
+            console.log("[ROOM DETAILS] Fetch aborted, retrying...");
+            // Don't increment the retry counter for aborted requests
+            if (!isAborted.current) {
+              setTimeout(() => {
+                fetchRoomDetails();
+              }, 1000);
+            }
+          } else {
+            console.error("[ROOM DETAILS] Error:", error);
+            // If we've tried too many times, give up
+            if (fetchAttemptsRef.current >= maxFetchAttempts) {
+              setIsLoading(false);
+              toast.error(
+                "Failed to load room details after multiple attempts"
+              );
+            } else {
+              // Otherwise, try again after a delay
+              setTimeout(() => {
+                fetchRoomDetails();
+              }, 2000);
+            }
           }
-
-          // Otherwise, try again after a delay
-          setTimeout(() => {
-            fetchRoomDetails();
-          }, 2000);
 
           return;
         }
@@ -388,17 +457,26 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
 
         setIsLoading(false);
       } catch (error) {
-        console.error("[ROOM DETAILS] Error:", error);
-
-        // If we've tried too many times, give up
-        if (fetchAttemptsRef.current >= maxFetchAttempts) {
-          setIsLoading(false);
-          toast.error("Failed to load room details after multiple attempts");
+        if (error instanceof Error && error.name === "AbortError") {
+          console.log("[ROOM DETAILS] Fetch aborted, retrying...");
+          // Don't increment the retry counter for aborted requests
+          if (!isAborted.current) {
+            setTimeout(() => {
+              fetchRoomDetails();
+            }, 1000);
+          }
         } else {
-          // Otherwise, try again after a delay
-          setTimeout(() => {
-            fetchRoomDetails();
-          }, 2000);
+          console.error("[ROOM DETAILS] Error:", error);
+          // If we've tried too many times, give up
+          if (fetchAttemptsRef.current >= maxFetchAttempts) {
+            setIsLoading(false);
+            toast.error("Failed to load room details after multiple attempts");
+          } else {
+            // Otherwise, try again after a delay
+            setTimeout(() => {
+              fetchRoomDetails();
+            }, 2000);
+          }
         }
       } finally {
         if (fetchAttemptsRef.current >= maxFetchAttempts) {
@@ -446,12 +524,25 @@ export function useRoomDetails(roomData: RoomData | null, roomId: string) {
 
     return () => {
       console.log(`[ROOM DETAILS] Cleaning up subscription for room:${roomId}`);
+      const abortController = new AbortController();
+      const isAborted = { current: false };
+      isAborted.current = true;
+      abortController.abort();
       supabase.removeChannel(roomSubscription);
 
-      // Clear any existing timeout
+      // Clear all existing timeouts
       if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
+        if (Array.isArray(loadingTimeoutRef.current)) {
+          loadingTimeoutRef.current.forEach((id) => clearTimeout(id));
+        } else {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        loadingTimeoutRef.current = null;
       }
+
+      // Clear any existing toasts
+      toast.dismiss("room-loading");
+      toast.dismiss("fetch-timeout");
     };
   }, [
     roomId,

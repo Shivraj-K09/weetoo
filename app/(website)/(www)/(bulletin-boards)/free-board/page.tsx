@@ -12,11 +12,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { getPosts, getTopViewedPosts } from "@/app/actions/post-actions";
 import { formatDistanceToNow } from "date-fns";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { FileText } from "lucide-react";
+import { unstable_noStore } from "next/cache";
 
 export default async function FreeBoard() {
-  const supabase = await createServerClient();
+  unstable_noStore();
+
+  const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -35,7 +38,7 @@ export default async function FreeBoard() {
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="/banner.png"
+          src="https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2070&auto=format&fit=crop"
           alt="trader-banner"
           width={1000}
           height={250}
@@ -114,6 +117,7 @@ export default async function FreeBoard() {
                       src={
                         post.featured_images?.[0] ||
                         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
+                        "/placeholder.svg" ||
                         "/placeholder.svg" ||
                         "/placeholder.svg"
                       }

@@ -1,16 +1,50 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin"; // We'll need to create this
+import { revalidatePath, unstable_noStore } from "next/cache";
 import { cookies } from "next/headers";
 import type { Post } from "@/types";
 import { checkDailyLimit } from "./point-system-actions";
 import { awardPoints } from "./point-system-actions";
 
+// Define a system user ID to use for system actions
+const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"; // This should be replaced with a real admin ID
+
+// Verify reCAPTCHA token
+async function verifyRecaptcha(token: string) {
+  try {
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+
+    if (!secretKey) {
+      console.error("reCAPTCHA secret key is not defined");
+      return { success: false, score: 0 };
+    }
+
+    const response = await fetch(
+      `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`,
+      { method: "POST" }
+    );
+
+    const data = await response.json();
+
+    return {
+      success: data.success,
+      score: data.score,
+      action: data.action,
+      challengeTimestamp: data.challenge_ts,
+    };
+  } catch (error) {
+    console.error("reCAPTCHA verification error:", error);
+    return { success: false, score: 0 };
+  }
+}
+
 // Fetch all posts for the free board
 export async function getPosts(): Promise<Post[]> {
+  unstable_noStore();
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("posts")
@@ -24,7 +58,9 @@ export async function getPosts(): Promise<Post[]> {
       )
       .eq("status", "approved") // Only fetch approved posts
       .eq("category", "free") // Only fetch posts with category "free"
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100) // Add a reasonable limit
+      .throwOnError();
 
     if (error) {
       console.error("Error fetching posts:", error);
@@ -40,8 +76,9 @@ export async function getPosts(): Promise<Post[]> {
 
 // Fetch top viewed posts for the free board
 export async function getTopViewedPosts(count: number): Promise<Post[]> {
+  unstable_noStore();
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("posts")
@@ -56,7 +93,8 @@ export async function getTopViewedPosts(count: number): Promise<Post[]> {
       .eq("status", "approved") // Only fetch approved posts
       .eq("category", "free") // Only fetch posts with category "free"
       .order("view_count", { ascending: false })
-      .limit(count);
+      .limit(count)
+      .throwOnError();
 
     if (error) {
       console.error("Error fetching top viewed posts:", error);
@@ -72,8 +110,9 @@ export async function getTopViewedPosts(count: number): Promise<Post[]> {
 
 // Fetch a single post by ID without incrementing view count
 export async function getPost(id: string): Promise<Post | null> {
+  unstable_noStore();
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const { data: post, error } = await supabase
       .from("posts")
@@ -86,7 +125,8 @@ export async function getPost(id: string): Promise<Post | null> {
       `
       )
       .eq("id", id)
-      .single();
+      .single()
+      .throwOnError();
 
     if (error) {
       console.error("Error fetching post:", error);
@@ -103,7 +143,7 @@ export async function getPost(id: string): Promise<Post | null> {
 // Separate action to increment view count - this will be called from the client
 export async function incrementPostView(postId: string): Promise<void> {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get the current user - using getUser() for security
     const { data: userData } = await supabase.auth.getUser();
@@ -156,12 +196,50 @@ export async function incrementPostView(postId: string): Promise<void> {
   }
 }
 
+// Helper function to get an admin user ID
+async function getAdminUserId(
+  supabase: any,
+  fallbackUserId: string
+): Promise<string> {
+  try {
+    // Try to get a super_admin user
+    const { data: adminUser, error: adminError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("role", "super_admin")
+      .limit(1)
+      .single();
+
+    if (!adminError && adminUser) {
+      return adminUser.id;
+    }
+
+    // Try to get an admin user
+    const { data: regularAdmin, error: regularAdminError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .single();
+
+    if (!regularAdminError && regularAdmin) {
+      return regularAdmin.id;
+    }
+
+    // If no admin found, use the fallback user ID
+    return fallbackUserId;
+  } catch (error) {
+    console.error("Error finding admin user:", error);
+    return fallbackUserId;
+  }
+}
+
 // Create a new post with auto-approval
 export async function createPost(formData: FormData) {
   console.log("Server action: createPost called");
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get the current user - using getUser() for security
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -187,12 +265,31 @@ export async function createPost(formData: FormData) {
     const category = formData.get("category") as string;
     const tagsString = formData.get("tags") as string;
     const featuredImagesString = formData.get("featuredImages") as string;
-    const captchaToken = formData.get("captchaToken") as string;
 
-    // Verify CAPTCHA token if provided
-    if (!captchaToken) {
-      return { error: "CAPTCHA verification failed. Please try again." };
+    // Get reCAPTCHA token - support both old and new token names for backward compatibility
+    const recaptchaToken =
+      (formData.get("recaptchaToken") as string) ||
+      (formData.get("captchaToken") as string);
+
+    // Verify reCAPTCHA token
+    if (!recaptchaToken) {
+      console.error("No reCAPTCHA token provided");
+      return { error: "Security verification failed. Please try again." };
     }
+
+    // Verify the token with Google's API
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
+
+    // Check if verification was successful and score is acceptable
+    if (!recaptchaResult.success || recaptchaResult.score < 0.5) {
+      console.error("reCAPTCHA verification failed:", recaptchaResult);
+      return { error: "Security verification failed. Please try again." };
+    }
+
+    console.log(
+      "reCAPTCHA verification successful with score:",
+      recaptchaResult.score
+    );
 
     // Parse tags and featured images
     const tags = tagsString ? JSON.parse(tagsString) : [];
@@ -213,7 +310,11 @@ export async function createPost(formData: FormData) {
       return { error: "Title, content, and category are required" };
     }
 
-    // Insert the post with status 'pending' so it appears in admin dashboard
+    // Get an admin user ID for logging
+    const adminId = await getAdminUserId(supabase, user.id);
+    const timestamp = new Date().toISOString();
+
+    // First, insert the post with status 'pending' (this should work with RLS)
     const { data: post, error } = await supabase
       .from("posts")
       .insert({
@@ -223,9 +324,9 @@ export async function createPost(formData: FormData) {
         category,
         tags,
         featured_images,
-        status: "pending", // Set to pending so it appears in admin dashboard
+        status: "pending", // Set to pending initially to comply with RLS
         view_count: 0,
-        points_awarded: true, // Mark points as awarded
+        points_awarded: false, // Will be set to true after approval
       })
       .select()
       .single();
@@ -235,7 +336,35 @@ export async function createPost(formData: FormData) {
       return { error: error.message };
     }
 
-    console.log("Post created successfully:", post.id);
+    console.log("Post created successfully with pending status:", post.id);
+
+    // Now, use the admin client to update the post to approved status
+    try {
+      // Create an admin client that bypasses RLS
+      const adminSupabase = await createAdminClient();
+
+      // Update the post to approved status
+      const { error: updateError } = await adminSupabase
+        .from("posts")
+        .update({
+          status: "approved",
+          moderated_by: adminId,
+          moderated_at: timestamp,
+          points_awarded: true,
+          updated_at: timestamp,
+        })
+        .eq("id", post.id);
+
+      if (updateError) {
+        console.error("Error updating post to approved status:", updateError);
+        // Continue anyway, the post is created but will need manual approval
+      } else {
+        console.log("Post updated to approved status:", post.id);
+      }
+    } catch (adminError) {
+      console.error("Error using admin client:", adminError);
+      // Continue anyway, the post is created but will need manual approval
+    }
 
     // Award points immediately
     const pointResult = await awardPoints(
@@ -267,12 +396,11 @@ export async function createPost(formData: FormData) {
     }
 
     if (existingRecord) {
-      // Update existing record - don't use RPC, just update directly
+      // Update existing record - don't use updated_at to avoid schema cache issues
       const { error: activityError } = await supabase
         .from("daily_activity_limits")
         .update({
           posts_created: (existingRecord.posts_created || 0) + 1,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", existingRecord.id);
 
@@ -296,19 +424,22 @@ export async function createPost(formData: FormData) {
 
     // Log admin activity for auto-approval
     try {
-      // Insert directly into admin_activity_log table
-      const { error: logError } = await supabase
+      // Use admin client to bypass RLS for logging
+      const adminSupabase = await createAdminClient();
+
+      // Insert into admin_activity_log table with a valid admin_id
+      const { error: logError } = await adminSupabase
         .from("admin_activity_log")
         .insert({
           action: "post_auto_approve",
           action_label: "Post Auto-Approved",
-          admin_id: null, // Set to null for system actions
+          admin_id: adminId, // Use a valid admin ID
           target: `Post: ${title}`,
           details: `Post ID: ${post.id} was automatically approved by the system. Category: ${category}. User ID: ${user.id}`,
           severity: "low",
           target_id: post.id,
           target_type: "post",
-          timestamp: new Date().toISOString(), // Explicitly set timestamp
+          timestamp: timestamp, // Explicitly set timestamp
         });
 
       if (logError) {
@@ -321,8 +452,19 @@ export async function createPost(formData: FormData) {
       console.error("Error logging auto-approval:", logError);
     }
 
-    // Revalidate the free board page
-    revalidatePath("/free-board");
+    // Revalidate all necessary paths
+    revalidatePath(`/${category}-board`);
+    revalidatePath(`/free-board`); // Also revalidate free-board for the community component
+    revalidatePath(`/`); // Revalidate home page if it shows posts
+
+    // Force revalidation of the specific board page
+    if (category === "free") {
+      revalidatePath("/free-board");
+    } else if (category === "education") {
+      revalidatePath("/education-board");
+    } else if (category === "profit") {
+      revalidatePath("/profit-board");
+    }
 
     // Return success
     return {
@@ -341,7 +483,7 @@ export async function updatePost(formData: FormData) {
   console.log("Server action: updatePost called");
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get the current user - using getUser() for security
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -427,9 +569,20 @@ export async function updatePost(formData: FormData) {
 
     console.log("Post updated successfully:", post.id);
 
-    // Revalidate the free board page and the post page
-    revalidatePath("/free-board");
-    revalidatePath(`/free-board/${id}`);
+    // Revalidate all necessary paths
+    revalidatePath(`/${category}-board`);
+    revalidatePath(`/${category}-board/${id}`);
+    revalidatePath(`/free-board`); // Also revalidate free-board for the community component
+    revalidatePath(`/`); // Revalidate home page if it shows posts
+
+    // Force revalidation of the specific board page
+    if (category === "free") {
+      revalidatePath("/free-board");
+    } else if (category === "education") {
+      revalidatePath("/education-board");
+    } else if (category === "profit") {
+      revalidatePath("/profit-board");
+    }
 
     // Return success
     return {
@@ -446,7 +599,7 @@ export async function updatePost(formData: FormData) {
 // Delete a post
 export async function deletePost(postId: string) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get the current user
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -460,7 +613,7 @@ export async function deletePost(postId: string) {
     // Check if the user is the author of the post
     const { data: post, error: fetchError } = await supabase
       .from("posts")
-      .select("user_id")
+      .select("user_id, category")
       .eq("id", postId)
       .single();
 
@@ -472,6 +625,8 @@ export async function deletePost(postId: string) {
     if (post.user_id !== userId) {
       return { error: "You can only delete your own posts" };
     }
+
+    const category = post.category || "free";
 
     // Update post status to deleted
     const { error } = await supabase
@@ -487,9 +642,20 @@ export async function deletePost(postId: string) {
       return { error: error.message };
     }
 
-    // Revalidate paths
-    revalidatePath("/free-board");
-    revalidatePath(`/free-board/${postId}`);
+    // Revalidate all necessary paths
+    revalidatePath(`/${category}-board`);
+    revalidatePath(`/${category}-board/${postId}`);
+    revalidatePath(`/free-board`); // Also revalidate free-board for the community component
+    revalidatePath(`/`); // Revalidate home page if it shows posts
+
+    // Force revalidation of the specific board page
+    if (category === "free") {
+      revalidatePath("/free-board");
+    } else if (category === "education") {
+      revalidatePath("/education-board");
+    } else if (category === "profit") {
+      revalidatePath("/profit-board");
+    }
 
     return { success: true, message: "Post deleted successfully" };
   } catch (error: any) {
@@ -500,8 +666,12 @@ export async function deletePost(postId: string) {
 
 // Add this new function to fetch posts by category
 export async function getPostsByCategory(category: string): Promise<Post[]> {
+  unstable_noStore();
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
+
+    // Add cache-busting timestamp to ensure fresh data
+    const cacheBuster = new Date().getTime();
 
     const { data, error } = await supabase
       .from("posts")
@@ -515,16 +685,43 @@ export async function getPostsByCategory(category: string): Promise<Post[]> {
       )
       .eq("status", "approved") // Only fetch approved posts
       .eq("category", category) // Filter by category
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100) // Add a reasonable limit
+      .throwOnError();
 
     if (error) {
       console.error(`Error fetching ${category} posts:`, error);
       return [];
     }
 
+    console.log(`Fetched ${data.length} ${category} posts at ${cacheBuster}`);
     return data as Post[];
   } catch (error) {
     console.error(`Unexpected error fetching ${category} posts:`, error);
     return [];
+  }
+}
+
+// Add a new function to force refresh posts data
+export async function refreshPostsData(category: string): Promise<boolean> {
+  try {
+    // Revalidate all necessary paths
+    revalidatePath(`/${category}-board`);
+    revalidatePath(`/free-board`); // Also revalidate free-board for the community component
+    revalidatePath(`/`); // Revalidate home page if it shows posts
+
+    // Force revalidation of the specific board page
+    if (category === "free") {
+      revalidatePath("/free-board");
+    } else if (category === "education") {
+      revalidatePath("/education-board");
+    } else if (category === "profit") {
+      revalidatePath("/profit-board");
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`Error refreshing ${category} posts data:`, error);
+    return false;
   }
 }

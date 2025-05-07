@@ -1,5 +1,7 @@
 "use client";
 
+import type React from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +10,11 @@ import { TiptapEditor } from "./tiptap-editor";
 import { TagInput } from "./tag-input";
 import { ImageUpload } from "./image-upload";
 import { CaptchaWrapper } from "../captcha-wrapper";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { EyeIcon, SaveIcon } from "lucide-react";
+import { Eye, Save } from "lucide-react";
+import { toast } from "sonner";
 
 interface PostData {
   title: string;
@@ -27,7 +30,6 @@ interface CreatePostFormProps {
   onPreview: () => void;
   onSave?: (content: string) => Promise<void>;
   onImageUpload?: (file: File) => Promise<string | null>;
-  captchaVerified?: boolean;
   onCaptchaVerify?: (token: string) => void;
   onCaptchaExpire?: () => void;
   onPublish?: () => void;
@@ -35,6 +37,7 @@ interface CreatePostFormProps {
   isPreviewMode?: boolean;
   isEditing?: boolean;
   boardType?: string;
+  recaptchaToken?: string | null;
 }
 
 export function CreatePostForm({
@@ -50,28 +53,46 @@ export function CreatePostForm({
   isPreviewMode = false,
   isEditing = false,
   boardType = "free-board",
+  recaptchaToken,
 }: CreatePostFormProps) {
   const router = useRouter();
-  const [captchaToken, setCaptchaToken] = useState<string>("");
+  const [isRecaptchaReady, setIsRecaptchaReady] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  // Add a function to handle CAPTCHA verification
-  const handleCaptchaVerify = (token: string) => {
+  // Handle reCAPTCHA verification
+  const handleRecaptchaVerify = (token: string) => {
     setCaptchaToken(token);
+    setIsRecaptchaReady(true);
     if (onCaptchaVerify) {
       onCaptchaVerify(token);
     }
   };
 
-  // Add a function to handle CAPTCHA expiration
-  const handleCaptchaExpire = () => {
-    setCaptchaToken("");
+  // Handle reCAPTCHA expiration
+  const handleRecaptchaExpire = () => {
+    setCaptchaToken(null);
+    setIsRecaptchaReady(false);
     if (onCaptchaExpire) {
       onCaptchaExpire();
     }
   };
 
+  // Monitor recaptchaToken changes from props
+  useEffect(() => {
+    if (recaptchaToken) {
+      setCaptchaToken(recaptchaToken);
+      setIsRecaptchaReady(true);
+    }
+  }, [recaptchaToken]);
+
   const handlePublishClick = (e: React.MouseEvent) => {
     e.preventDefault();
+
+    if (!captchaToken && !recaptchaToken) {
+      toast.error("Please wait a moment while we verify your request");
+      return;
+    }
+
     console.log("Publish/Update button clicked in CreatePostForm");
     if (onPublish) {
       onPublish();
@@ -138,11 +159,12 @@ export function CreatePostForm({
         />
       </div>
 
-      {/* Captcha Section */}
+      {/* Invisible reCAPTCHA */}
       <div className="mt-6">
         <CaptchaWrapper
-          onVerify={handleCaptchaVerify}
-          onExpire={handleCaptchaExpire}
+          onVerify={handleRecaptchaVerify}
+          onExpire={handleRecaptchaExpire}
+          action="create_post"
         />
       </div>
 
@@ -158,7 +180,7 @@ export function CreatePostForm({
 
         {!isPreviewMode && (
           <Button variant="outline" onClick={onPreview} className="gap-2">
-            <EyeIcon className="h-4 w-4" />
+            <Eye className="h-4 w-4" />
             Preview
           </Button>
         )}
@@ -166,16 +188,21 @@ export function CreatePostForm({
         <Button
           className="bg-[#FF4C4C] hover:bg-[#FF4C4C]/90"
           onClick={handlePublishClick}
-          disabled={isPublishing}
+          disabled={
+            isPublishing ||
+            (!isRecaptchaReady && !captchaToken && !recaptchaToken)
+          }
           type="button"
         >
           {isEditing ? (
             <>
-              <SaveIcon className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 mr-2" />
               {isPublishing ? "Saving..." : "Save Changes"}
             </>
           ) : isPublishing ? (
             "Publishing..."
+          ) : !isRecaptchaReady && !captchaToken && !recaptchaToken ? (
+            "Verifying..."
           ) : (
             "Publish"
           )}

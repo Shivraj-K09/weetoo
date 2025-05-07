@@ -13,11 +13,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { getPostsByCategory } from "@/app/actions/post-actions";
+import { unstable_noStore as noStore } from "next/cache";
 
 export default async function EducationBoard() {
-  const supabase = await createServerClient();
+  // Disable caching for this page
+  noStore();
+
+  const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -31,8 +35,8 @@ export default async function EducationBoard() {
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="/banner.png"
-          alt="trader-banner"
+          src="/colorful-learning-banner.png"
+          alt="education-banner"
           width={1000}
           height={250}
           className="w-full rounded object-cover h-[250px]"
@@ -128,7 +132,7 @@ export default async function EducationBoard() {
                       <TableCell className="text-center">{index + 1}</TableCell>
                       <TableCell>
                         <Link
-                          href={`/free-board/${post.id}`}
+                          href={`/education-board/${post.id}`}
                           className="hover:underline block"
                         >
                           <div className="flex items-center gap-2">
