@@ -3,7 +3,7 @@
 import type React from "react";
 
 import { useState, useEffect, useRef } from "react";
-import { User, MessageSquare, Bell, Ban, Flag, X, Send } from "lucide-react";
+import { User, MessageSquare, Ban, Flag, X, Send } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -19,6 +19,14 @@ import {
 } from "@/app/actions/ranking-actions";
 import { formatCurrency } from "@/utils/format-utils";
 import { UserProfileDialog } from "./user-profile-dialog";
+
+// Add these imports at the top
+import {
+  getFollowStatus,
+  followUser,
+  unfollowUser,
+} from "@/app/actions/follow-actions";
+import { createClient } from "@/lib/supabase/client";
 
 export function Ranking() {
   const [messageDialog, setMessageDialog] = useState({
@@ -50,11 +58,20 @@ export function Ranking() {
     userId: "",
   });
 
+  // Add these state variables inside the Ranking component
+  const [followStatusMap, setFollowStatusMap] = useState<
+    Record<string, boolean>
+  >({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followLoading, setFollowLoading] = useState<Record<string, boolean>>(
+    {}
+  );
+
   const rankingTitles = [
     "Top-5 Return Rate Ranking",
     "Top-5 Virtual Money Holding",
     "Top-5 Activity Ranking (XP)",
-    "Top-5 Top Sponsored Users",
+    "Top-5 Top Sponsored Users (Kor_coins)",
     "Top-5 Most Followed Users",
   ];
 
@@ -82,6 +99,21 @@ export function Ranking() {
         // Fetch follower rankings
         const followerData = await getRankings("followers", 5);
         setFollowerRankings(followerData.rankings);
+
+        // Collect all user IDs to check follow status
+        const allUserIds = [
+          ...profitData.rankings,
+          ...virtualData.rankings,
+          ...sponsoredData.rankings,
+          ...activityData.rankings,
+          ...followerData.rankings,
+        ].map((item) => item.user_id);
+
+        // Remove duplicates
+        const uniqueUserIds = [...new Set(allUserIds)];
+
+        // Check follow status for all users
+        checkFollowStatusForUsers(uniqueUserIds);
       } catch (error) {
         console.error("Error fetching rankings:", error);
       } finally {
@@ -90,6 +122,17 @@ export function Ranking() {
     };
 
     fetchRankings();
+  }, [currentUserId]); // Add currentUserId as a dependency
+
+  // Add this useEffect after the existing useEffects
+  useEffect(() => {
+    // Get current user ID
+    const supabase = createClient();
+    const getCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data.user?.id || null);
+    };
+    getCurrentUser();
   }, []);
 
   // Open profile dialog
@@ -223,6 +266,63 @@ export function Ranking() {
     }
   };
 
+  // Add this function before the renderRankingColumn function
+  const handleFollowToggle = async (userId: string) => {
+    if (!currentUserId || userId === currentUserId) return;
+
+    // Set loading state for this specific user
+    setFollowLoading((prev) => ({ ...prev, [userId]: true }));
+
+    try {
+      const isCurrentlyFollowing = followStatusMap[userId] || false;
+
+      // Optimistically update UI
+      setFollowStatusMap((prev) => ({
+        ...prev,
+        [userId]: !isCurrentlyFollowing,
+      }));
+
+      // Perform the actual follow/unfollow action
+      if (isCurrentlyFollowing) {
+        await unfollowUser(userId);
+      } else {
+        await followUser(userId);
+      }
+    } catch (error) {
+      console.error("Error toggling follow status:", error);
+      // Revert on error
+      setFollowStatusMap((prev) => ({ ...prev, [userId]: !prev[userId] }));
+    } finally {
+      setFollowLoading((prev) => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  // Add this function to check follow status for a list of users
+  const checkFollowStatusForUsers = async (userIds: string[]) => {
+    if (!currentUserId || userIds.length === 0) return;
+
+    const statusMap: Record<string, boolean> = {};
+
+    // Check follow status for each user
+    await Promise.all(
+      userIds.map(async (userId) => {
+        try {
+          const response = await getFollowStatus(userId);
+          if (response.success) {
+            statusMap[userId] = response.isFollowing;
+          }
+        } catch (error) {
+          console.error(
+            `Error checking follow status for user ${userId}:`,
+            error
+          );
+        }
+      })
+    );
+
+    setFollowStatusMap((prev) => ({ ...prev, ...statusMap }));
+  };
+
   // Render a single ranking column with a specific title
   const renderRankingColumn = (title: string, index: number) => {
     const rankings = getRankingsByIndex(index);
@@ -306,10 +406,34 @@ export function Ranking() {
                       <span>메시지 보내기</span>
                     </ContextMenuItem>
 
-                    <ContextMenuItem className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50">
-                      <Bell className="h-3.5 w-3.5 mr-2 text-[#e74c3c]" />
-                      <span>구독하기</span>
-                    </ContextMenuItem>
+                    {currentUserId && currentUserId !== item.user_id && (
+                      <ContextMenuItem
+                        className="flex items-center px-3 py-2 text-xs cursor-pointer hover:bg-gray-50"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleFollowToggle(item.user_id);
+                        }}
+                        disabled={followLoading[item.user_id]}
+                      >
+                        {followLoading[item.user_id] ? (
+                          <>
+                            <div className="h-3.5 w-3.5 mr-2 rounded-full border-2 border-[#e74c3c] border-t-transparent animate-spin"></div>
+                            <span>처리 중...</span>
+                          </>
+                        ) : followStatusMap[item.user_id] ? (
+                          <>
+                            <User className="h-3.5 w-3.5 mr-2 text-green-500" />
+                            <span>팔로잉</span>
+                          </>
+                        ) : (
+                          <>
+                            <User className="h-3.5 w-3.5 mr-2 text-[#e74c3c]" />
+                            <span>팔로우</span>
+                          </>
+                        )}
+                      </ContextMenuItem>
+                    )}
                   </div>
 
                   <ContextMenuSeparator />
