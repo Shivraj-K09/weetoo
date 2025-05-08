@@ -56,8 +56,8 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     nickname: "",
-    // New fields for identity verification
-    residentRegistrationNumber: "",
+    // Changed from residentRegistrationNumber to birthDate
+    birthDate: "",
     mobileNumber: "",
   });
 
@@ -96,6 +96,7 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Update the validateForm function to properly check for 6 digits only
   const validateForm = () => {
     // Existing validation
     if (!formData.first_name.trim()) {
@@ -133,17 +134,17 @@ export default function RegisterPage() {
       return false;
     }
 
-    // New validation for identity verification fields
-    if (!formData.residentRegistrationNumber.trim()) {
-      toast.error("Resident Registration Number is required");
+    // Updated validation for birthDate - ONLY 6 digits
+    if (!formData.birthDate.trim()) {
+      toast.error("Birth date is required");
       return false;
     }
 
-    // Basic validation for Korean Resident Registration Number format (YYMMDD-XXXXXXX)
-    const rrnRegex = /^\d{6}-\d{7}$/;
-    if (!rrnRegex.test(formData.residentRegistrationNumber)) {
+    // Strict validation for birthdate format (YYMMDD) - exactly 6 digits
+    const birthDateRegex = /^\d{6}$/;
+    if (!birthDateRegex.test(formData.birthDate)) {
       toast.error(
-        "Please enter a valid Resident Registration Number (YYMMDD-XXXXXXX)"
+        "Please enter a valid birth date (YYMMDD) - exactly 6 digits"
       );
       return false;
     }
@@ -168,6 +169,7 @@ export default function RegisterPage() {
     return true;
   };
 
+  // Update the handleSubmit function to use birthDate instead of RRN
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -184,7 +186,7 @@ export default function RegisterPage() {
 
       const verificationResult = await initiateVerification({
         fullName,
-        residentRegistrationNumber: formData.residentRegistrationNumber,
+        birthDate: formData.birthDate.replace(/-/g, ""), // Send only the birthdate (6 digits)
         mobileNumber: formData.mobileNumber,
       });
 
@@ -195,7 +197,9 @@ export default function RegisterPage() {
           : verificationResult.message || "Failed to initiate verification";
 
         console.error("Verification error:", errorMessage);
-        throw new Error(errorMessage);
+        setVerificationError(errorMessage);
+        toast.error("Failed to initiate verification. Please try again.");
+        return;
       }
 
       // Store verification ID and move to verification code step
@@ -310,27 +314,16 @@ export default function RegisterPage() {
     setShowConfirmPassword((prev) => !prev);
   };
 
-  // Format the Resident Registration Number as user types
-  const handleRRNChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9-]/g, ""); // Allow only numbers and hyphens
+  // Replace the handleBirthDateChange function with this simplified version
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9]/g, ""); // Allow only numbers
 
-    // If user manually entered a hyphen, don't add another one
-    if (value.length === 6 && !value.includes("-")) {
-      value = `${value}-`;
-    } else if (value.length > 6 && !value.includes("-")) {
-      // Add hyphen if it's missing
-      value = `${value.substring(0, 6)}-${value.substring(6, 13)}`;
+    // Strictly limit to 6 digits
+    if (value.length > 6) {
+      value = value.substring(0, 6);
     }
 
-    // Limit to correct length
-    if (value.includes("-")) {
-      const parts = value.split("-");
-      if (parts[0].length > 6) parts[0] = parts[0].substring(0, 6);
-      if (parts[1] && parts[1].length > 7) parts[1] = parts[1].substring(0, 7);
-      value = parts.join("-");
-    }
-
-    setFormData((prev) => ({ ...prev, residentRegistrationNumber: value }));
+    setFormData((prev) => ({ ...prev, birthDate: value }));
   };
 
   // Format the mobile number as user types
@@ -361,7 +354,13 @@ export default function RegisterPage() {
     // Limit to correct length
     if (value.split("-").join("").length > 11) {
       const parts = value.split("-");
-      value = parts.slice(0, 3).join("-");
+      if (parts.length === 3) {
+        value = `${parts[0]}-${parts[1]}-${parts[2].substring(0, 4)}`;
+      } else if (parts.length === 2) {
+        value = `${parts[0]}-${parts[1].substring(0, 8)}`;
+      } else {
+        value = value.substring(0, 11);
+      }
     }
 
     setFormData((prev) => ({ ...prev, mobileNumber: value }));
@@ -516,18 +515,23 @@ export default function RegisterPage() {
                 />
               </div>
 
+              {/* Replace the birthDate input field with this updated version */}
               <div>
                 <Input
-                  id="residentRegistrationNumber"
-                  name="residentRegistrationNumber"
+                  id="birthDate"
+                  name="birthDate"
                   type="text"
-                  placeholder="Resident Registration Number (YYMMDD-XXXXXXX)"
+                  placeholder="Birth Date (YYMMDD) - 6 digits only"
                   className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
                   required
-                  maxLength={14}
-                  value={formData.residentRegistrationNumber}
-                  onChange={handleRRNChange}
+                  maxLength={6}
+                  value={formData.birthDate}
+                  onChange={handleBirthDateChange}
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter only the 6 digits of your birth date (e.g., 980215 for
+                  Feb 15, 1998)
+                </p>
               </div>
 
               <div>

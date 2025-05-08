@@ -28,6 +28,9 @@ interface PortOneVerificationResult {
 const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET;
 const PORTONE_API_URL = "https://api.portone.io/v2";
 
+// Add a debug mode flag at the top of the file
+const DEBUG_MODE = true; // Set to false in production
+
 // Get access token from PortOne
 export async function getPortOneToken(): Promise<{
   success: boolean;
@@ -102,10 +105,10 @@ export async function getPortOneToken(): Promise<{
   }
 }
 
-// Initiate identity verification
+// Update the initiateVerification function to work with only the birthdate portion (first 6 digits)
 export async function initiateVerification(formData: {
   fullName: string;
-  residentRegistrationNumber: string;
+  birthDate: string; // Changed from residentRegistrationNumber to birthDate
   mobileNumber: string;
 }): Promise<{
   success: boolean;
@@ -115,13 +118,44 @@ export async function initiateVerification(formData: {
 }> {
   try {
     // Log the start of verification process (without sensitive data)
-    console.log("Starting identity verification process");
+    if (DEBUG_MODE)
+      console.log("Starting identity verification process", {
+        fullName: formData.fullName,
+      });
 
-    // Format the mobile number correctly if needed
-    const formattedMobileNumber = formData.mobileNumber.replace(/-/g, "");
+    // Format the mobile number correctly - remove all non-numeric characters
+    const formattedMobileNumber = formData.mobileNumber.replace(/[^0-9]/g, "");
 
-    // Format the RRN correctly if needed
-    const formattedRRN = formData.residentRegistrationNumber.replace(/-/g, "");
+    // Format the birthdate correctly - remove all non-numeric characters
+    const formattedBirthDate = formData.birthDate.replace(/[^0-9]/g, "");
+
+    if (DEBUG_MODE) {
+      console.log(
+        "Formatted mobile number length:",
+        formattedMobileNumber.length
+      );
+      console.log("Formatted birthdate length:", formattedBirthDate.length);
+    }
+
+    // Validate formatted data
+    if (
+      formattedMobileNumber.length < 10 ||
+      formattedMobileNumber.length > 11
+    ) {
+      return {
+        success: false,
+        message: "Invalid mobile number format",
+        errorDetails: "Mobile number must be 10-11 digits",
+      };
+    }
+
+    if (formattedBirthDate.length !== 6) {
+      return {
+        success: false,
+        message: "Invalid birthdate format",
+        errorDetails: "Birthdate must be exactly 6 digits (YYMMDD)",
+      };
+    }
 
     const tokenResult = await getPortOneToken();
 
@@ -134,27 +168,33 @@ export async function initiateVerification(formData: {
       };
     }
 
-    console.log("Successfully obtained PortOne token");
+    if (DEBUG_MODE) console.log("Successfully obtained PortOne token");
 
     // Create identity verification request
-    console.log("Sending identity verification request to PortOne");
+    if (DEBUG_MODE)
+      console.log("Sending identity verification request to PortOne");
 
+    // Prepare the request body according to PortOne API specifications
+    // Note: We're now using only the birthdate instead of the full RRN
     const requestBody = {
       name: formData.fullName,
-      residentRegistrationNumber: formattedRRN,
+      birthDate: formattedBirthDate, // Using only the birthdate portion
       mobileNumber: formattedMobileNumber,
       // Add any other required fields based on PortOne API documentation
     };
 
-    console.log(
-      "Request structure:",
-      JSON.stringify({
-        ...requestBody,
-        residentRegistrationNumber: "MASKED",
-        mobileNumber: "MASKED",
-      })
-    );
+    if (DEBUG_MODE) {
+      console.log(
+        "Request structure:",
+        JSON.stringify({
+          ...requestBody,
+          birthDate: formattedBirthDate, // We can show this since it's not as sensitive as the full RRN
+          mobileNumber: "MASKED",
+        })
+      );
+    }
 
+    // Make the API request with proper error handling
     const verificationResponse = await fetch(
       `${PORTONE_API_URL}/identity-verifications`,
       {
@@ -167,17 +207,20 @@ export async function initiateVerification(formData: {
       }
     );
 
+    // Handle non-successful responses
     if (!verificationResponse.ok) {
       let errorDetails = "";
       try {
         const text = await verificationResponse.text();
-        console.error("PortOne verification error response:", text);
+        if (DEBUG_MODE)
+          console.error("PortOne verification error response:", text);
 
         if (text) {
           try {
             const errorJson = JSON.parse(text);
             errorDetails = JSON.stringify(errorJson);
-            console.error("Parsed error details:", errorDetails);
+            if (DEBUG_MODE)
+              console.error("Parsed error details:", errorDetails);
           } catch {
             errorDetails = text;
           }
@@ -195,13 +238,21 @@ export async function initiateVerification(formData: {
       };
     }
 
-    console.log("Successfully created identity verification request");
-    const verificationData: PortOneVerificationResponse =
-      await verificationResponse.json();
-    console.log(
-      "Received verification ID:",
-      verificationData.identityVerificationId
-    );
+    if (DEBUG_MODE)
+      console.log("Successfully created identity verification request");
+
+    // Parse the successful response
+    const verificationData = await verificationResponse.json();
+    if (DEBUG_MODE)
+      console.log("Verification response:", JSON.stringify(verificationData));
+
+    if (!verificationData.identityVerificationId) {
+      return {
+        success: false,
+        message: "Invalid response from PortOne API",
+        errorDetails: "Missing identityVerificationId in response",
+      };
+    }
 
     // Store verification ID in a cookie for the session
     const cookieStore = await cookies();
@@ -217,7 +268,8 @@ export async function initiateVerification(formData: {
     );
 
     // Send verification code to user's mobile
-    console.log("Sending verification code to mobile");
+    if (DEBUG_MODE) console.log("Sending verification code to mobile");
+
     const sendResponse = await fetch(
       `${PORTONE_API_URL}/identity-verifications/${verificationData.identityVerificationId}/send`,
       {
@@ -237,7 +289,8 @@ export async function initiateVerification(formData: {
       let errorDetails = "";
       try {
         const text = await sendResponse.text();
-        console.error("PortOne send verification code error:", text);
+        if (DEBUG_MODE)
+          console.error("PortOne send verification code error:", text);
 
         if (text) {
           try {
@@ -260,7 +313,8 @@ export async function initiateVerification(formData: {
       };
     }
 
-    console.log("Successfully sent verification code");
+    if (DEBUG_MODE) console.log("Successfully sent verification code");
+
     return {
       success: true,
       verificationId: verificationData.identityVerificationId,
