@@ -7,16 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { getNaverOAuthURL } from "@/lib/auth/naver";
 import { supabase, type SupportedProvider } from "@/lib/supabase/client";
-import { ArrowRight, Eye, EyeOff, TrendingUp } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { ArrowRight, Eye, EyeOff, TrendingUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import {
+  initiateVerification,
+  confirmVerification,
+} from "@/app/actions/portone-verification";
+
+// Define verification steps
+enum VerificationStep {
+  INITIAL_FORM = 0,
+  VERIFICATION_CODE = 1,
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -26,7 +34,17 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState<boolean>(false);
   const [agreeTerms, setAgreeTerms] = useState<boolean>(false);
-  const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+
+  // Verification state
+  const [verificationStep, setVerificationStep] = useState<VerificationStep>(
+    VerificationStep.INITIAL_FORM
+  );
+  const [verificationCode, setVerificationCode] = useState<string>("");
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  );
+  const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -36,16 +54,10 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     nickname: "",
+    // New fields for identity verification
+    residentRegistrationNumber: "",
+    mobileNumber: "",
   });
-
-  useEffect(() => {
-    // Simulate loading delay
-    const timer = setTimeout(() => {
-      setIsPageLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   // Slides with titles and subtitles
   const slides = [
@@ -83,6 +95,7 @@ export default function RegisterPage() {
   };
 
   const validateForm = () => {
+    // Existing validation
     if (!formData.first_name.trim()) {
       toast.error("First name is required");
       return false;
@@ -118,6 +131,33 @@ export default function RegisterPage() {
       return false;
     }
 
+    // New validation for identity verification fields
+    if (!formData.residentRegistrationNumber.trim()) {
+      toast.error("Resident Registration Number is required");
+      return false;
+    }
+
+    // Basic validation for Korean Resident Registration Number format (YYMMDD-XXXXXXX)
+    const rrnRegex = /^\d{6}-\d{7}$/;
+    if (!rrnRegex.test(formData.residentRegistrationNumber)) {
+      toast.error(
+        "Please enter a valid Resident Registration Number (YYMMDD-XXXXXXX)"
+      );
+      return false;
+    }
+
+    if (!formData.mobileNumber.trim()) {
+      toast.error("Mobile Number is required");
+      return false;
+    }
+
+    // Basic validation for Korean mobile number format
+    const mobileRegex = /^01[016789]-\d{3,4}-\d{4}$/;
+    if (!mobileRegex.test(formData.mobileNumber)) {
+      toast.error("Please enter a valid mobile number (010-XXXX-XXXX)");
+      return false;
+    }
+
     if (!agreeTerms) {
       toast.error("You must agree to the Terms of Service and Privacy Policy");
       return false;
@@ -133,9 +173,61 @@ export default function RegisterPage() {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setVerificationError(null);
 
     try {
-      // Register with Supabase
+      // Initiate identity verification
+      const fullName = `${formData.last_name}${formData.first_name}`; // Korean name format: Last name + First name
+
+      const verificationResult = await initiateVerification({
+        fullName,
+        residentRegistrationNumber: formData.residentRegistrationNumber,
+        mobileNumber: formData.mobileNumber,
+      });
+
+      if (!verificationResult.success) {
+        throw new Error(
+          verificationResult.message || "Failed to initiate verification"
+        );
+      }
+
+      // Store verification ID and move to verification code step
+      setVerificationId(verificationResult.verificationId || null);
+      setVerificationStep(VerificationStep.VERIFICATION_CODE);
+      toast.success("Verification code sent to your mobile number");
+    } catch (err) {
+      console.error("Verification initiation error:", err);
+      setVerificationError(
+        err instanceof Error ? err.message : "Failed to start verification"
+      );
+      toast.error("Failed to initiate verification. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerificationCodeSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    if (!verificationCode.trim()) {
+      toast.error("Please enter the verification code");
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationError(null);
+
+    try {
+      // Confirm verification with code
+      const confirmResult = await confirmVerification(verificationCode);
+
+      if (!confirmResult.success || !confirmResult.verified) {
+        throw new Error(confirmResult.message || "Failed to verify identity");
+      }
+
+      // Verification successful, now create Supabase account
       const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -145,6 +237,9 @@ export default function RegisterPage() {
             last_name: formData.last_name,
             nickname: formData.nickname,
             role: "user",
+            // Store verification data in user metadata
+            verified: true,
+            verification_date: new Date().toISOString(),
           },
         },
       });
@@ -157,10 +252,15 @@ export default function RegisterPage() {
       // Redirect to login page with success message
       router.push("/login?registered=true");
     } catch (err) {
-      console.error("Registration error:", err);
-      toast.error("Failed to create account. Please try again.");
+      console.error("Verification or registration error:", err);
+      setVerificationError(
+        err instanceof Error ? err.message : "Failed to complete verification"
+      );
+      toast.error(
+        "Failed to verify identity or create account. Please try again."
+      );
     } finally {
-      setIsLoading(false);
+      setIsVerifying(false);
     }
   };
 
@@ -198,12 +298,48 @@ export default function RegisterPage() {
     setShowConfirmPassword((prev) => !prev);
   };
 
+  // Format the Resident Registration Number as user types
+  const handleRRNChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9]/g, ""); // Remove non-numeric characters
+
+    // Add hyphen after the first 6 digits
+    if (value.length > 6) {
+      value = `${value.substring(0, 6)}-${value.substring(6, 13)}`;
+    }
+
+    setFormData((prev) => ({ ...prev, residentRegistrationNumber: value }));
+  };
+
+  // Format the mobile number as user types
+  const handleMobileNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9]/g, ""); // Remove non-numeric characters
+
+    // Format as 010-XXXX-XXXX or 010-XXX-XXXX
+    if (value.length > 3 && value.length <= 7) {
+      value = `${value.substring(0, 3)}-${value.substring(3)}`;
+    } else if (value.length > 7) {
+      value = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
+    }
+
+    setFormData((prev) => ({ ...prev, mobileNumber: value }));
+  };
+
+  // Go back to the initial form
+  const handleBackToForm = () => {
+    setVerificationStep(VerificationStep.INITIAL_FORM);
+    setVerificationCode("");
+    setVerificationError(null);
+  };
+
   return (
-    <div className="flex min-h-screen w-full bg-background">
-      {/* Brand in top left */}
+    <div className="flex min-h-screen w-full bg-black text-white">
+      {/* Logo in top left */}
       <div className="absolute left-6 top-6 z-10 flex w-[calc(100%-3rem)] items-center justify-between md:left-10 md:top-10 md:w-[calc(50%-5rem)]">
         <div className="flex items-center space-x-2">
-          <TrendingUp className="h-6 w-6 text-[#e74c3c]" aria-hidden="true" />
+          <TrendingUpIcon
+            className="h-6 w-6 text-[#e74c3c]"
+            aria-hidden="true"
+          />
           <span className="text-xl font-bold">
             <span className="text-[#e74c3c]">W</span>EE
             <span className="text-[#e74c3c]">T</span>OO
@@ -211,418 +347,320 @@ export default function RegisterPage() {
         </div>
         <Link
           href="/"
-          className="text-sm font-medium text-muted-foreground hover:text-[#e74c3c] hover:underline"
+          className="text-sm font-medium text-gray-400 hover:text-[#e74c3c] hover:underline"
           aria-label="Return to main website"
         >
           Back to website
         </Link>
       </div>
-      {/* Back to website link in top right */}
 
       {/* Form Section */}
-      <main className="relative flex w-full flex-col justify-center px-4 md:w-1/2 md:px-8 lg:px-12 xl:px-16">
-        {isPageLoading ? (
-          <div className="mx-auto w-full max-w-md space-y-8">
-            {/* Skeleton for title and subtitle */}
-            <div className="space-y-3">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-64" />
-            </div>
-
-            {/* Skeleton for social login buttons */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <Skeleton className="h-12 w-full rounded-xl" />
-                <Skeleton className="h-12 w-full rounded-xl" />
-                <Skeleton className="h-12 w-full rounded-xl" />
-              </div>
-
-              {/* Skeleton for divider */}
-              <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center">
-                  <Skeleton className="h-[1px] w-full" />
-                </div>
-                <div className="relative flex justify-center">
-                  <Skeleton className="h-4 w-40 rounded-sm" />
-                </div>
-              </div>
-
-              {/* Skeleton for form fields */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-4 w-64" />
-                </div>
-                <Skeleton className="h-12 w-full rounded-xl" />
-              </div>
-
-              {/* Skeleton for sign in link */}
-              <div className="flex justify-center pt-4">
-                <Skeleton className="h-4 w-48" />
-              </div>
-            </div>
+      <main className="relative flex w-full flex-col justify-center px-6 md:w-1/2 md:px-10 lg:px-16 xl:px-20">
+        <div className="mx-auto w-full max-w-md">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold">Create account</h1>
+            <p className="mt-2 text-gray-400">
+              Join thousands of users on our platform
+            </p>
           </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mx-auto w-full max-w-md"
-          >
-            <div className="mb-10">
-              <motion.h1
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-3xl font-bold"
-              >
-                Create account
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="mt-2 text-muted-foreground"
-              >
-                Join thousands of users on our platform
-              </motion.p>
-            </div>
 
-            {/* Social Login Buttons - Side by Side */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mb-8"
-            >
+          {verificationStep === VerificationStep.INITIAL_FORM ? (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* Social login buttons */}
               <div className="grid grid-cols-3 gap-3">
                 {/* Google Login */}
-                <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    className="h-12 w-full rounded-xl border-[#e74c3c]/20 bg-transparent px-0 hover:bg-[#e74c3c]/5 cursor-pointer"
-                    aria-label="Sign up with Google"
-                    onClick={() => handleSocialLogin("google")}
-                  >
-                    <Icons.google2Icon className="w-5 h-5" />
-                    <span className="sr-only">Sign up with Google</span>
-                  </Button>
-                </motion.div>
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="h-12 w-full rounded-xl border-gray-800 bg-transparent px-0 hover:bg-gray-800"
+                  aria-label="Sign up with Google"
+                  onClick={() => handleSocialLogin("google")}
+                >
+                  <Icons.google2Icon className="w-5 h-5" />
+                </Button>
 
                 {/* Kakao Login */}
-                <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    className="h-12 w-full rounded-xl border-[#e74c3c]/20 !bg-[#FEE500] px-0 !text-black hover:!bg-[#FEE500]/90 hover:!text-black cursor-pointer"
-                    aria-label="Sign up with Kakao"
-                    onClick={() => handleSocialLogin("kakao")}
-                  >
-                    <Icons.kakao2Icon className="w-5 h-5" />
-                    <span className="sr-only">Sign up with Kakao</span>
-                  </Button>
-                </motion.div>
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="h-12 w-full rounded-xl border-gray-800 !bg-[#FEE500] px-0 !text-black hover:!bg-[#FEE500]/90 hover:!text-black"
+                  aria-label="Sign up with Kakao"
+                  onClick={() => handleSocialLogin("kakao")}
+                >
+                  <Icons.kakao2Icon className="w-5 h-5" />
+                </Button>
 
                 {/* Naver Login */}
-                <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    className="h-12 w-full rounded-xl border-[#e74c3c]/20 !bg-[#03C75A] px-0 !text-white hover:!bg-[#03C75A]/90 hover:!text-white cursor-pointer"
-                    aria-label="Sign up with Naver"
-                    onClick={() => handleSocialLogin("naver")}
-                  >
-                    <Icons.naver2Icon className="w-5 h-5" />
-                    <span className="sr-only">Sign up with Naver</span>
-                  </Button>
-                </motion.div>
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="h-12 w-full rounded-xl border-gray-800 !bg-[#03C75A] px-0 !text-white hover:!bg-[#03C75A]/90 hover:!text-white"
+                  aria-label="Sign up with Naver"
+                  onClick={() => handleSocialLogin("naver")}
+                >
+                  <Icons.naver2Icon className="w-5 h-5" />
+                </Button>
               </div>
-            </motion.div>
 
-            <div className="relative mb-8">
-              <div className="absolute inset-0 flex items-center">
-                <span
-                  className="w-full border-t border-[#e74c3c]/10"
-                  aria-hidden="true"
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span
+                    className="w-full border-t border-gray-800"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-black px-2 text-gray-400">
+                    or continue with email
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    id="first_name"
+                    name="first_name"
+                    type="text"
+                    placeholder="First Name"
+                    className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                    required
+                    value={formData.first_name}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Input
+                    id="last_name"
+                    name="last_name"
+                    type="text"
+                    placeholder="Last Name"
+                    className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                    required
+                    value={formData.last_name}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Input
+                  id="nickname"
+                  name="nickname"
+                  type="text"
+                  placeholder="Nickname"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  value={formData.nickname}
+                  onChange={handleInputChange}
                 />
               </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-2 text-muted-foreground select-none">
-                  or continue with email
-                </span>
+
+              <div>
+                <Input
+                  id="residentRegistrationNumber"
+                  name="residentRegistrationNumber"
+                  type="text"
+                  placeholder="Resident Registration Number (YYMMDD-XXXXXXX)"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  maxLength={14}
+                  value={formData.residentRegistrationNumber}
+                  onChange={handleRRNChange}
+                />
               </div>
-            </div>
 
-            {/* Register Form */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name" className="text-sm font-medium">
-                      First Name
-                    </Label>
-                    <Input
-                      id="first_name"
-                      name="first_name"
-                      type="text"
-                      placeholder="John"
-                      className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                      required
-                      aria-required="true"
-                      autoComplete="given-name"
-                      value={formData.first_name}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name" className="text-sm font-medium">
-                      Last Name
-                    </Label>
-                    <Input
-                      id="last_name"
-                      name="last_name"
-                      type="text"
-                      placeholder="Doe"
-                      className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                      required
-                      aria-required="true"
-                      autoComplete="family-name"
-                      value={formData.last_name}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
+              <div>
+                <Input
+                  id="mobileNumber"
+                  name="mobileNumber"
+                  type="tel"
+                  placeholder="Mobile Phone Number (010-XXXX-XXXX)"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  maxLength={13}
+                  value={formData.mobileNumber}
+                  onChange={handleMobileNumberChange}
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="nickname" className="text-sm font-medium">
-                    Nickname
-                  </Label>
-                  <Input
-                    id="nickname"
-                    name="nickname"
-                    type="text"
-                    placeholder="Your nickname"
-                    className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                    required
-                    aria-required="true"
-                    autoComplete="nickname"
-                    value={formData.nickname}
-                    onChange={handleInputChange}
-                  />
-                </div>
+              <div>
+                <Input
+                  id="register-email"
+                  name="email"
+                  type="email"
+                  placeholder="Email"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  value={formData.email}
+                  onChange={handleInputChange}
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-email"
-                    className="text-sm font-medium"
-                  >
-                    Email
-                  </Label>
-                  <Input
-                    id="register-email"
-                    name="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                    required
-                    aria-required="true"
-                    autoComplete="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-password"
-                    className="text-sm font-medium"
-                  >
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="register-password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Create a strong password"
-                      className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 pr-10 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                      required
-                      aria-required="true"
-                      autoComplete="new-password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                    />
-                    <button
-                      type="button"
-                      onClick={togglePasswordVisibility}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-[#e74c3c] cursor-pointer"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.div
-                          key={showPassword ? "eye-off" : "eye"}
-                          initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
-                          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, rotate: 10 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          {showPassword ? (
-                            <EyeOff size={18} aria-hidden="true" />
-                          ) : (
-                            <Eye size={18} aria-hidden="true" />
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="confirm-password"
-                    className="text-sm font-medium"
-                  >
-                    Confirm Password
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="confirm-password"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      className="h-12 rounded-xl border-[#e74c3c]/20 bg-[#f8f9fa]/20 pr-10 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
-                      required
-                      aria-required="true"
-                      autoComplete="new-password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                    />
-                    <button
-                      type="button"
-                      onClick={toggleConfirmPasswordVisibility}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-[#e74c3c] cursor-pointer"
-                      aria-label={
-                        showConfirmPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.div
-                          key={showConfirmPassword ? "eye-off" : "eye"}
-                          initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
-                          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, rotate: 10 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff size={18} aria-hidden="true" />
-                          ) : (
-                            <Eye size={18} aria-hidden="true" />
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-1">
-                  <Checkbox
-                    id="terms"
-                    checked={agreeTerms}
-                    onCheckedChange={(checked) =>
-                      setAgreeTerms(checked as boolean)
-                    }
-                    className="border-[#e74c3c]/30 text-[#e74c3c] data-[state=checked]:bg-[#e74c3c] data-[state=checked]:text-primary-foreground cursor-pointer"
-                    required
-                    aria-required="true"
-                  />
-                  <Label
-                    htmlFor="terms"
-                    className="text-xs text-muted-foreground cursor-pointer"
-                  >
-                    I agree to the{" "}
-                    <Link href="#" className="text-[#e74c3c] hover:underline">
-                      Terms of Service
-                    </Link>{" "}
-                    and{" "}
-                    <Link href="#" className="text-[#e74c3c] hover:underline">
-                      Privacy Policy
-                    </Link>
-                  </Label>
-                </div>
-
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className="pt-2"
+              <div className="relative">
+                <Input
+                  id="register-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent pr-10 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  value={formData.password}
+                  onChange={handleInputChange}
+                />
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#e74c3c]"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  <Button
-                    type="submit"
-                    className="relative h-12 w-full overflow-hidden rounded-xl bg-[#e74c3c] font-medium text-white transition-all hover:bg-[#c0392b] cursor-pointer"
-                    disabled={isLoading || !agreeTerms}
-                    aria-busy={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div
-                          className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"
-                          aria-hidden="true"
-                        ></div>
-                        <span className="ml-2">Creating account...</span>
-                      </div>
-                    ) : (
-                      <span className="flex items-center justify-center">
-                        Create account
-                        <ArrowRight
-                          className="ml-2 h-5 w-5"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    )}
-                  </Button>
-                </motion.div>
-              </form>
-            </motion.div>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="mt-8 text-center text-sm"
-            >
-              <p className="text-muted-foreground">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="font-medium text-[#e74c3c] hover:underline"
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm Password"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent pr-10 transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                />
+                <button
+                  type="button"
+                  onClick={toggleConfirmPasswordVisibility}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#e74c3c]"
+                  aria-label={
+                    showConfirmPassword ? "Hide password" : "Show password"
+                  }
                 >
-                  Sign in
-                </Link>
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <Checkbox
+                  id="terms"
+                  checked={agreeTerms}
+                  onCheckedChange={(checked) =>
+                    setAgreeTerms(checked as boolean)
+                  }
+                  className="border-gray-700 text-[#e74c3c] data-[state=checked]:bg-[#e74c3c] data-[state=checked]:text-white"
+                  required
+                />
+                <Label htmlFor="terms" className="text-xs text-gray-400">
+                  I agree to the{" "}
+                  <Link href="#" className="text-[#e74c3c] hover:underline">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="#" className="text-[#e74c3c] hover:underline">
+                    Privacy Policy
+                  </Link>
+                </Label>
+              </div>
+
+              <Button
+                type="submit"
+                className="relative h-12 w-full overflow-hidden rounded-xl bg-[#e74c3c] font-medium text-white transition-all hover:bg-[#c0392b] mt-2"
+                disabled={isLoading || !agreeTerms}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    <span className="ml-2">Creating account...</span>
+                  </div>
+                ) : (
+                  <span className="flex items-center justify-center">
+                    Create account
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </span>
+                )}
+              </Button>
+            </form>
+          ) : (
+            <form
+              onSubmit={handleVerificationCodeSubmit}
+              className="flex flex-col gap-4"
+            >
+              {verificationError && (
+                <div className="rounded-md bg-red-900/50 p-4 text-sm text-red-300 border border-red-800">
+                  {verificationError}
+                </div>
+              )}
+
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-medium">Verify Your Identity</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  A verification code has been sent to your mobile number.
+                  Please enter it below to complete your registration.
+                </p>
+              </div>
+
+              <div>
+                <Input
+                  id="verification-code"
+                  type="text"
+                  placeholder="Enter verification code"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c] text-center text-lg tracking-wider"
+                  required
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  maxLength={6}
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  type="submit"
+                  className="relative h-12 w-full overflow-hidden rounded-xl bg-[#e74c3c] font-medium text-white transition-all hover:bg-[#c0392b]"
+                  disabled={isVerifying}
+                >
+                  {isVerifying ? (
+                    <div className="flex items-center justify-center">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      <span className="ml-2">Verifying...</span>
+                    </div>
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      Verify and Create Account
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </span>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 rounded-xl border-gray-800 bg-transparent hover:bg-gray-800"
+                  onClick={handleBackToForm}
+                  disabled={isVerifying}
+                >
+                  Back to Form
+                </Button>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-8 text-center text-sm">
+            <p className="text-gray-400">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-[#e74c3c] hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
       </main>
 
       {/* Image Carousel Section - Only visible on md and larger screens */}
@@ -630,91 +668,65 @@ export default function RegisterPage() {
         className="hidden md:block md:w-1/2"
         aria-label="Feature highlights"
       >
-        {isPageLoading ? (
-          <div className="h-full w-full">
-            <Skeleton className="h-full w-full" />
-          </div>
-        ) : (
-          <div className="relative h-full w-full overflow-hidden">
-            {/* Carousel images with text overlay */}
-            {slides.map((slide, index) => (
-              <div
-                key={index}
-                className={`absolute inset-0 transition-opacity duration-1000 ${
-                  currentSlide === index ? "opacity-100" : "opacity-0"
-                }`}
-                aria-hidden={currentSlide !== index}
-              >
-                <Image
-                  src={slide.image || ""}
-                  alt={slide.title}
-                  fill
-                  className="object-cover"
-                  aria-hidden="true"
-                  unoptimized={slide.image?.startsWith(
-                    "https://images.unsplash.com"
-                  )}
-                />
-                {/* Gradient overlay - left to right */}
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-black/30"
-                  aria-hidden="true"
-                ></div>
-
-                {/* Text overlay */}
-                <div className="absolute bottom-32 left-0 w-full px-10 text-white">
-                  <motion.h2
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{
-                      opacity: currentSlide === index ? 1 : 0,
-                      y: currentSlide === index ? 0 : 20,
-                    }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="mb-2 text-4xl font-bold"
-                  >
-                    {slide.title}
-                  </motion.h2>
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{
-                      opacity: currentSlide === index ? 1 : 0,
-                      y: currentSlide === index ? 0 : 20,
-                    }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                    className="text-xl text-white/90"
-                  >
-                    {slide.subtitle}
-                  </motion.p>
-                </div>
-              </div>
-            ))}
-
-            {/* Carousel indicators - Matching the provided design */}
+        <div className="relative h-full w-full overflow-hidden">
+          {/* Carousel images with text overlay */}
+          {slides.map((slide, index) => (
             <div
-              className="absolute bottom-16 left-0 right-0 flex items-center px-10 space-x-2"
-              role="tablist"
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ${
+                currentSlide === index ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden={currentSlide !== index}
             >
-              {slides.map((slide, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentSlide(index)}
-                  className="flex items-center"
-                  role="tab"
-                  aria-selected={currentSlide === index}
-                  aria-label={`View slide ${index + 1}: ${slide.title}`}
-                >
-                  <div
-                    className={`transition-all duration-300 ${
-                      currentSlide === index
-                        ? "h-1 w-8 rounded-full bg-white"
-                        : "h-2 w-2 rounded-full bg-white/40"
-                    }`}
-                  />
-                </button>
-              ))}
+              <Image
+                src={slide.image || ""}
+                alt={slide.title}
+                fill
+                className="object-cover"
+                aria-hidden="true"
+                unoptimized={slide.image?.startsWith(
+                  "https://images.unsplash.com"
+                )}
+              />
+              {/* Gradient overlay - left to right */}
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-black/30"
+                aria-hidden="true"
+              ></div>
+
+              {/* Text overlay */}
+              <div className="absolute bottom-32 left-0 w-full px-10 text-white">
+                <h2 className="mb-2 text-4xl font-bold">{slide.title}</h2>
+                <p className="text-xl text-white/90">{slide.subtitle}</p>
+              </div>
             </div>
+          ))}
+
+          {/* Carousel indicators */}
+          <div
+            className="absolute bottom-16 left-0 right-0 flex items-center px-10 space-x-2"
+            role="tablist"
+          >
+            {slides.map((slide, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className="flex items-center"
+                role="tab"
+                aria-selected={currentSlide === index}
+                aria-label={`View slide ${index + 1}: ${slide.title}`}
+              >
+                <div
+                  className={`transition-all duration-300 ${
+                    currentSlide === index
+                      ? "h-1 w-8 rounded-full bg-white"
+                      : "h-2 w-2 rounded-full bg-white/40"
+                  }`}
+                />
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </aside>
     </div>
   );
