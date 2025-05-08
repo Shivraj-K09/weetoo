@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getNaverOAuthURL } from "@/lib/auth/naver";
 import { supabase, type SupportedProvider } from "@/lib/supabase/client";
-import { ArrowRight, Eye, EyeOff, TrendingUpIcon } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,8 @@ import {
   initiateVerification,
   confirmVerification,
 } from "@/app/actions/portone-verification";
+// Import the new component at the top of the file
+import { VerificationErrorDisplay } from "./verification-error-display";
 
 // Define verification steps
 enum VerificationStep {
@@ -186,9 +188,12 @@ export default function RegisterPage() {
       });
 
       if (!verificationResult.success) {
-        throw new Error(
-          verificationResult.message || "Failed to initiate verification"
-        );
+        // Show detailed error message
+        const errorMessage = verificationResult.errorDetails
+          ? `${verificationResult.message}: ${verificationResult.errorDetails}`
+          : verificationResult.message || "Failed to initiate verification";
+
+        throw new Error(errorMessage);
       }
 
       // Store verification ID and move to verification code step
@@ -197,10 +202,10 @@ export default function RegisterPage() {
       toast.success("Verification code sent to your mobile number");
     } catch (err) {
       console.error("Verification initiation error:", err);
-      setVerificationError(
-        err instanceof Error ? err.message : "Failed to start verification"
-      );
-      toast.error("Failed to initiate verification. Please try again.");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to start verification";
+      setVerificationError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +229,12 @@ export default function RegisterPage() {
       const confirmResult = await confirmVerification(verificationCode);
 
       if (!confirmResult.success || !confirmResult.verified) {
-        throw new Error(confirmResult.message || "Failed to verify identity");
+        // Show detailed error message
+        const errorMessage = confirmResult.errorDetails
+          ? `${confirmResult.message}: ${confirmResult.errorDetails}`
+          : confirmResult.message || "Failed to verify identity";
+
+        throw new Error(errorMessage);
       }
 
       // Verification successful, now create Supabase account
@@ -253,12 +263,12 @@ export default function RegisterPage() {
       router.push("/login?registered=true");
     } catch (err) {
       console.error("Verification or registration error:", err);
-      setVerificationError(
-        err instanceof Error ? err.message : "Failed to complete verification"
-      );
-      toast.error(
-        "Failed to verify identity or create account. Please try again."
-      );
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to verify identity or create account";
+      setVerificationError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsVerifying(false);
     }
@@ -336,10 +346,27 @@ export default function RegisterPage() {
       {/* Logo in top left */}
       <div className="absolute left-6 top-6 z-10 flex w-[calc(100%-3rem)] items-center justify-between md:left-10 md:top-10 md:w-[calc(50%-5rem)]">
         <div className="flex items-center space-x-2">
-          <TrendingUpIcon
+          <svg
             className="h-6 w-6 text-[#e74c3c]"
-            aria-hidden="true"
-          />
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2 12L7 3L12 12L17 3L22 12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M2 21L7 12L12 21L17 12L22 21"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
           <span className="text-xl font-bold">
             <span className="text-[#e74c3c]">W</span>EE
             <span className="text-[#e74c3c]">T</span>OO
@@ -365,7 +392,7 @@ export default function RegisterPage() {
           </div>
 
           {verificationStep === VerificationStep.INITIAL_FORM ? (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               {/* Social login buttons */}
               <div className="grid grid-cols-3 gap-3">
                 {/* Google Login */}
@@ -588,12 +615,10 @@ export default function RegisterPage() {
           ) : (
             <form
               onSubmit={handleVerificationCodeSubmit}
-              className="flex flex-col gap-4"
+              className="flex flex-col gap-6"
             >
               {verificationError && (
-                <div className="rounded-md bg-red-900/50 p-4 text-sm text-red-300 border border-red-800">
-                  {verificationError}
-                </div>
+                <VerificationErrorDisplay error={verificationError} />
               )}
 
               <div className="text-center mb-4">
