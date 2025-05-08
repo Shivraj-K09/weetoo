@@ -180,6 +180,7 @@ export default function RegisterPage() {
     try {
       // Initiate identity verification
       const fullName = `${formData.last_name}${formData.first_name}`; // Korean name format: Last name + First name
+      console.log("Starting verification for:", fullName);
 
       const verificationResult = await initiateVerification({
         fullName,
@@ -193,6 +194,7 @@ export default function RegisterPage() {
           ? `${verificationResult.message}: ${verificationResult.errorDetails}`
           : verificationResult.message || "Failed to initiate verification";
 
+        console.error("Verification error:", errorMessage);
         throw new Error(errorMessage);
       }
 
@@ -205,7 +207,7 @@ export default function RegisterPage() {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to start verification";
       setVerificationError(errorMessage);
-      toast.error(errorMessage);
+      toast.error("Failed to initiate verification. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -310,11 +312,22 @@ export default function RegisterPage() {
 
   // Format the Resident Registration Number as user types
   const handleRRNChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9]/g, ""); // Remove non-numeric characters
+    let value = e.target.value.replace(/[^0-9-]/g, ""); // Allow only numbers and hyphens
 
-    // Add hyphen after the first 6 digits
-    if (value.length > 6) {
+    // If user manually entered a hyphen, don't add another one
+    if (value.length === 6 && !value.includes("-")) {
+      value = `${value}-`;
+    } else if (value.length > 6 && !value.includes("-")) {
+      // Add hyphen if it's missing
       value = `${value.substring(0, 6)}-${value.substring(6, 13)}`;
+    }
+
+    // Limit to correct length
+    if (value.includes("-")) {
+      const parts = value.split("-");
+      if (parts[0].length > 6) parts[0] = parts[0].substring(0, 6);
+      if (parts[1] && parts[1].length > 7) parts[1] = parts[1].substring(0, 7);
+      value = parts.join("-");
     }
 
     setFormData((prev) => ({ ...prev, residentRegistrationNumber: value }));
@@ -322,13 +335,33 @@ export default function RegisterPage() {
 
   // Format the mobile number as user types
   const handleMobileNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9]/g, ""); // Remove non-numeric characters
+    let value = e.target.value.replace(/[^0-9-]/g, ""); // Allow only numbers and hyphens
 
     // Format as 010-XXXX-XXXX or 010-XXX-XXXX
-    if (value.length > 3 && value.length <= 7) {
-      value = `${value.substring(0, 3)}-${value.substring(3)}`;
+    if (value.length <= 3) {
+      // Just the first part
+    } else if (value.length > 3 && value.length <= 7) {
+      // Check if there's already a hyphen after the first 3 digits
+      if (value.charAt(3) !== "-" && !value.includes("-")) {
+        value = `${value.substring(0, 3)}-${value.substring(3)}`;
+      }
     } else if (value.length > 7) {
-      value = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
+      // Check for hyphens
+      if (!value.includes("-")) {
+        value = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
+      } else if (value.indexOf("-") === 3 && value.lastIndexOf("-") === 3) {
+        // Only has first hyphen
+        const secondPart = value.substring(4);
+        if (secondPart.length > 4) {
+          value = `${value.substring(0, 8)}-${value.substring(8)}`;
+        }
+      }
+    }
+
+    // Limit to correct length
+    if (value.split("-").join("").length > 11) {
+      const parts = value.split("-");
+      value = parts.slice(0, 3).join("-");
     }
 
     setFormData((prev) => ({ ...prev, mobileNumber: value }));

@@ -35,6 +35,17 @@ export async function getPortOneToken(): Promise<{
   errorDetails?: string;
 }> {
   try {
+    console.log("Requesting PortOne API token");
+
+    if (!PORTONE_API_SECRET) {
+      console.error("PORTONE_API_SECRET environment variable is not set");
+      return {
+        success: false,
+        errorDetails:
+          "API Secret is not configured. Please check your environment variables.",
+      };
+    }
+
     const response = await fetch(`${PORTONE_API_URL}/login/api-secret`, {
       method: "POST",
       headers: {
@@ -47,11 +58,14 @@ export async function getPortOneToken(): Promise<{
 
     if (!response.ok) {
       const errorMessage = `Status ${response.status}: ${response.statusText || "Unknown error"}`;
-      let errorDetails = "";
+      console.error("PortOne token request failed:", errorMessage);
 
+      let errorDetails = "";
       try {
         // Try to parse as JSON if possible
         const text = await response.text();
+        console.error("PortOne token error response:", text);
+
         if (text) {
           try {
             const errorJson = JSON.parse(text);
@@ -73,9 +87,14 @@ export async function getPortOneToken(): Promise<{
     }
 
     const data: PortOneTokenResponse = await response.json();
+    console.log("Successfully obtained PortOne API token");
     return { success: true, token: data.accessToken };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(
+      "Network or server error during token request:",
+      errorMessage
+    );
     return {
       success: false,
       errorDetails: `Network or server error: ${errorMessage}`,
@@ -95,9 +114,19 @@ export async function initiateVerification(formData: {
   errorDetails?: string;
 }> {
   try {
+    // Log the start of verification process (without sensitive data)
+    console.log("Starting identity verification process");
+
+    // Format the mobile number correctly if needed
+    const formattedMobileNumber = formData.mobileNumber.replace(/-/g, "");
+
+    // Format the RRN correctly if needed
+    const formattedRRN = formData.residentRegistrationNumber.replace(/-/g, "");
+
     const tokenResult = await getPortOneToken();
 
     if (!tokenResult.success) {
+      console.error("PortOne authentication failed:", tokenResult.errorDetails);
       return {
         success: false,
         message: "Failed to authenticate with PortOne API",
@@ -105,7 +134,27 @@ export async function initiateVerification(formData: {
       };
     }
 
+    console.log("Successfully obtained PortOne token");
+
     // Create identity verification request
+    console.log("Sending identity verification request to PortOne");
+
+    const requestBody = {
+      name: formData.fullName,
+      residentRegistrationNumber: formattedRRN,
+      mobileNumber: formattedMobileNumber,
+      // Add any other required fields based on PortOne API documentation
+    };
+
+    console.log(
+      "Request structure:",
+      JSON.stringify({
+        ...requestBody,
+        residentRegistrationNumber: "MASKED",
+        mobileNumber: "MASKED",
+      })
+    );
+
     const verificationResponse = await fetch(
       `${PORTONE_API_URL}/identity-verifications`,
       {
@@ -114,12 +163,7 @@ export async function initiateVerification(formData: {
           Authorization: `Bearer ${tokenResult.token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: formData.fullName,
-          residentRegistrationNumber: formData.residentRegistrationNumber,
-          mobileNumber: formData.mobileNumber,
-          // Add any other required fields based on PortOne API documentation
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 
@@ -127,10 +171,13 @@ export async function initiateVerification(formData: {
       let errorDetails = "";
       try {
         const text = await verificationResponse.text();
+        console.error("PortOne verification error response:", text);
+
         if (text) {
           try {
             const errorJson = JSON.parse(text);
             errorDetails = JSON.stringify(errorJson);
+            console.error("Parsed error details:", errorDetails);
           } catch {
             errorDetails = text;
           }
@@ -148,8 +195,13 @@ export async function initiateVerification(formData: {
       };
     }
 
+    console.log("Successfully created identity verification request");
     const verificationData: PortOneVerificationResponse =
       await verificationResponse.json();
+    console.log(
+      "Received verification ID:",
+      verificationData.identityVerificationId
+    );
 
     // Store verification ID in a cookie for the session
     const cookieStore = await cookies();
@@ -165,6 +217,7 @@ export async function initiateVerification(formData: {
     );
 
     // Send verification code to user's mobile
+    console.log("Sending verification code to mobile");
     const sendResponse = await fetch(
       `${PORTONE_API_URL}/identity-verifications/${verificationData.identityVerificationId}/send`,
       {
@@ -184,6 +237,8 @@ export async function initiateVerification(formData: {
       let errorDetails = "";
       try {
         const text = await sendResponse.text();
+        console.error("PortOne send verification code error:", text);
+
         if (text) {
           try {
             const errorJson = JSON.parse(text);
@@ -205,12 +260,14 @@ export async function initiateVerification(formData: {
       };
     }
 
+    console.log("Successfully sent verification code");
     return {
       success: true,
       verificationId: verificationData.identityVerificationId,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Unexpected error during verification:", errorMessage);
     return {
       success: false,
       message: "An unexpected error occurred during verification initiation",
