@@ -26,6 +26,12 @@ export interface RankingResponse {
   lastUpdated: string;
 }
 
+// Add type for the ranking data
+interface RankingData {
+  user_id: string;
+  [key: string]: any;
+}
+
 /**
  * Fetches user rankings based on the specified type
  * @param type The type of ranking to fetch (profit, virtual, sponsored, activity, followers)
@@ -88,8 +94,83 @@ export async function getRankings(
       };
     }
 
+    // Handle followers ranking separately since it requires a different query approach
+    if (type === "followers") {
+      try {
+        // Get users with the most followers
+        const { data: followersData, error: followersError } =
+          await supabase.rpc("get_most_followed_users", {
+            limit_count: limit,
+          });
+
+        if (followersError) {
+          console.error("Error fetching followers rankings:", followersError);
+          return {
+            rankings: [],
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+
+        if (followersData && followersData.length > 0) {
+          // Get user IDs from the followers data
+          const userIds = followersData.map(
+            (item: { following_id: string }) => item.following_id
+          );
+
+          // Fetch user details for these IDs
+          const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("id, first_name, last_name, avatar_url")
+            .in("id", userIds);
+
+          if (userError) {
+            console.error(
+              "Error fetching user data for followers ranking:",
+              userError
+            );
+          } else if (userData) {
+            // Create a map of user data for quick lookup
+            const userMap = new Map(userData.map((user) => [user.id, user]));
+
+            // Combine followers data with user data
+            rankings = followersData.map(
+              (
+                item: { following_id: string; follower_count: number },
+                index: number
+              ) => {
+                const user = userMap.get(item.following_id);
+                const displayName = user
+                  ? [user.first_name, user.last_name].filter(Boolean).join(" ")
+                  : "Unknown User";
+
+                return {
+                  user_id: item.following_id,
+                  username: displayName,
+                  avatar_url: user?.avatar_url || null,
+                  value: Number(item.follower_count),
+                  rank: index + 1,
+                };
+              }
+            );
+          }
+        }
+
+        return {
+          rankings,
+          lastUpdated: new Date().toISOString(),
+        };
+      } catch (error) {
+        console.error("Error in followers ranking:", error);
+        return {
+          rankings: [],
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+
     // For other ranking types, we need to fetch the ranking data first
-    let rankingData: any[] = [];
+    // Fix the type annotations in the main switch statement
+    let rankingData: RankingData[] = [];
     let rankingError = null;
     let valueField = "";
     let tableName = "";
@@ -160,8 +241,8 @@ export async function getRankings(
         // Create a map of user data for quick lookup
         const userMap = new Map(userData.map((user) => [user.id, user]));
 
-        // Combine ranking data with user data
-        rankings = rankingData.map((item, index) => {
+        // Fix the type annotations in the user data mapping
+        rankings = rankingData.map((item: RankingData, index: number) => {
           const user = userMap.get(item.user_id);
           const displayName = user
             ? [user.first_name, user.last_name].filter(Boolean).join(" ")
@@ -205,6 +286,40 @@ export async function getUserRanking(
   try {
     const cookieStore = cookies();
     const supabase = await createServerClient();
+
+    // Special handling for followers ranking
+    if (type === "followers") {
+      // Get the user's follower count
+      const { data: followerData, error: followerError } = await supabase
+        .from("user_follows")
+        .select("following_id", { count: "exact" })
+        .eq("following_id", userId);
+
+      if (followerError) {
+        console.error("Error getting user follower count:", followerError);
+        return null;
+      }
+
+      const followerCount = followerData?.length || 0;
+
+      // Count how many users have more followers
+      const { data: higherRankedData, error: rankError } = await supabase.rpc(
+        "get_users_with_more_followers",
+        {
+          min_followers: followerCount,
+        }
+      );
+
+      if (rankError) {
+        console.error("Error getting user follower rank:", rankError);
+        return null;
+      }
+
+      return {
+        rank: (higherRankedData?.length || 0) + 1,
+        value: followerCount,
+      };
+    }
 
     let tableName: string;
     let valueColumn: string;

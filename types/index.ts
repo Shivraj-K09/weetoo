@@ -308,3 +308,30 @@ export interface FormattedTradingRecords {
     sell: { count: number; percentage: number };
   };
 }
+
+// Follow system interfaces
+export interface FollowRelationship {
+  id: string;
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+}
+
+export interface FollowResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface FollowStatusResponse extends FollowResponse {
+  isFollowing: boolean;
+}
+
+export interface FollowCountResponse extends FollowResponse {
+  count: number;
+}
+
+export interface FollowListResponse extends FollowResponse {
+  users: (UserProfile & { follow_date: string })[];
+  count: number;
+}

@@ -41,6 +41,7 @@ export function Ranking() {
     []
   );
   const [activityRankings, setActivityRankings] = useState<RankingEntry[]>([]);
+  const [followerRankings, setFollowerRankings] = useState<RankingEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // State for user profile dialog
@@ -53,7 +54,7 @@ export function Ranking() {
     "Top-5 Return Rate Ranking",
     "Top-5 Virtual Money Holding",
     "Top-5 Activity Ranking (XP)",
-    "Top-5 Top Sponsored Users (Kor_coins)",
+    "Top-5 Top Sponsored Users",
     "Top-5 Most Followed Users",
   ];
 
@@ -76,8 +77,11 @@ export function Ranking() {
 
         // Fetch activity rankings
         const activityData = await getRankings("activity", 5);
-        console.log("Activity rankings data:", activityData);
         setActivityRankings(activityData.rankings);
+
+        // Fetch follower rankings
+        const followerData = await getRankings("followers", 5);
+        setFollowerRankings(followerData.rankings);
       } catch (error) {
         console.error("Error fetching rankings:", error);
       } finally {
@@ -177,6 +181,8 @@ export function Ranking() {
       return `${value.toLocaleString()} Kor`;
     } else if (type === "activity") {
       return `${value.toLocaleString()} XP`;
+    } else if (type === "followers") {
+      return `${value.toLocaleString()} 팔로워`;
     }
     return value.toString();
   };
@@ -192,17 +198,10 @@ export function Ranking() {
         return activityRankings;
       case 3: // Sponsored
         return sponsoredRankings;
+      case 4: // Followers
+        return followerRankings;
       default:
-        // Demo data for followers ranking
-        return Array(5)
-          .fill(null)
-          .map((_, i) => ({
-            user_id: `demo-${i}`,
-            username: "나스닥 탑천",
-            avatar_url: null,
-            value: 500 - i * 50, // followers
-            rank: i + 1,
-          }));
+        return [];
     }
   };
 
@@ -217,6 +216,8 @@ export function Ranking() {
         return "activity";
       case 3:
         return "sponsored";
+      case 4:
+        return "followers";
       default:
         return "followers";
     }
