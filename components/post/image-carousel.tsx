@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import {
   Carousel,
   CarouselContent,
@@ -11,6 +10,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 
 interface ImageCarouselProps {
   images: Array<string>;
@@ -49,12 +49,13 @@ export function ImageCarousel({ images, className }: ImageCarouselProps) {
           className
         )}
       >
-        <Image
+        <OptimizedImage
           src={images[0] || "/placeholder.svg"}
           alt="Featured image"
           fill
           className="object-cover"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority
         />
       </div>
     );
@@ -68,12 +69,13 @@ export function ImageCarousel({ images, className }: ImageCarouselProps) {
             {images.map((image, index) => (
               <CarouselItem key={index}>
                 <div className="aspect-video w-full overflow-hidden rounded-md">
-                  <Image
+                  <OptimizedImage
                     src={image || "/placeholder.svg"}
                     alt={`Featured image ${index + 1}`}
                     width={1200}
                     height={675}
                     className="h-full w-full object-cover"
+                    priority={index === 0}
                   />
                 </div>
               </CarouselItem>
@@ -85,7 +87,7 @@ export function ImageCarousel({ images, className }: ImageCarouselProps) {
       </div>
 
       {/* Thumbnails */}
-      <div className="flex items-center justify-start gap-2 overflow-x-auto py-2">
+      <div className="flex gap-2 overflow-x-auto pb-2">
         {images.map((image, index) => (
           <button
             key={index}
@@ -99,7 +101,7 @@ export function ImageCarousel({ images, className }: ImageCarouselProps) {
             aria-label={`View image ${index + 1}`}
             aria-current={current === index ? "true" : "false"}
           >
-            <Image
+            <OptimizedImage
               src={image || "/placeholder.svg"}
               alt={`Thumbnail ${index + 1}`}
               fill

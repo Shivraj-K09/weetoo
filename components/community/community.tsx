@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { UsersIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import Image from "next/image";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 import { supabase } from "@/lib/supabase/client";
 import type { Post } from "@/types";
 
@@ -14,120 +14,143 @@ export function Community() {
   const [profitPosts, setProfitPosts] = useState<Post[]>([]);
   const [educationPosts, setEducationPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     async function fetchPosts() {
+      if (!isMounted) return;
+
       try {
         setLoading(true);
+        setError(null);
 
-        // Add cache-busting timestamp to ensure fresh data
-        const cacheBuster = new Date().getTime();
+        // Fetch posts in parallel with a timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Request timeout")), 10000);
+        });
 
-        // Fetch free board posts (all categories)
-        const { data: freeData, error: freeError } = await supabase
-          .from("posts")
-          .select(
+        const fetchPromise = Promise.all([
+          // Fetch free board posts
+          supabase
+            .from("posts")
+            .select(
+              `
+              id,
+              title,
+              content,
+              user_id,
+              category,
+              tags,
+              featured_images,
+              view_count,
+              status,
+              created_at,
+              updated_at,
+              user:user_id (
+                first_name,
+                last_name
+              )
             `
-            id,
-            title,
-            content,
-            user_id,
-            category,
-            tags,
-            featured_images,
-            view_count,
-            status,
-            created_at,
-            updated_at,
-            user:user_id (
-              first_name,
-              last_name
             )
-          `
-          )
-          .eq("status", "approved")
-          .order("created_at", { ascending: false })
-          .limit(10);
+            .eq("status", "approved")
+            .order("created_at", { ascending: false })
+            .limit(10),
 
-        if (freeError) {
-          console.error("Error fetching free posts:", freeError);
+          // Fetch profit board posts
+          supabase
+            .from("posts")
+            .select(
+              `
+              id,
+              title,
+              content,
+              user_id,
+              category,
+              tags,
+              featured_images,
+              view_count,
+              status,
+              created_at,
+              updated_at,
+              user:user_id (
+                first_name,
+                last_name
+              )
+            `
+            )
+            .eq("status", "approved")
+            .eq("category", "profit")
+            .order("created_at", { ascending: false })
+            .limit(10),
+
+          // Fetch education board posts
+          supabase
+            .from("posts")
+            .select(
+              `
+              id,
+              title,
+              content,
+              user_id,
+              category,
+              tags,
+              featured_images,
+              view_count,
+              status,
+              created_at,
+              updated_at,
+              user:user_id (
+                first_name,
+                last_name
+              )
+            `
+            )
+            .eq("status", "approved")
+            .eq("category", "education")
+            .order("created_at", { ascending: false })
+            .limit(10),
+        ]);
+
+        const results = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (!isMounted) return;
+
+        const [freeResult, profitResult, educationResult] = results as any[];
+
+        if (freeResult.error) {
+          console.error("Error fetching free posts:", freeResult.error);
+          setError("Failed to load free posts");
         } else {
-          setFreePosts(freeData as unknown as Post[]);
+          setFreePosts(freeResult.data as Post[]);
         }
 
-        // Fetch profit board posts (only profit category)
-        const { data: profitData, error: profitError } = await supabase
-          .from("posts")
-          .select(
-            `
-            id,
-            title,
-            content,
-            user_id,
-            category,
-            tags,
-            featured_images,
-            view_count,
-            status,
-            created_at,
-            updated_at,
-            user:user_id (
-              first_name,
-              last_name
-            )
-          `
-          )
-          .eq("status", "approved")
-          .eq("category", "profit")
-          .order("created_at", { ascending: false })
-          .limit(10);
-
-        if (profitError) {
-          console.error("Error fetching profit posts:", profitError);
+        if (profitResult.error) {
+          console.error("Error fetching profit posts:", profitResult.error);
+          setError("Failed to load profit posts");
         } else {
-          setProfitPosts(profitData as unknown as Post[]);
+          setProfitPosts(profitResult.data as Post[]);
         }
 
-        // Fetch education board posts (only education category)
-        const { data: educationData, error: educationError } = await supabase
-          .from("posts")
-          .select(
-            `
-            id,
-            title,
-            content,
-            user_id,
-            category,
-            tags,
-            featured_images,
-            view_count,
-            status,
-            created_at,
-            updated_at,
-            user:user_id (
-              first_name,
-              last_name
-            )
-          `
-          )
-          .eq("status", "approved")
-          .eq("category", "education")
-          .order("created_at", { ascending: false })
-          .limit(10);
-
-        if (educationError) {
-          console.error("Error fetching education posts:", educationError);
+        if (educationResult.error) {
+          console.error(
+            "Error fetching education posts:",
+            educationResult.error
+          );
+          setError("Failed to load education posts");
         } else {
-          setEducationPosts(educationData as unknown as Post[]);
+          setEducationPosts(educationResult.data as Post[]);
         }
-
-        console.log(
-          `Community component fetched posts at timestamp: ${cacheBuster}`
-        );
       } catch (error) {
+        if (!isMounted) return;
         console.error("Error fetching posts:", error);
+        setError("Failed to load posts. Please try again later.");
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -136,8 +159,12 @@ export function Community() {
     // Set up a polling interval to refresh data every 30 seconds
     const intervalId = setInterval(fetchPosts, 30000);
 
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(intervalId);
+    // Clean up
+    return () => {
+      isMounted = false;
+      controller.abort();
+      clearInterval(intervalId);
+    };
   }, []);
 
   // Format date to a readable format
@@ -189,6 +216,21 @@ export function Community() {
         return "자유";
     }
   };
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white p-4 text-center">
+        <p className="text-red-500">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 px-4 py-2 bg-[#e74c3c] text-white rounded-md hover:bg-[#e74c3c]/90"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-[1168px] border border-gray-200 rounded-md overflow-hidden bg-white">
@@ -266,11 +308,12 @@ export function Community() {
                     <Link href={getPostUrl(post)} key={post.id}>
                       <div className="relative rounded overflow-hidden">
                         <div className="aspect-video w-full">
-                          <Image
+                          <OptimizedImage
                             src={post.featured_images[0] || "/placeholder.svg"}
                             alt={post.title}
                             fill
                             className="object-cover"
+                            sizes="(max-width: 768px) 50vw, 25vw"
                           />
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-1">
@@ -462,13 +505,14 @@ export function Community() {
                       <Link href={getPostUrl(post)} key={post.id}>
                         <div className="relative rounded-md overflow-hidden shadow-sm">
                           <div className="aspect-video w-full">
-                            <Image
+                            <OptimizedImage
                               src={
                                 post.featured_images[0] || "/placeholder.svg"
                               }
                               alt={post.title}
                               fill
                               className="object-cover"
+                              sizes="(max-width: 768px) 50vw, 25vw"
                             />
                           </div>
                           <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5">

@@ -337,13 +337,38 @@ function VoiceChannelInner({
       setConnectionError(null);
       connectionAttempts.current = 0;
 
+      // First, check if we have any audio devices available
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(
+        (device) => device.kind === "audioinput"
+      );
+
+      if (audioInputs.length === 0) {
+        logVoice("No audio input devices found");
+        toast.error(
+          "No microphone found. Please connect a microphone and try again."
+        );
+        setIsConnecting(false);
+        return;
+      }
+
       // Make sure we have microphone permissions first
       logVoice("Checking microphone permissions");
-      const hasMicPermission = await checkMicrophonePermission();
-      if (!hasMicPermission) {
-        logVoice("Microphone permission denied");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+
+        // Stop the test stream immediately
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (error) {
+        logVoice("Microphone permission denied:", error);
         toast.error(
-          "Microphone permission denied. Please allow microphone access."
+          "Microphone access denied. Please allow microphone access in your browser settings and try again."
         );
         setIsConnecting(false);
         return;
@@ -368,9 +393,13 @@ function VoiceChannelInner({
               `Publishing attempt ${connectionAttempts.current}/${maxConnectionAttempts}`
             );
 
-            // Create and publish audio track
+            // Create and publish audio track with specific constraints
             logVoice("Enabling microphone");
-            const track = await localParticipant.setMicrophoneEnabled(true);
+            const track = await localParticipant.setMicrophoneEnabled(true, {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            });
 
             logVoice("Microphone enabled, track:", track);
             return track || null;

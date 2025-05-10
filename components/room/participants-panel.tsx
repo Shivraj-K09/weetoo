@@ -106,7 +106,11 @@ export function ParticipantsPanel({
           }
         }
 
-        setParticipants(participantsData || []);
+        // Remove any duplicate participants by ID before setting state
+        const uniqueParticipants = removeDuplicateParticipants(
+          participantsData || []
+        );
+        setParticipants(uniqueParticipants);
       }
     } catch (error) {
       console.error(
@@ -119,6 +123,18 @@ export function ParticipantsPanel({
     }
   }, [roomDetails]);
 
+  // Helper function to remove duplicate participants
+  const removeDuplicateParticipants = (participants: any[]) => {
+    const uniqueIds = new Set();
+    return participants.filter((participant) => {
+      if (uniqueIds.has(participant.id)) {
+        return false;
+      }
+      uniqueIds.add(participant.id);
+      return true;
+    });
+  };
+
   // Update participants when initialParticipants changes
   useEffect(() => {
     if (initialParticipants && initialParticipants.length > 0) {
@@ -126,7 +142,10 @@ export function ParticipantsPanel({
         "[PARTICIPANTS PANEL] Updating from initialParticipants:",
         initialParticipants
       );
-      setParticipants(initialParticipants);
+      // Remove any duplicate participants before setting state
+      const uniqueParticipants =
+        removeDuplicateParticipants(initialParticipants);
+      setParticipants(uniqueParticipants);
     } else {
       // If no initial participants provided, fetch them
       fetchParticipants();
@@ -213,7 +232,13 @@ export function ParticipantsPanel({
               console.log(
                 "[PARTICIPANTS PANEL] Adding owner to participants list"
               );
-              setParticipants((prev) => [...prev, userData]);
+              setParticipants((prev) => {
+                // Check if user is already in the list to avoid duplicates
+                if (prev.some((p) => p.id === userData.id)) {
+                  return prev;
+                }
+                return [...prev, userData];
+              });
             }
           }
         }
@@ -240,9 +265,9 @@ export function ParticipantsPanel({
         </div>
         <div className="space-y-2 max-h-[230px] overflow-y-auto">
           {participants && participants.length > 0 ? (
-            participants.map((participant) => (
+            participants.map((participant, index) => (
               <div
-                key={participant.id}
+                key={`${participant.id}-${index}`}
                 className="flex items-center justify-between"
               >
                 <div className="flex items-center">

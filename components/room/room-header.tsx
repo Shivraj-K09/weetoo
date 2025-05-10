@@ -11,6 +11,7 @@ import { ProfitRateDisplay } from "@/components/room/profit-rate-display";
 import { Badge } from "@/components/ui/badge";
 import { HostActivityIndicator } from "./host-activity-indicator";
 import { useTradingRecords } from "@/hooks/use-trading-records";
+import { memo, useMemo } from "react";
 
 interface RoomHeaderProps {
   roomDetails: any;
@@ -20,7 +21,103 @@ interface RoomHeaderProps {
   onCloseRoomClick: () => void;
   onRefreshRoom?: () => void;
   connectionStatus?: "connected" | "connecting" | "disconnected";
+  initialTradingRecords?: any;
 }
+
+// Create a memoized component for the trading records display
+const TradingRecordsDisplay = memo(({ daily, total, isLoading }: any) => {
+  return (
+    <>
+      {/* Today Records */}
+      <div className="ml-10 border-l border-[#3f445c] pl-6">
+        <div className="text-sm font-medium text-gray-400 mb-1">
+          Today Records
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center">
+            <span className="text-blue-500 font-bold mr-2">BUY</span>
+            {isLoading ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : (
+              <span
+                className={`${daily.buy.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
+              >
+                {daily.buy.percentage >= 0 ? (
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 mr-1" />
+                )}
+                {Math.abs(daily.buy.percentage).toFixed(2)}%
+              </span>
+            )}
+          </div>
+          <div className="flex items-center">
+            <span className="text-red-500 font-bold mr-2">SELL</span>
+            {isLoading ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : (
+              <span
+                className={`${daily.sell.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
+              >
+                {daily.sell.percentage >= 0 ? (
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 mr-1" />
+                )}
+                {Math.abs(daily.sell.percentage).toFixed(2)}%
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Total Records */}
+      <div className="ml-10 border-l border-[#3f445c] pl-6">
+        <div className="text-sm font-medium text-gray-400 mb-1">
+          Total Records
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center">
+            <span className="text-blue-500 font-bold mr-2">BUY</span>
+            {isLoading ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : (
+              <span
+                className={`${total.buy.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
+              >
+                {total.buy.percentage >= 0 ? (
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 mr-1" />
+                )}
+                {Math.abs(total.buy.percentage).toFixed(2)}%
+              </span>
+            )}
+          </div>
+          <div className="flex items-center">
+            <span className="text-red-500 font-bold mr-2">SELL</span>
+            {isLoading ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : (
+              <span
+                className={`${total.sell.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
+              >
+                {total.sell.percentage >= 0 ? (
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 mr-1" />
+                )}
+                {Math.abs(total.sell.percentage).toFixed(2)}%
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+});
+
+TradingRecordsDisplay.displayName = "TradingRecordsDisplay";
 
 export function RoomHeader({
   roomDetails,
@@ -30,12 +127,44 @@ export function RoomHeader({
   onCloseRoomClick,
   onRefreshRoom,
   connectionStatus,
+  initialTradingRecords,
 }: RoomHeaderProps) {
   const isOwner = user && user.id === roomDetails.owner_id;
   const isVoiceRoom = roomDetails.room_category === "voice";
 
-  // Fetch trading records for this room
+  // Use initial trading records if available
+  const initialData = useMemo(() => {
+    if (!initialTradingRecords) return undefined;
+
+    return {
+      daily: {
+        buy: {
+          percentage: initialTradingRecords.daily_buy_percentage || 0,
+          pnl: initialTradingRecords.daily_buy_pnl || 0,
+        },
+        sell: {
+          percentage: initialTradingRecords.daily_sell_percentage || 0,
+          pnl: initialTradingRecords.daily_sell_pnl || 0,
+        },
+      },
+      total: {
+        buy: {
+          percentage: initialTradingRecords.total_buy_percentage || 0,
+          pnl: initialTradingRecords.total_buy_pnl || 0,
+        },
+        sell: {
+          percentage: initialTradingRecords.total_sell_percentage || 0,
+          pnl: initialTradingRecords.total_sell_pnl || 0,
+        },
+      },
+    };
+  }, [initialTradingRecords]);
+
+  // Fetch trading records for this room with initial data
   const { daily, total, isLoading, error } = useTradingRecords(roomDetails.id);
+
+  // Memoize participant count to prevent unnecessary re-renders
+  const participantCount = useMemo(() => participants.length, [participants]);
 
   return (
     <>
@@ -75,7 +204,7 @@ export function RoomHeader({
                   {roomDetails.max_participants}
                 </span>
                 <span className="flex items-center text-yellow-500 mr-1">
-                  <span className="mr-1">•</span> {participants.length}
+                  <span className="mr-1">•</span> {participantCount}
                 </span>
                 <span className="flex items-center text-yellow-500">
                   <span className="mr-1">•</span> 13
@@ -98,91 +227,12 @@ export function RoomHeader({
             </div>
           </div>
 
-          {/* Today Records */}
-          <div className="ml-10 border-l border-[#3f445c] pl-6">
-            <div className="text-sm font-medium text-gray-400 mb-1">
-              Today Records
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center">
-                <span className="text-blue-500 font-bold mr-2">BUY</span>
-                {isLoading ? (
-                  <span className="text-gray-400">Loading...</span>
-                ) : (
-                  <span
-                    className={`${daily.buy.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
-                  >
-                    {daily.buy.percentage >= 0 ? (
-                      <ArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(daily.buy.percentage).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center">
-                <span className="text-red-500 font-bold mr-2">SELL</span>
-                {isLoading ? (
-                  <span className="text-gray-400">Loading...</span>
-                ) : (
-                  <span
-                    className={`${daily.sell.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
-                  >
-                    {daily.sell.percentage >= 0 ? (
-                      <ArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(daily.sell.percentage).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Total Records */}
-          <div className="ml-10 border-l border-[#3f445c] pl-6">
-            <div className="text-sm font-medium text-gray-400 mb-1">
-              Total Records
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center">
-                <span className="text-blue-500 font-bold mr-2">BUY</span>
-                {isLoading ? (
-                  <span className="text-gray-400">Loading...</span>
-                ) : (
-                  <span
-                    className={`${total.buy.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
-                  >
-                    {total.buy.percentage >= 0 ? (
-                      <ArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(total.buy.percentage).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center">
-                <span className="text-red-500 font-bold mr-2">SELL</span>
-                {isLoading ? (
-                  <span className="text-gray-400">Loading...</span>
-                ) : (
-                  <span
-                    className={`${total.sell.percentage >= 0 ? "text-green-500" : "text-red-500"} flex items-center`}
-                  >
-                    {total.sell.percentage >= 0 ? (
-                      <ArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {Math.abs(total.sell.percentage).toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Trading Records Display */}
+          <TradingRecordsDisplay
+            daily={daily}
+            total={total}
+            isLoading={isLoading}
+          />
         </div>
 
         {/* Right side - Add refresh button here */}
@@ -256,3 +306,6 @@ export function RoomHeader({
     </>
   );
 }
+
+// Export a memoized version to prevent unnecessary re-renders
+export default memo(RoomHeader);

@@ -1,8 +1,12 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { toast } from "sonner";
 
-// Enhanced createClient function with error handling and retry logic
-export function createClient() {
+// Global connection state
+let isReconnecting = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Create a singleton instance with optimized settings
+const createOptimizedClient = () => {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -14,9 +18,6 @@ export function createClient() {
       throw new Error("Supabase configuration missing");
     }
 
-    console.log("Creating Supabase client with URL:", supabaseUrl);
-
-    // Create client with default auth settings to ensure proper OAuth flow
     return createBrowserClient(supabaseUrl, supabaseKey, {
       auth: {
         autoRefreshToken: true,
@@ -25,7 +26,29 @@ export function createClient() {
       },
       realtime: {
         params: {
-          eventsPerSecond: 10,
+          eventsPerSecond: 20, // Increased from 10 to 20
+        },
+        heartbeatIntervalMs: 15000, // Reduced from default to 15 seconds
+        timeout: 10000, // Reduced timeout to 10 seconds
+      },
+      global: {
+        fetch: (...args) => {
+          // Use a custom fetch with shorter timeouts
+          const controller = new AbortController();
+          const { signal } = controller;
+
+          // Set a timeout of 8 seconds
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          return fetch(args[0], { ...args[1], signal })
+            .then((response) => {
+              clearTimeout(timeoutId);
+              return response;
+            })
+            .catch((error) => {
+              clearTimeout(timeoutId);
+              throw error;
+            });
         },
       },
     });
@@ -33,21 +56,19 @@ export function createClient() {
     console.error("Failed to create Supabase client:", error);
     throw new Error("Failed to initialize Supabase client");
   }
+};
+
+// Create the singleton instance
+export const supabase = createOptimizedClient();
+
+// Export the createClient function for consistency
+export function createClient() {
+  return supabase;
 }
-
-// Create a singleton instance
-export const supabase = createClient();
-
-// Global connection state
-let isReconnecting = false;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Function to ensure we have a valid auth session
 export async function ensureAuthSession() {
   try {
-    console.log("[SUPABASE] Ensuring auth session...");
-
     // First try to get the existing session
     const { data: sessionData, error: sessionError } =
       await supabase.auth.getSession();
@@ -58,8 +79,6 @@ export async function ensureAuthSession() {
     }
 
     if (sessionData.session) {
-      console.log("[SUPABASE] Session exists, refreshing...");
-
       // Try to refresh the token
       const { error: refreshError } = await supabase.auth.refreshSession();
 
@@ -68,10 +87,8 @@ export async function ensureAuthSession() {
         return false;
       }
 
-      console.log("[SUPABASE] Session refreshed successfully");
       return true;
     } else {
-      console.log("[SUPABASE] No session found");
       return false;
     }
   } catch (error) {
@@ -80,91 +97,67 @@ export async function ensureAuthSession() {
   }
 }
 
-// Update the reconnectSupabase function to properly handle missing sessions
-
-// Replace the existing reconnectSupabase function with this improved version:
+// Improved reconnectSupabase function with better cleanup
 export async function reconnectSupabase() {
   if (isReconnecting) return false;
 
   try {
     isReconnecting = true;
-    console.log("[SUPABASE] Attempting to reconnect...");
 
-    // First try a more conservative approach - just get session without removing channels
+    // Remove all existing channels to clean up
+    supabase.removeAllChannels();
+
+    // Get the current session
     const { data: sessionData } = await supabase.auth.getSession();
 
+    // If we have a session, try to refresh it
     if (sessionData.session) {
-      console.log("[SUPABASE] Session exists, attempting minimal reconnect");
-
       try {
-        // Create a new channel to test connection
-        const testChannel = supabase
-          .channel("connection_test")
-          .subscribe((status) => {
-            console.log("[SUPABASE] Connection test status:", status);
-            if (status === "SUBSCRIBED") {
-              // Connection is good, we can be more conservative
-              console.log("[SUPABASE] Connection test successful");
-
-              // Clean up test channel
-              setTimeout(() => {
-                supabase.removeChannel(testChannel);
-              }, 1000);
-            }
-          });
-
-        // If we got here without errors, connection is likely fine
-        console.log(
-          "[SUPABASE] Reconnection successful with minimal disruption"
-        );
-        reconnectAttempts = 0;
-        return true;
-      } catch (error) {
-        console.warn(
-          "[SUPABASE] Minimal reconnect failed, trying full reconnect",
-          error
-        );
-        // Fall through to full reconnect
+        await supabase.auth.refreshSession();
+      } catch (err) {
+        console.error("[SUPABASE] Exception refreshing session:", err);
       }
     }
 
-    // If minimal approach didn't work, do a more thorough reconnect
-    // Remove all existing channels
-    supabase.removeAllChannels();
+    // Create a new test channel to verify connection
+    const testChannel = supabase.channel("reconnect-test");
 
-    // First check if we have a session before trying to refresh it
-    const { data: refreshCheckData } = await supabase.auth.getSession();
+    // Wait for the subscription to complete
+    const subscriptionPromise = new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve(false);
+      }, 3000); // Reduced from 5000ms to 3000ms
 
-    if (!refreshCheckData.session) {
-      console.log(
-        "[SUPABASE] No active session to refresh, reconnect successful"
-      );
-      // No session to refresh, but connection is still valid
+      testChannel.subscribe((status) => {
+        clearTimeout(timeout);
+
+        if (status === "SUBSCRIBED") {
+          resolve(true);
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          resolve(false);
+        }
+      });
+    });
+
+    const success = await subscriptionPromise;
+
+    // Clean up the test channel
+    supabase.removeChannel(testChannel);
+
+    if (success) {
+      // Reset reconnect attempts on success
+      reconnectAttempts = 0;
       return true;
-    }
-
-    // Only try to refresh if we have a session
-    const { error } = await supabase.auth.refreshSession();
-
-    if (error) {
-      console.error(
-        "[SUPABASE] Error refreshing session during reconnect:",
-        error
-      );
+    } else {
+      // Increment reconnect attempts on failure
       reconnectAttempts++;
 
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        toast.error("Connection lost. Please refresh the page.");
         return false;
       }
 
       return false;
     }
-
-    // Reset reconnect attempts on success
-    reconnectAttempts = 0;
-    console.log("[SUPABASE] Reconnected successfully");
-    return true;
   } catch (error) {
     console.error("[SUPABASE] Error during reconnect:", error);
     return false;
@@ -173,65 +166,17 @@ export async function reconnectSupabase() {
   }
 }
 
-// Define the supported providers
-export type SupportedProvider =
-  | "google"
-  | "kakao"
-  | "naver"
-  | "github"
-  | "facebook"
-  | "twitter"
-  | "apple"
-  | "azure"
-  | "bitbucket"
-  | "discord"
-  | "gitlab"
-  | "linkedin"
-  | "notion"
-  | "slack"
-  | "spotify"
-  | "twitch"
-  | "workos"
-  | "zoom";
-
-// Add a helper function to reset the Supabase client
-export function resetSupabaseClient() {
-  try {
-    // Remove all channels
-    supabase.removeAllChannels();
-
-    // Refresh the auth session
-    supabase.auth
-      .refreshSession()
-      .then(() => console.log("Auth session refreshed"))
-      .catch((err) => console.error("Error refreshing auth session:", err));
-
-    // Create a new channel to force reconnection
-    supabase.channel("system:reconnect").subscribe((status) => {
-      console.log("Reconnection status:", status);
-    });
-
-    console.log("Supabase client reset");
-    return true;
-  } catch (error) {
-    console.error("Failed to reset Supabase client:", error);
-    return false;
-  }
-}
-
-// Initialize connection monitoring
+// Initialize connection monitoring with optimized intervals
 if (typeof window !== "undefined") {
   // Set up visibility change handler
   document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
-      console.log("[SUPABASE] Page became visible, checking connection");
       await reconnectSupabase();
     }
   });
 
   // Set up online/offline handlers
   window.addEventListener("online", async () => {
-    console.log("[SUPABASE] Browser went online, reconnecting");
     await reconnectSupabase();
   });
 
@@ -245,5 +190,5 @@ if (typeof window !== "undefined") {
         await supabase.from("users").select("id").limit(1).maybeSingle();
       }
     }
-  }, 30000); // Every 30 seconds
+  }, 20000); // Reduced from 30 seconds to 20 seconds
 }

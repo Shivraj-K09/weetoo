@@ -14,7 +14,10 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { getPostsByCategory } from "@/app/actions/post-actions";
+import {
+  getPostsByCategory,
+  getTopViewedPosts,
+} from "@/app/actions/post-actions";
 import { unstable_noStore as noStore } from "next/cache";
 
 export default async function EducationBoard() {
@@ -29,13 +32,22 @@ export default async function EducationBoard() {
   // Fetch posts with education category
   const educationPosts = await getPostsByCategory("education");
 
+  // Get top education posts by view count
+  const topEducationPosts = await getTopViewedPosts(6, "education");
+
+  // Filter out top posts from regular posts to avoid duplication
+  const topPostIds = topEducationPosts.map((post) => post.id);
+  const regularEducationPosts = educationPosts.filter(
+    (post) => !topPostIds.includes(post.id)
+  );
+
   const hasNoPosts = educationPosts.length === 0;
 
   return (
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="/colorful-learning-banner.png"
+          src="/banner.png"
           alt="education-banner"
           width={1000}
           height={250}
@@ -79,8 +91,6 @@ export default async function EducationBoard() {
         )}
       </div>
 
-      <Separator orientation="horizontal" className="w-full my-5" />
-
       {/* If there are no posts at all, show the empty state */}
       {hasNoPosts ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -102,117 +112,164 @@ export default async function EducationBoard() {
           )}
         </div>
       ) : (
-        <div className="">
-          <div className="[&>div]:max-h-[43.75rem] border rounded overflow-hidden">
-            <Table className="[&_td]:border-border [&_th]:border-border border-separate border-spacing-0 [&_th]:border-b [&_tr]:border-none [&_tr:not(:last-child)_td]:border-b">
-              <TableHeader className="bg-background/90 sticky top-0 z-10 backdrop-blur-xs">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-16 text-center font-medium">
-                    번호
-                  </TableHead>
-                  <TableHead className="font-medium">제목</TableHead>
-                  <TableHead className="w-24 text-center font-medium">
-                    글쓴이
-                  </TableHead>
-                  <TableHead className="w-24 text-center font-medium">
-                    작성일
-                  </TableHead>
-                  <TableHead className="w-16 text-center font-medium">
-                    조회
-                  </TableHead>
-                  <TableHead className="w-16 text-center font-medium">
-                    추천
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {educationPosts.length > 0 ? (
-                  educationPosts.map((post, index) => (
-                    <TableRow key={post.id} className="hover:bg-slate-50">
-                      <TableCell className="text-center">{index + 1}</TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/education-board/${post.id}`}
-                          className="hover:underline block"
-                        >
-                          <div className="flex items-center gap-2">
-                            {post.featured_images?.length > 0 && (
-                              <div className="h-12 w-16 overflow-hidden rounded">
-                                <Image
-                                  src={
-                                    post.featured_images[0] ||
-                                    "/placeholder.svg"
-                                  }
-                                  alt="Post thumbnail"
-                                  width={64}
-                                  height={48}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1">
-                              <Badge
-                                variant="secondary"
-                                className="rounded-full bg-green-100 px-1.5 text-xs text-green-700"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="12"
-                                  height="12"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="mr-1"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                  <path d="M12 16v-4" />
-                                  <path d="M12 8h.01" />
-                                </svg>
-                                {post.category}
-                              </Badge>
-                              <span>{post.title}</span>
-                              {post.tags?.length > 0 && (
-                                <span className="text-gray-500">
-                                  [{post.tags.length}]
-                                </span>
+        <>
+          {/* Top Posts Grid - Only shown if there are posts */}
+          {topEducationPosts.length > 0 && (
+            <>
+              <h2 className="text-lg font-medium mb-3">Most Popular Posts</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-3">
+                {topEducationPosts.map((post) => (
+                  <Link
+                    href={`/education-board/${post.id}`}
+                    key={post.id}
+                    className="flex items-center gap-4 w-full hover:bg-slate-50 p-2 rounded-md transition-colors"
+                  >
+                    <div className="w-44 h-20 overflow-hidden rounded-md">
+                      <Image
+                        src={
+                          post.featured_images?.[0] ||
+                          "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg"
+                        }
+                        alt="Post thumbnail"
+                        width={176}
+                        height={80}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 w-full">
+                      <span className="font-medium">{post.title}</span>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <span className="mr-3">{post.view_count} views</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground text-justify line-clamp-2">
+                        {post.content.replace(/<[^>]*>/g, "")}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
+          <Separator orientation="horizontal" className="w-full my-5" />
+
+          {/* Posts Table - Only shown if there are posts */}
+          <div className="">
+            <div className="[&>div]:max-h-[43.75rem] border rounded overflow-hidden">
+              <Table className="[&_td]:border-border [&_th]:border-border border-separate border-spacing-0 [&_th]:border-b [&_tr]:border-none [&_tr:not(:last-child)_td]:border-b">
+                <TableHeader className="bg-background/90 sticky top-0 z-10 backdrop-blur-xs">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-16 text-center font-medium">
+                      번호
+                    </TableHead>
+                    <TableHead className="font-medium">제목</TableHead>
+                    <TableHead className="w-24 text-center font-medium">
+                      글쓴이
+                    </TableHead>
+                    <TableHead className="w-24 text-center font-medium">
+                      작성일
+                    </TableHead>
+                    <TableHead className="w-16 text-center font-medium">
+                      조회
+                    </TableHead>
+                    <TableHead className="w-16 text-center font-medium">
+                      추천
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {regularEducationPosts.length > 0 ? (
+                    regularEducationPosts.map((post, index) => (
+                      <TableRow key={post.id} className="hover:bg-slate-50">
+                        <TableCell className="text-center">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/education-board/${post.id}`}
+                            className="hover:underline block"
+                          >
+                            <div className="flex items-center gap-2">
+                              {post.featured_images?.length > 0 && (
+                                <div className="h-12 w-16 overflow-hidden rounded">
+                                  <Image
+                                    src={
+                                      post.featured_images[0] ||
+                                      "/placeholder.svg"
+                                    }
+                                    alt="Post thumbnail"
+                                    width={64}
+                                    height={48}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
                               )}
+                              <div className="flex items-center gap-1">
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full bg-green-100 px-1.5 text-xs text-green-700"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="mr-1"
+                                  >
+                                    <circle cx="12" cy="12" r="10" />
+                                    <path d="M12 16v-4" />
+                                    <path d="M12 8h.01" />
+                                  </svg>
+                                  {post.category}
+                                </Badge>
+                                <span>{post.title}</span>
+                                {post.tags?.length > 0 && (
+                                  <span className="text-gray-500">
+                                    [{post.tags.length}]
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{post.user?.first_name || "Anonymous"}</span>
                           </div>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <span>{post.user?.first_name || "Anonymous"}</span>
+                        </TableCell>
+                        <TableCell className="text-center text-sm">
+                          {formatDistanceToNow(new Date(post.created_at), {
+                            addSuffix: true,
+                          })}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {post.view_count}
+                        </TableCell>
+                        <TableCell className="text-center">0</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <FileText className="h-12 w-12 mb-2 opacity-20" />
+                          <p>No education posts found</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {formatDistanceToNow(new Date(post.created_at), {
-                          addSuffix: true,
-                        })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {post.view_count}
-                      </TableCell>
-                      <TableCell className="text-center">0</TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      <div className="flex flex-col items-center justify-center text-muted-foreground">
-                        <FileText className="h-12 w-12 mb-2 opacity-20" />
-                        <p>No education posts found</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

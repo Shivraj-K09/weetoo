@@ -83,6 +83,9 @@ export function PositionsPanel({
   const [connectionStatus, setConnectionStatus] = useState<
     "connected" | "connecting" | "disconnected"
   >("connecting");
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [forceRender, setForceRender] = useState(false);
 
   // State for close position dialog
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
@@ -120,13 +123,34 @@ export function PositionsPanel({
       );
       setPositions((data as Position[]) || []);
       setLastUpdate(new Date());
+      setRetryCount(0); // Reset retry count on successful fetch
     } catch (err: any) {
       console.error("[PositionsPanel] Unexpected error:", err);
       setError(err.message);
+      setRetryCount((prev) => prev + 1);
     } finally {
       setIsLoading(false);
+      setLoadingTimeout(false);
     }
   };
+
+  // Force render after timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.log("[PositionsPanel] Loading timeout reached, forcing render");
+        setLoadingTimeout(true);
+        setForceRender(true);
+
+        // Try to fetch positions again
+        if (retryCount < 3) {
+          fetchPositions();
+        }
+      }
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(timer);
+  }, [isLoading, retryCount]);
 
   // Set up real-time subscription for positions
   useEffect(() => {
@@ -378,7 +402,17 @@ export function PositionsPanel({
     };
   }, []);
 
-  if (isLoading && positions.length === 0) {
+  // Handle manual refresh
+  const handleManualRefresh = () => {
+    console.log("[PositionsPanel] Manual refresh triggered");
+    fetchPositions();
+  };
+
+  // Show loading state or empty state based on conditions
+  if (
+    (isLoading && positions.length === 0 && !loadingTimeout) ||
+    (isLoading && retryCount === 0 && !forceRender)
+  ) {
     return (
       <div className="bg-[#212631] p-4 rounded-md">
         {!hideTitle && (
@@ -486,6 +520,21 @@ export function PositionsPanel({
             >
               Short
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Refreshing...
+                </span>
+              ) : (
+                "Refresh"
+              )}
+            </Button>
           </div>
           {connectionStatus && (
             <div className="ml-2 flex items-center">
@@ -524,9 +573,30 @@ export function PositionsPanel({
         <>
           {filteredPositions.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
-              {hostId
-                ? "No positions are currently open. When the host opens positions, they will be displayed here."
-                : "No open positions"}
+              {error ? (
+                <div className="flex flex-col items-center">
+                  <p className="mb-2">Error loading positions: {error}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManualRefresh}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center">
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Retrying...
+                      </span>
+                    ) : (
+                      "Retry"
+                    )}
+                  </Button>
+                </div>
+              ) : hostId ? (
+                "No positions are currently open. When the host opens positions, they will be displayed here."
+              ) : (
+                "No open positions"
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">

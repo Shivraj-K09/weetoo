@@ -25,21 +25,15 @@ export const createServerClient = async (useServiceRole = false) => {
         return cookieStore.get(name)?.value;
       },
       set(name: string, value: string, options: CookieOptions) {
-        try {
+        // Only set cookies in server actions or route handlers
+        if (typeof window === "undefined") {
           cookieStore.set({ name, value, ...options });
-        } catch (error: unknown) {
-          // The `set` method was called from a Server Component.
-          // This can be ignored if you have opted-in to using cookies.
-          console.error(error);
         }
       },
       remove(name: string, options: CookieOptions) {
-        try {
+        // Only remove cookies in server actions or route handlers
+        if (typeof window === "undefined") {
           cookieStore.delete({ name, ...options });
-        } catch (error: unknown) {
-          // The `delete` method was called from a Server Component.
-          // This can be ignored if you have opted-in to using cookies.
-          console.error(error);
         }
       },
     },

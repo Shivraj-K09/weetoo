@@ -1,0 +1,48 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Trading System Guide
+
+The trading system is a core feature of this application, with several key components and features:
+
+## Trading Components
+
+- `components/trading/trading.tsx`: Main trading interface component
+- `components/trading/forex-broker-table.tsx`: Forex broker comparison table
+- `components/trading/crypto-exchange-table.tsx`: Cryptocurrency exchange comparison table
+
+## Trading Features
+
+### Forex Trading
+- Located in `app/forex/` directory
+- Includes broker comparison functionality
+- Supports margin trading (see `margin-implementation.md`)
+- Profit rate calculations (see `profit-rate-implementation.md`)
+
+### Trading Rooms
+- Voice chat integration via LiveKit
+- Room management components in `components/room/`
+- Host-only room functionality (see `host-only-room.md`)
+
+### Trading Documentation
+- `trading-issue.mdx`: Trading system issues and solutions
+- `margin-implementation.md`: Margin trading implementation details
+- `profit-rate-implementation.md`: Profit rate calculation implementation
+- `fix-margin.md`: Margin trading fixes and improvements
+
+## Related Features
+
+### Follower System
+- Follow button component: `components/follow-button.tsx`
+- Follower management documentation: `follower.md`
+
+### Points System
+- Points toast notification: `components/points-toast.tsx`
+- Points management in trading operations
+
+### Admin Features
+- Trading-related admin components in `components/admin/`
+- Admin documentation in `admin.md`
+

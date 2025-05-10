@@ -7,9 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getNaverOAuthURL } from "@/lib/auth/naver";
 import { supabase, type SupportedProvider } from "@/lib/supabase/client";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,6 +27,13 @@ import {
 } from "@/app/actions/portone-verification";
 // Import the new component at the top of the file
 import { VerificationErrorDisplay } from "./verification-error-display";
+// Add this near the top of the file with other imports
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 // Define verification steps
 enum VerificationStep {
@@ -59,6 +72,7 @@ export default function RegisterPage() {
     // Changed from residentRegistrationNumber to birthDate
     birthDate: "",
     mobileNumber: "",
+    mobileNumberRaw: "", // Add this field to store the raw number
   });
 
   // Slides with titles and subtitles
@@ -96,7 +110,7 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Update the validateForm function to properly check for 6 digits only
+  // Update the validateForm function to check for 7 digits
   const validateForm = () => {
     // Existing validation
     if (!formData.first_name.trim()) {
@@ -134,17 +148,17 @@ export default function RegisterPage() {
       return false;
     }
 
-    // Updated validation for birthDate - ONLY 6 digits
+    // Updated validation for birthDate - EXACTLY 7 digits
     if (!formData.birthDate.trim()) {
       toast.error("Birth date is required");
       return false;
     }
 
-    // Strict validation for birthdate format (YYMMDD) - exactly 6 digits
-    const birthDateRegex = /^\d{6}$/;
+    // Strict validation for birthdate format (YYMMDD) + gender digit - exactly 7 digits
+    const birthDateRegex = /^\d{7}$/;
     if (!birthDateRegex.test(formData.birthDate)) {
       toast.error(
-        "Please enter a valid birth date (YYMMDD) - exactly 6 digits"
+        "Please enter a valid birth date (YYMMDD) + gender digit - exactly 7 digits"
       );
       return false;
     }
@@ -184,10 +198,17 @@ export default function RegisterPage() {
       const fullName = `${formData.last_name}${formData.first_name}`; // Korean name format: Last name + First name
       console.log("Starting verification for:", fullName);
 
+      // Get the raw mobile number without hyphens
+      const mobileNumberRaw =
+        formData.mobileNumberRaw ||
+        formData.mobileNumber.replace(/[^0-9]/g, "");
+
+      console.log("Using mobile number (raw):", mobileNumberRaw);
+
       const verificationResult = await initiateVerification({
         fullName,
-        birthDate: formData.birthDate.replace(/-/g, ""), // Send only the birthdate (6 digits)
-        mobileNumber: formData.mobileNumber,
+        birthDate: formData.birthDate.replace(/-/g, ""), // Send the 7-digit birthDate
+        mobileNumber: mobileNumberRaw, // Use the raw number without hyphens
       });
 
       if (!verificationResult.success) {
@@ -314,13 +335,13 @@ export default function RegisterPage() {
     setShowConfirmPassword((prev) => !prev);
   };
 
-  // Replace the handleBirthDateChange function with this simplified version
+  // Update the handleBirthDateChange function to allow 7 digits
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^0-9]/g, ""); // Allow only numbers
 
-    // Strictly limit to 6 digits
-    if (value.length > 6) {
-      value = value.substring(0, 6);
+    // Strictly limit to 7 digits
+    if (value.length > 7) {
+      value = value.substring(0, 7);
     }
 
     setFormData((prev) => ({ ...prev, birthDate: value }));
@@ -328,42 +349,35 @@ export default function RegisterPage() {
 
   // Format the mobile number as user types
   const handleMobileNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9-]/g, ""); // Allow only numbers and hyphens
+    let value = e.target.value.replace(/[^0-9-]/g, ""); // Allow only numbers and hyphens for display
 
-    // Format as 010-XXXX-XXXX or 010-XXX-XXXX
-    if (value.length <= 3) {
+    // Also store the raw value without any hyphens
+    const rawValue = value.replace(/[^0-9]/g, "");
+
+    // Format as 010-XXXX-XXXX or 010-XXX-XXXX for display only
+    if (rawValue.length <= 3) {
       // Just the first part
-    } else if (value.length > 3 && value.length <= 7) {
-      // Check if there's already a hyphen after the first 3 digits
-      if (value.charAt(3) !== "-" && !value.includes("-")) {
-        value = `${value.substring(0, 3)}-${value.substring(3)}`;
-      }
-    } else if (value.length > 7) {
-      // Check for hyphens
-      if (!value.includes("-")) {
-        value = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
-      } else if (value.indexOf("-") === 3 && value.lastIndexOf("-") === 3) {
-        // Only has first hyphen
-        const secondPart = value.substring(4);
-        if (secondPart.length > 4) {
-          value = `${value.substring(0, 8)}-${value.substring(8)}`;
-        }
-      }
+      value = rawValue;
+    } else if (rawValue.length > 3 && rawValue.length <= 7) {
+      // Format with first hyphen
+      value = `${rawValue.substring(0, 3)}-${rawValue.substring(3)}`;
+    } else if (rawValue.length > 7) {
+      // Format with both hyphens
+      value = `${rawValue.substring(0, 3)}-${rawValue.substring(3, 7)}-${rawValue.substring(7)}`;
     }
 
-    // Limit to correct length
-    if (value.split("-").join("").length > 11) {
-      const parts = value.split("-");
-      if (parts.length === 3) {
-        value = `${parts[0]}-${parts[1]}-${parts[2].substring(0, 4)}`;
-      } else if (parts.length === 2) {
-        value = `${parts[0]}-${parts[1].substring(0, 8)}`;
-      } else {
-        value = value.substring(0, 11);
-      }
+    // Limit to correct length (11 digits max)
+    if (rawValue.length > 11) {
+      const trimmedRaw = rawValue.substring(0, 11);
+      value = `${trimmedRaw.substring(0, 3)}-${trimmedRaw.substring(3, 7)}-${trimmedRaw.substring(7)}`;
     }
 
-    setFormData((prev) => ({ ...prev, mobileNumber: value }));
+    // Store both the formatted value for display and the raw value for API
+    setFormData((prev) => ({
+      ...prev,
+      mobileNumber: value,
+      mobileNumberRaw: rawValue.substring(0, 11), // Limit to 11 digits
+    }));
   };
 
   // Go back to the initial form
@@ -515,22 +529,50 @@ export default function RegisterPage() {
                 />
               </div>
 
-              {/* Replace the birthDate input field with this updated version */}
-              <div>
+              {/* Updated birthDate input field with tooltip */}
+              <div className="relative">
                 <Input
                   id="birthDate"
                   name="birthDate"
                   type="text"
-                  placeholder="Birth Date (YYMMDD) - 6 digits only"
+                  placeholder="Birth Date + Gender Digit (YYMMDD+G)"
                   className="h-12 rounded-xl border-gray-800 bg-transparent transition-colors focus-visible:border-[#e74c3c] focus-visible:ring-[#e74c3c]"
                   required
-                  maxLength={6}
+                  maxLength={7}
                   value={formData.birthDate}
                   onChange={handleBirthDateChange}
                 />
+                <div className="absolute right-3 top-0 bottom-0 flex items-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info size={16} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-medium mb-1">
+                          Gender/Century Indicator Digit:
+                        </p>
+                        <p className="text-xs mb-1">For Korean citizens:</p>
+                        <ul className="text-xs list-disc pl-4 mb-1">
+                          <li>1: Male born before 2000</li>
+                          <li>2: Female born before 2000</li>
+                          <li>3: Male born after 2000</li>
+                          <li>4: Female born after 2000</li>
+                        </ul>
+                        <p className="text-xs mb-1">For foreign nationals:</p>
+                        <ul className="text-xs list-disc pl-4">
+                          <li>5: Male foreign national before 2000</li>
+                          <li>6: Female foreign national before 2000</li>
+                          <li>7: Male foreign national after 2000</li>
+                          <li>8: Female foreign national after 2000</li>
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Enter only the 6 digits of your birth date (e.g., 980215 for
-                  Feb 15, 1998)
+                  Enter your 6-digit birth date (e.g., 980215 for Feb 15, 1998)
+                  + 1 gender digit
                 </p>
               </div>
 
@@ -609,26 +651,75 @@ export default function RegisterPage() {
                 </button>
               </div>
 
-              <div className="flex items-center space-x-2 pt-1">
-                <Checkbox
-                  id="terms"
-                  checked={agreeTerms}
-                  onCheckedChange={(checked) =>
-                    setAgreeTerms(checked as boolean)
-                  }
-                  className="border-gray-700 text-[#e74c3c] data-[state=checked]:bg-[#e74c3c] data-[state=checked]:text-white"
-                  required
-                />
-                <Label htmlFor="terms" className="text-xs text-gray-400">
-                  I agree to the{" "}
-                  <Link href="#" className="text-[#e74c3c] hover:underline">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="#" className="text-[#e74c3c] hover:underline">
-                    Privacy Policy
-                  </Link>
-                </Label>
+              {/* Then find the checkbox section in the form and replace it with this: */}
+              <div className="space-y-4 pt-1">
+                <Collapsible className="w-full">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="terms"
+                      checked={agreeTerms}
+                      onCheckedChange={(checked) =>
+                        setAgreeTerms(checked as boolean)
+                      }
+                      className="border-gray-700 text-[#e74c3c] data-[state=checked]:bg-[#e74c3c] data-[state=checked]:text-white"
+                      required
+                    />
+                    <div className="flex flex-1 items-center justify-between">
+                      <Label htmlFor="terms" className="text-xs text-gray-400">
+                        I agree to the{" "}
+                        <Link
+                          href="#"
+                          className="text-[#e74c3c] hover:underline"
+                        >
+                          Terms of Service
+                        </Link>
+                        ,{" "}
+                        <Link
+                          href="#"
+                          className="text-[#e74c3c] hover:underline"
+                        >
+                          Privacy Policy
+                        </Link>
+                        , and{" "}
+                        <span className="text-[#e74c3c]">
+                          Personal Information Processing Policy
+                        </span>
+                      </Label>
+                      <CollapsibleTrigger className="text-gray-400 hover:text-[#e74c3c]">
+                        <ChevronDown size={16} />
+                      </CollapsibleTrigger>
+                    </div>
+                  </div>
+                  <CollapsibleContent className="mt-2 rounded-md bg-gray-900 p-4 text-xs text-gray-300">
+                    <h4 className="mb-2 font-medium">
+                      Personal Information Processing Policy
+                    </h4>
+                    <p className="mb-2">
+                      We collect and process your personal information for
+                      identity verification purposes. The following information
+                      will be collected and processed:
+                    </p>
+                    <ul className="mb-2 list-inside list-disc space-y-1">
+                      <li>Full Name</li>
+                      <li>Date of Birth</li>
+                      <li>Mobile Phone Number</li>
+                      <li>Gender</li>
+                      <li>Resident Registration Number (partial)</li>
+                    </ul>
+                    <p className="mb-2">
+                      This information will be processed by our identity
+                      verification service provider (Danal) to verify your
+                      identity. Your information will be stored securely and
+                      will not be shared with third parties except as necessary
+                      for identity verification purposes.
+                    </p>
+                    <p>
+                      By checking the box above, you consent to the collection
+                      and processing of your personal information as described
+                      in this policy.
+                    </p>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               <Button

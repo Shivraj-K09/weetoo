@@ -1,0 +1,54 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Authentication System Guide
+
+The authentication system is implemented using Next.js App Router and includes several key components:
+
+## Auth Routes
+
+- `app/(auth)/`: Authentication-related routes
+  - Login
+  - Registration
+  - Password reset
+  - Email verification
+
+## Protected Routes
+
+- `app/restricted/`: Protected routes requiring authentication
+- `app/(admin)/`: Admin-only routes
+- `middleware.ts`: Route protection middleware
+
+## Auth Components
+
+- `components/captcha-wrapper.tsx`: CAPTCHA integration for security
+- `components/nav-user.tsx`: User navigation and authentication state
+- `components/message-dialog.tsx`: Authentication-related messages
+
+## Security Features
+
+### Route Protection
+- Middleware-based route protection
+- Role-based access control
+- Admin-only routes
+
+### CAPTCHA Integration
+- CAPTCHA wrapper component for form protection
+- Used in authentication forms
+
+## Related Features
+
+### User Profile
+- Profile components in `components/profile/`
+- User settings and preferences
+
+### Navigation
+- Auth-aware navigation in `components/navigation/`
+- User menu in `components/nav-user.tsx`
+
+### Error Handling
+- `app/not-found.tsx`: Custom 404 page
+- Error boundary in `components/error-boundary.tsx`
+

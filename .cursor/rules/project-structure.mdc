@@ -1,0 +1,58 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project Structure Guide
+
+This is a Next.js project with a well-organized structure. Here are the key directories and their purposes:
+
+## Core Directories
+
+- `app/`: Contains the main application routes and layouts using Next.js 13+ App Router
+  - `(website)/`: Public website routes
+  - `(auth)/`: Authentication-related routes
+  - `(admin)/`: Admin panel routes
+  - `forex/`: Forex trading related routes
+  - `restricted/`: Protected routes
+  - `api/`: API route handlers
+  - `actions/`: Server actions for data mutations
+
+- `components/`: Reusable React components
+  - `ui/`: Basic UI components
+  - `trading/`: Trading-related components
+  - `room/`: Room management components
+  - `voice-room/`: Voice chat components
+  - `profile/`: User profile components
+  - `navigation/`: Navigation components
+  - `livekit/`: LiveKit integration components
+  - `admin/`: Admin panel components
+
+- `lib/`: Utility libraries and shared code
+- `utils/`: Helper functions and utilities
+- `hooks/`: Custom React hooks
+- `types/`: TypeScript type definitions
+- `providers/`: React context providers
+- `public/`: Static assets
+- `data/`: Data-related files and configurations
+
+## Key Files
+
+- `middleware.ts`: Next.js middleware for route protection
+- `next.config.ts`: Next.js configuration
+- `tsconfig.json`: TypeScript configuration
+- `package.json`: Project dependencies and scripts
+- `components.json`: Component configuration
+- `postcss.config.mjs`: PostCSS configuration
+- `eslint.config.mjs`: ESLint configuration
+
+## Documentation
+
+The project includes several markdown files documenting different features:
+- `task.md`: Task management documentation
+- `ranking.md`: Ranking system documentation
+- `record.md`: Record keeping documentation
+- `follower.md`: Follower system documentation
+- `admin.md`: Admin panel documentation
+- `funds.md`: Funds management documentation
+

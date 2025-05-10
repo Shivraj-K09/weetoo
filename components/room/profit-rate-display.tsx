@@ -92,11 +92,10 @@ export function ProfitRateDisplay({ className = "" }: ProfitRateDisplayProps) {
 
       {isNegative && (
         <Button
-          variant="outline"
           size="sm"
           onClick={handleReset}
           disabled={isResetting}
-          className="self-start text-xs"
+          className="self-start text-xs bg-none border"
         >
           {isResetting ? "Resetting..." : "Reset Trade History"}
         </Button>

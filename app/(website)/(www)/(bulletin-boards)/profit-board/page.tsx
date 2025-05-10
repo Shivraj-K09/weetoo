@@ -14,7 +14,10 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { getPostsByCategory } from "@/app/actions/post-actions";
+import {
+  getPostsByCategory,
+  getTopViewedPosts,
+} from "@/app/actions/post-actions";
 import { unstable_noStore as noStore } from "next/cache";
 
 export default async function ProfitBoard() {
@@ -29,8 +32,14 @@ export default async function ProfitBoard() {
   // Fetch posts with profit category
   const profitPosts = await getPostsByCategory("profit");
 
-  // Get top profit posts for the grid display
-  const topProfitPosts = profitPosts.slice(0, 6);
+  // Get top profit posts by view count
+  const topProfitPosts = await getTopViewedPosts(6, "profit");
+
+  // Filter out top posts from regular posts to avoid duplication
+  const topPostIds = topProfitPosts.map((post) => post.id);
+  const regularProfitPosts = profitPosts.filter(
+    (post) => !topPostIds.includes(post.id)
+  );
 
   const hasNoPosts = profitPosts.length === 0;
 
@@ -38,7 +47,7 @@ export default async function ProfitBoard() {
     <div className="w-full h-full">
       <div className="flex flex-col w-full">
         <Image
-          src="/profit-board-banner.png"
+          src="/banner.png"
           alt="profit-banner"
           width={1000}
           height={250}
@@ -107,39 +116,42 @@ export default async function ProfitBoard() {
         <>
           {/* Top Posts Grid - Only shown if there are posts */}
           {topProfitPosts.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-3">
-              {topProfitPosts.map((post) => (
-                <Link
-                  href={`/profit-board/${post.id}`}
-                  key={post.id}
-                  className="flex items-center gap-4 w-full hover:bg-slate-50 p-2 rounded-md transition-colors"
-                >
-                  <div className="w-44 h-20 overflow-hidden rounded-md">
-                    <Image
-                      src={
-                        post.featured_images?.[0] ||
-                        "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
-                        "/placeholder.svg" ||
-                        "/placeholder.svg" ||
-                        "/placeholder.svg" ||
-                        "/placeholder.svg" ||
-                        "/placeholder.svg"
-                      }
-                      alt="Post thumbnail"
-                      width={176}
-                      height={80}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 w-full">
-                    <span className="font-medium">{post.title}</span>
-                    <span className="text-sm text-muted-foreground text-justify line-clamp-2">
-                      {post.content.replace(/<[^>]*>/g, "")}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <>
+              <h2 className="text-lg font-medium mb-3">Most Popular Posts</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-3">
+                {topProfitPosts.map((post) => (
+                  <Link
+                    href={`/profit-board/${post.id}`}
+                    key={post.id}
+                    className="flex items-center gap-4 w-full hover:bg-slate-50 p-2 rounded-md transition-colors"
+                  >
+                    <div className="w-44 h-20 overflow-hidden rounded-md">
+                      <Image
+                        src={
+                          post.featured_images?.[0] ||
+                          "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg"
+                        }
+                        alt="Post thumbnail"
+                        width={176}
+                        height={80}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 w-full">
+                      <span className="font-medium">{post.title}</span>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <span className="mr-3">{post.view_count} views</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground text-justify line-clamp-2">
+                        {post.content.replace(/<[^>]*>/g, "")}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
 
           <Separator orientation="horizontal" className="w-full my-5" />
@@ -169,8 +181,8 @@ export default async function ProfitBoard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {profitPosts.length > 0 ? (
-                    profitPosts.map((post, index) => (
+                  {regularProfitPosts.length > 0 ? (
+                    regularProfitPosts.map((post, index) => (
                       <TableRow key={post.id} className="hover:bg-slate-50">
                         <TableCell className="text-center">
                           {index + 1}

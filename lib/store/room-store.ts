@@ -75,7 +75,37 @@ export const useRoomStore = create<RoomState>()(
 
       // Actions
       setRoomId: (roomId) => {
-        set({ roomId });
+        const { cleanupSubscriptions } = get();
+        cleanupSubscriptions();
+
+        // Reset all state
+        set((state) => ({
+          roomId,
+          roomDetails: null,
+          positions: [],
+          tradeHistory: [],
+          virtualCurrency: 0,
+          currentPrice: 0,
+          selectedSymbol: "",
+          isLoading: {
+            ...state.isLoading,
+            room: true,
+            positions: true,
+            tradeHistory: true,
+            virtualCurrency: true,
+          },
+          error: {
+            room: null,
+            positions: null,
+            tradeHistory: null,
+            virtualCurrency: null,
+          },
+          connectionStatus: "connecting",
+          subscriptions: [],
+        }));
+
+        // Immediately start fetching room details
+        get().fetchRoomDetails(roomId);
       },
 
       resetRoomState: () => {
@@ -111,11 +141,6 @@ export const useRoomStore = create<RoomState>()(
         // Don't update state if roomId doesn't match current roomId
         if (get().roomId !== roomId) return;
 
-        set((state) => ({
-          isLoading: { ...state.isLoading, room: true },
-          error: { ...state.error, room: null },
-        }));
-
         try {
           const { data, error } = await supabase
             .from("trading_rooms")
@@ -131,7 +156,18 @@ export const useRoomStore = create<RoomState>()(
           set((state) => ({
             roomDetails: data,
             isLoading: { ...state.isLoading, room: false },
+            connectionStatus: "connected",
           }));
+
+          // After room details are loaded, fetch other data
+          await Promise.all([
+            get().fetchPositions(roomId),
+            get().fetchTradeHistory(roomId),
+            get().fetchVirtualCurrency(roomId),
+          ]);
+
+          // Set up subscriptions after all data is loaded
+          get().setupSubscriptions(roomId);
         } catch (error: any) {
           console.error("Error fetching room details:", error);
 
@@ -141,6 +177,7 @@ export const useRoomStore = create<RoomState>()(
           set((state) => ({
             error: { ...state.error, room: error.message },
             isLoading: { ...state.isLoading, room: false },
+            connectionStatus: "disconnected",
           }));
         }
       },
@@ -320,82 +357,16 @@ export const useRoomStore = create<RoomState>()(
         const { cleanupSubscriptions } = get();
         cleanupSubscriptions();
 
-        // Set up subscription for positions
-        const positionsSubscription = supabase
-          .channel(`trading_positions_${roomId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "trading_positions",
-              filter: `room_id=eq.${roomId}`,
-            },
-            (payload) => {
-              console.log("Position change:", payload);
-              const {
-                fetchVirtualCurrency,
-                addPosition,
-                updatePosition,
-                removePosition,
-              } = get();
+        // Don't set up subscriptions if roomId doesn't match
+        if (get().roomId !== roomId) {
+          return () => {}; // Return empty cleanup function
+        }
 
-              if (
-                payload.eventType === "INSERT" &&
-                payload.new.status === "open"
-              ) {
-                addPosition(payload.new as Position);
-              } else if (payload.eventType === "UPDATE") {
-                if (payload.new.status === "open") {
-                  updatePosition(
-                    payload.new.id,
-                    payload.new as Partial<Position>
-                  );
-                } else {
-                  // Position closed or partially closed
-                  removePosition(payload.old.id);
+        const subscriptions = [];
 
-                  // Fetch updated virtual currency
-                  fetchVirtualCurrency(roomId);
-                }
-              } else if (payload.eventType === "DELETE") {
-                removePosition(payload.old.id);
-              }
-            }
-          )
-          .subscribe((status) => {
-            console.log("Positions subscription status:", status);
-            const { setConnectionStatus } = get();
-
-            if (status === "SUBSCRIBED") {
-              setConnectionStatus("connected");
-            } else if (status === "TIMED_OUT" || status === "CHANNEL_ERROR") {
-              setConnectionStatus("disconnected");
-            }
-          });
-
-        // Set up subscription for trade history
-        const tradeHistorySubscription = supabase
-          .channel(`trade_history_${roomId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "trade_history",
-              filter: `room_id=eq.${roomId}`,
-            },
-            (payload) => {
-              console.log("Trade history change:", payload);
-              const { addTradeHistory } = get();
-              addTradeHistory(payload.new as TradeHistory);
-            }
-          )
-          .subscribe();
-
-        // Set up subscription for virtual currency
-        const virtualCurrencySubscription = supabase
-          .channel(`trading_rooms_${roomId}`)
+        // Room updates subscription
+        const roomSubscription = supabase
+          .channel(`room:${roomId}`)
           .on(
             "postgres_changes",
             {
@@ -404,27 +375,60 @@ export const useRoomStore = create<RoomState>()(
               table: "trading_rooms",
               filter: `id=eq.${roomId}`,
             },
-            (payload) => {
-              console.log("Virtual currency change:", payload);
-              const { updateVirtualCurrency } = get();
-
-              if (payload.new.virtual_currency !== undefined) {
-                updateVirtualCurrency(payload.new.virtual_currency);
-              }
+            async (payload) => {
+              if (get().roomId !== roomId) return;
+              console.log("[ROOM STORE] Room update received:", payload.new);
+              set((state) => ({
+                roomDetails: payload.new as RoomDetails,
+              }));
             }
           )
           .subscribe();
 
-        // Store subscriptions for cleanup
-        set({
-          subscriptions: [
-            positionsSubscription,
-            tradeHistorySubscription,
-            virtualCurrencySubscription,
-          ],
-        });
+        subscriptions.push(roomSubscription);
 
-        // Return cleanup function
+        // Positions subscription
+        const positionsSubscription = supabase
+          .channel(`positions:${roomId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "positions",
+              filter: `room_id=eq.${roomId}`,
+            },
+            async () => {
+              if (get().roomId !== roomId) return;
+              get().fetchPositions(roomId);
+            }
+          )
+          .subscribe();
+
+        subscriptions.push(positionsSubscription);
+
+        // Trade history subscription
+        const tradeHistorySubscription = supabase
+          .channel(`trades:${roomId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "trade_history",
+              filter: `room_id=eq.${roomId}`,
+            },
+            async () => {
+              if (get().roomId !== roomId) return;
+              get().fetchTradeHistory(roomId);
+            }
+          )
+          .subscribe();
+
+        subscriptions.push(tradeHistorySubscription);
+
+        set({ subscriptions });
+
         return () => {
           cleanupSubscriptions();
         };
@@ -433,9 +437,7 @@ export const useRoomStore = create<RoomState>()(
       cleanupSubscriptions: () => {
         const { subscriptions } = get();
         subscriptions.forEach((subscription) => {
-          if (subscription) {
-            supabase.removeChannel(subscription);
-          }
+          supabase.removeChannel(subscription);
         });
         set({ subscriptions: [] });
       },
@@ -489,13 +491,9 @@ export const useRoomStore = create<RoomState>()(
       },
     }),
     {
-      name: "room-storage",
+      name: "room-store",
       partialize: (state) => ({
         roomId: state.roomId,
-        roomDetails: state.roomDetails,
-        positions: state.positions,
-        tradeHistory: state.tradeHistory.slice(0, 20), // Only persist the 20 most recent trades
-        virtualCurrency: state.virtualCurrency,
         selectedSymbol: state.selectedSymbol,
       }),
     }

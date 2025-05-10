@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-
-import { RoomsList } from "./rooms-list";
 import { CreateRoomPopover } from "./create-room-popover";
+import { RoomsList } from "./rooms-list";
+import { resetSupabaseClient } from "@/lib/supabase/utils";
 import { useUser } from "@/hooks/use-user";
 import type { Room } from "@/types/index";
-import { resetSupabaseClient } from "@/lib/supabase/utils";
-import { Button } from "@/components/ui/button";
 
 export function TradingRooms() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isRoomsLoading, setIsRoomsLoading] = useState(true);
@@ -26,7 +22,7 @@ export function TradingRooms() {
   // Function to force refresh the rooms list
   const refreshRooms = useCallback(() => {
     setLastRefresh(Date.now());
-    toast.success("Room list refreshed", { id: "refresh-rooms" });
+    console.log("[TRADING ROOMS] Manual refresh triggered");
   }, []);
 
   // Fetch rooms from Supabase
@@ -210,10 +206,10 @@ export function TradingRooms() {
 
   return (
     <div className="w-full h-full">
-      <div className="flex justify-end w-full py-3 gap-2">
+      <div className="flex justify-between w-full py-3">
         <Button
           onClick={refreshRooms}
-          className="bg-[#3498DB] hover:bg-[#3498DB]/90 font-semibold rounded cursor-pointer h-10"
+          className="bg-[#3498DB] hover:bg-[#3498DB]/90 text-white"
         >
           Refresh Rooms
         </Button>
@@ -224,6 +220,7 @@ export function TradingRooms() {
         isLoading={isRoomsLoading}
         user={user}
         onCreateRoom={() => setOpen(true)}
+        onRefresh={refreshRooms}
       />
     </div>
   );

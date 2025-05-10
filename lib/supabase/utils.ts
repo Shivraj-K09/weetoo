@@ -1,7 +1,7 @@
 import { supabase } from "./client";
 
 // Add a helper function to reset the Supabase client
-// Updated to be more conservative and not log users out
+// Updated to be more aggressive to fix room switching issues
 export function resetSupabaseClient() {
   try {
     console.log("[SUPABASE] Starting client reset");
@@ -9,6 +9,14 @@ export function resetSupabaseClient() {
     // Remove all channels
     supabase.removeAllChannels();
     console.log("[SUPABASE] All channels removed");
+
+    // Force refresh the session
+    supabase.auth
+      .refreshSession()
+      .then(() => console.log("[SUPABASE] Session refreshed"))
+      .catch((err) =>
+        console.error("[SUPABASE] Error refreshing session:", err)
+      );
 
     // Create a new channel to force reconnection
     const reconnectChannel = supabase.channel("system:reconnect");
@@ -73,13 +81,23 @@ export async function reinitializeSupabaseClient() {
 }
 
 // Add a new function to completely reset the client
-// DO NOT USE THIS FUNCTION - it's kept for reference only
 export async function forceResetSupabaseClient() {
   try {
     console.log("[SUPABASE] Force resetting client");
 
     // Remove all channels
     supabase.removeAllChannels();
+
+    // Force refresh the session
+    try {
+      await supabase.auth.refreshSession();
+      console.log("[SUPABASE] Session refreshed during force reset");
+    } catch (err) {
+      console.error(
+        "[SUPABASE] Error refreshing session during force reset:",
+        err
+      );
+    }
 
     // Create a new channel to force reconnection
     const reconnectChannel = supabase.channel("system:force-reconnect");
@@ -167,24 +185,38 @@ export function keepConnectionsAlive() {
 }
 
 // Add a new function to clear all toast notifications
-// Add this new function:
-
 export function clearAllToasts() {
   if (typeof window !== "undefined") {
     // This is a hack to access the toast dismiss function if it's available
-    // It assumes you're using a toast library that attaches to window
-    if (
-      "toast" in window &&
-      typeof (window as any).toast?.dismiss === "function"
-    ) {
-      (window as any).toast.dismiss();
-    }
-    // For sonner toast specifically
-    if (
-      "Sonner" in window &&
-      typeof (window as any).Sonner?.dismiss === "function"
-    ) {
-      (window as any).Sonner.dismiss();
+    try {
+      // For sonner toast specifically
+      if (
+        typeof window !== "undefined" &&
+        "Sonner" in window &&
+        typeof (window as any).Sonner.dismiss === "function"
+      ) {
+        (window as any).Sonner.dismiss();
+      }
+      // For generic toast libraries
+      if (
+        typeof window !== "undefined" &&
+        "toast" in window &&
+        typeof (window as any).toast.dismiss === "function"
+      ) {
+        (window as any).toast.dismiss();
+      }
+      // For sonner toast using the global toast object
+      if (
+        typeof window !== "undefined" &&
+        "toast" in window &&
+        typeof (window as any).toast.dismiss === "function"
+      ) {
+        (window as any).toast.dismiss();
+      }
+
+      console.log("[UTILS] All toasts cleared");
+    } catch (error) {
+      console.error("[UTILS] Error clearing toasts:", error);
     }
   }
 }

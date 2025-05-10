@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PositionsPanel } from "./position-panel";
 import { TradeHistory } from "./trade-history";
@@ -26,6 +26,20 @@ export function TradingTabsBottom({
 }: TradingTabsBottomProps) {
   const [activeTab, setActiveTab] = useState("positions");
   const { user } = useUser();
+  const [isFormLoading, setIsFormLoading] = useState(true);
+
+  // Add an effect to simulate the loading state for the form
+  useEffect(() => {
+    // Set initial loading state
+    setIsFormLoading(true);
+
+    // Create a timeout to set loading to false
+    const timer = setTimeout(() => {
+      setIsFormLoading(false);
+    }, 500); // Short timeout to ensure form appears quickly
+
+    return () => clearTimeout(timer);
+  }, [roomId, symbol]); // Re-run when room or symbol changes
 
   return (
     <Tabs
@@ -78,7 +92,11 @@ export function TradingTabsBottom({
         value="funding"
         className="h-[calc(100%-40px)] overflow-y-auto no-scrollbar"
       >
-        <FundingHistory roomId={roomId} userId={user?.id || ""} />
+        <FundingHistory
+          roomId={roomId}
+          userId={user?.id || ""}
+          hideTitle={true}
+        />
       </TabsContent>
     </Tabs>
   );

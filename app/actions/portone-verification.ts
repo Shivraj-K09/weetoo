@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { v4 as uuidv4 } from "uuid";
 
 // Types for PortOne API responses
 interface PortOneTokenResponse {
@@ -26,10 +27,14 @@ interface PortOneVerificationResult {
 
 // Store API secret in environment variable
 const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET;
-const PORTONE_API_URL = "https://api.portone.io/v2";
+const PORTONE_API_URL = "https://api.portone.io";
 
 // Add a debug mode flag at the top of the file
 const DEBUG_MODE = true; // Set to false in production
+
+// Update this with your actual channel key from the PortOne console
+// This should be the channel key for the Danal identity verification channel you just created
+const PORTONE_CHANNEL_KEY = "channel-key-5e46b62a-eaab-4594-b776-a33827a7f989"; // Replace with your actual channel key
 
 // Get access token from PortOne
 export async function getPortOneToken(): Promise<{
@@ -52,6 +57,7 @@ export async function getPortOneToken(): Promise<{
     const response = await fetch(`${PORTONE_API_URL}/login/api-secret`, {
       method: "POST",
       headers: {
+        Authorization: `PortOne ${PORTONE_API_SECRET}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -105,10 +111,10 @@ export async function getPortOneToken(): Promise<{
   }
 }
 
-// Update the initiateVerification function to work with only the birthdate portion (first 6 digits)
+// Update the initiateVerification function based on the v2 API documentation
 export async function initiateVerification(formData: {
   fullName: string;
-  birthDate: string; // Changed from residentRegistrationNumber to birthDate
+  birthDate: string; // 7 digits (YYMMDD + gender digit)
   mobileNumber: string;
 }): Promise<{
   success: boolean;
@@ -127,34 +133,34 @@ export async function initiateVerification(formData: {
     const formattedMobileNumber = formData.mobileNumber.replace(/[^0-9]/g, "");
 
     // Format the birthdate correctly - remove all non-numeric characters
-    const formattedBirthDate = formData.birthDate.replace(/[^0-9]/g, "");
+    const formattedInput = formData.birthDate.replace(/[^0-9]/g, "");
 
     if (DEBUG_MODE) {
+      console.log("Raw mobile number:", formData.mobileNumber);
+      console.log("Formatted mobile number:", formattedMobileNumber);
       console.log(
         "Formatted mobile number length:",
         formattedMobileNumber.length
       );
-      console.log("Formatted birthdate length:", formattedBirthDate.length);
+      console.log("Formatted input length:", formattedInput.length);
     }
 
     // Validate formatted data
-    if (
-      formattedMobileNumber.length < 10 ||
-      formattedMobileNumber.length > 11
-    ) {
+    if (formattedInput.length !== 7) {
       return {
         success: false,
-        message: "Invalid mobile number format",
-        errorDetails: "Mobile number must be 10-11 digits",
+        message: "Invalid format",
+        errorDetails: "Input must be exactly 7 digits (YYMMDD + gender digit)",
       };
     }
 
-    if (formattedBirthDate.length !== 6) {
-      return {
-        success: false,
-        message: "Invalid birthdate format",
-        errorDetails: "Birthdate must be exactly 6 digits (YYMMDD)",
-      };
+    // Extract the birthdate (first 6 digits) and gender indicator (7th digit)
+    const formattedBirthDate = formattedInput.substring(0, 6);
+    const genderIndicator = formattedInput.substring(6, 7);
+
+    if (DEBUG_MODE) {
+      console.log("Extracted birthdate:", formattedBirthDate);
+      console.log("Extracted gender indicator:", genderIndicator);
     }
 
     const tokenResult = await getPortOneToken();
@@ -170,33 +176,103 @@ export async function initiateVerification(formData: {
 
     if (DEBUG_MODE) console.log("Successfully obtained PortOne token");
 
-    // Create identity verification request
-    if (DEBUG_MODE)
-      console.log("Sending identity verification request to PortOne");
+    // Generate a unique ID for the verification
+    const verificationId = uuidv4();
 
-    // Prepare the request body according to PortOne API specifications
-    // Note: We're now using only the birthdate instead of the full RRN
+    if (DEBUG_MODE) console.log("Generated verification ID:", verificationId);
+
+    // Store verification ID in a cookie for the session
+    const cookieStore = await cookies();
+    cookieStore.set("verification_id", verificationId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 10, // 10 minutes
+      path: "/",
+    });
+
+    // Determine birth year based on gender indicator
+    // For Korean citizens: 1,2 = born before 2000, 3,4 = born after 2000
+    let birthYear = "";
+    if (
+      genderIndicator === "1" ||
+      genderIndicator === "2" ||
+      genderIndicator === "5" ||
+      genderIndicator === "6"
+    ) {
+      birthYear = "19" + formattedBirthDate.substring(0, 2);
+    } else if (
+      genderIndicator === "3" ||
+      genderIndicator === "4" ||
+      genderIndicator === "7" ||
+      genderIndicator === "8"
+    ) {
+      birthYear = "20" + formattedBirthDate.substring(0, 2);
+    } else {
+      birthYear = "19" + formattedBirthDate.substring(0, 2); // Default to 1900s if unknown
+    }
+
+    // Format birthdate as YYYY-MM-DD for the API
+    const birthMonth = formattedBirthDate.substring(2, 4);
+    const birthDay = formattedBirthDate.substring(4, 6);
+    const formattedBirthDateForAPI = `${birthYear}-${birthMonth}-${birthDay}`;
+
+    if (DEBUG_MODE)
+      console.log("Formatted birth date for API:", formattedBirthDateForAPI);
+
+    // Determine the likely telecom operator based on the mobile number
+    // This is a guess - the actual operator might be different
+    let operator = "SKT"; // Default to SKT
+    if (formattedMobileNumber.startsWith("010")) {
+      // Try to guess based on number ranges, but this is not reliable
+      // It's better to try multiple operators or let the user select
+      operator = "SKT"; // Default for 010
+    } else if (formattedMobileNumber.startsWith("011")) {
+      operator = "SKT";
+    } else if (formattedMobileNumber.startsWith("016")) {
+      operator = "KTF";
+    } else if (formattedMobileNumber.startsWith("017")) {
+      operator = "SKT";
+    } else if (formattedMobileNumber.startsWith("018")) {
+      operator = "KTF";
+    } else if (formattedMobileNumber.startsWith("019")) {
+      operator = "LGT";
+    }
+
+    // Add Danal-specific parameters as mentioned in the documentation
+    const danalBypass = {
+      danal: {
+        IsCarrier: operator, // Try with the guessed operator
+        CPTITLE: "WEETOO", // Your service name
+      },
+    };
+
+    // Prepare the request body according to v2 API
     const requestBody = {
-      name: formData.fullName,
-      birthDate: formattedBirthDate, // Using only the birthdate portion
-      mobileNumber: formattedMobileNumber,
-      // Add any other required fields based on PortOne API documentation
+      channelKey: PORTONE_CHANNEL_KEY,
+      method: "SMS",
+      customer: {
+        name: formData.fullName,
+        birthDate: formattedBirthDateForAPI,
+        phoneNumber: formattedMobileNumber,
+        identityNumber: formattedInput, // Send the full 7-digit input
+      },
+      bypass: danalBypass, // Add Danal-specific parameters
     };
 
     if (DEBUG_MODE) {
-      console.log(
-        "Request structure:",
-        JSON.stringify({
-          ...requestBody,
-          birthDate: formattedBirthDate, // We can show this since it's not as sensitive as the full RRN
-          mobileNumber: "MASKED",
-        })
-      );
+      console.log("Sending verification request with body:", {
+        ...requestBody,
+        customer: {
+          ...requestBody.customer,
+          identityNumber: "XXXXXXX", // Mask sensitive data in logs
+          phoneNumber: "XXXXXXXXXX",
+        },
+      });
     }
 
-    // Make the API request with proper error handling
-    const verificationResponse = await fetch(
-      `${PORTONE_API_URL}/identity-verifications`,
+    // Make the API request
+    const sendResponse = await fetch(
+      `${PORTONE_API_URL}/identity-verifications/${verificationId}/send`,
       {
         method: "POST",
         headers: {
@@ -207,90 +283,19 @@ export async function initiateVerification(formData: {
       }
     );
 
-    // Handle non-successful responses
-    if (!verificationResponse.ok) {
-      let errorDetails = "";
-      try {
-        const text = await verificationResponse.text();
-        if (DEBUG_MODE)
-          console.error("PortOne verification error response:", text);
-
-        if (text) {
-          try {
-            const errorJson = JSON.parse(text);
-            errorDetails = JSON.stringify(errorJson);
-            if (DEBUG_MODE)
-              console.error("Parsed error details:", errorDetails);
-          } catch {
-            errorDetails = text;
-          }
-        } else {
-          errorDetails = "No response body";
-        }
-      } catch (e) {
-        errorDetails = `Failed to read response: ${e instanceof Error ? e.message : String(e)}`;
-      }
-
+    // Handle the response
+    if (sendResponse.ok) {
+      if (DEBUG_MODE) console.log("Successfully sent verification code");
       return {
-        success: false,
-        message: `Verification request failed with status ${verificationResponse.status}`,
-        errorDetails: errorDetails,
+        success: true,
+        verificationId: verificationId,
       };
-    }
-
-    if (DEBUG_MODE)
-      console.log("Successfully created identity verification request");
-
-    // Parse the successful response
-    const verificationData = await verificationResponse.json();
-    if (DEBUG_MODE)
-      console.log("Verification response:", JSON.stringify(verificationData));
-
-    if (!verificationData.identityVerificationId) {
-      return {
-        success: false,
-        message: "Invalid response from PortOne API",
-        errorDetails: "Missing identityVerificationId in response",
-      };
-    }
-
-    // Store verification ID in a cookie for the session
-    const cookieStore = await cookies();
-    cookieStore.set(
-      "verification_id",
-      verificationData.identityVerificationId,
-      {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 10, // 10 minutes
-        path: "/",
-      }
-    );
-
-    // Send verification code to user's mobile
-    if (DEBUG_MODE) console.log("Sending verification code to mobile");
-
-    const sendResponse = await fetch(
-      `${PORTONE_API_URL}/identity-verifications/${verificationData.identityVerificationId}/send`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokenResult.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          method: "SMS",
-          // Add any other required fields based on PortOne API documentation
-        }),
-      }
-    );
-
-    if (!sendResponse.ok) {
+    } else {
+      // Handle error response
       let errorDetails = "";
       try {
         const text = await sendResponse.text();
-        if (DEBUG_MODE)
-          console.error("PortOne send verification code error:", text);
+        if (DEBUG_MODE) console.error("Verification request failed:", text);
 
         if (text) {
           try {
@@ -304,6 +309,34 @@ export async function initiateVerification(formData: {
         }
       } catch (e) {
         errorDetails = `Failed to read response: ${e instanceof Error ? e.message : String(e)}`;
+      }
+
+      // If we get a specific error about permissions, provide a clear message
+      if (
+        errorDetails.includes("permission") ||
+        errorDetails.includes("contract") ||
+        errorDetails.includes("access")
+      ) {
+        return {
+          success: false,
+          message: "Permission error with PortOne API",
+          errorDetails: `
+You've successfully set up the channel, but there may still be pending permission requirements.
+
+According to the documentation, to access additional customer information (like phone number or telecom operator), you need to:
+
+1. Display personal information processing policies on your website
+2. Send a request email to cs@portone.io with:
+   - Company name
+   - Business registration number
+   - Danal merchant ID (CPID) for identity verification
+   - Business type
+   - Reason for requiring the information
+   - URL to your personal information privacy policy
+
+Please check if you've completed these steps and received confirmation from PortOne.
+          `,
+        };
       }
 
       return {
@@ -312,13 +345,6 @@ export async function initiateVerification(formData: {
         errorDetails: errorDetails,
       };
     }
-
-    if (DEBUG_MODE) console.log("Successfully sent verification code");
-
-    return {
-      success: true,
-      verificationId: verificationData.identityVerificationId,
-    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Unexpected error during verification:", errorMessage);
@@ -369,8 +395,7 @@ export async function confirmVerification(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          code: verificationCode,
-          // Add any other required fields based on PortOne API documentation
+          otp: verificationCode, // According to the documentation, this is the field name for SMS verification
         }),
       }
     );
@@ -404,15 +429,17 @@ export async function confirmVerification(
     const confirmData = await confirmResponse.json();
 
     // Clean up the cookie
-    const cookieStoreCleanup = await cookies();
-    cookieStoreCleanup.delete("verification_id");
+    cookieStore.delete("verification_id");
+
+    // Extract verification details from the response
+    const verificationDetails = confirmData.identityVerification || confirmData;
 
     return {
       success: true,
       verified: true,
-      name: confirmData.name,
-      gender: confirmData.gender,
-      birthDate: confirmData.birthDate,
+      name: verificationDetails.name,
+      gender: verificationDetails.gender,
+      birthDate: verificationDetails.birthDate,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -421,68 +448,6 @@ export async function confirmVerification(
       verified: false,
       message: "An unexpected error occurred during verification confirmation",
       errorDetails: errorMessage,
-    };
-  }
-}
-
-// Add the following function after confirmVerification
-async function refreshPortOneToken(
-  refreshToken: string
-): Promise<{ success: boolean; token?: string; errorDetails?: string }> {
-  try {
-    const response = await fetch(`${PORTONE_API_URL}/token/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        refreshToken: refreshToken,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorMessage = `Status ${response.status}: ${response.statusText || "Unknown error"}`;
-      let errorDetails = "";
-
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const errorJson = JSON.parse(text);
-            errorDetails = JSON.stringify(errorJson);
-          } catch {
-            errorDetails = text;
-          }
-        } else {
-          errorDetails = "No response body received from PortOne API";
-        }
-      } catch (e) {
-        errorDetails = `Failed to read response: ${e instanceof Error ? e.message : String(e)}`;
-      }
-
-      return {
-        success: false,
-        errorDetails: `Token refresh failed: ${errorMessage}. Details: ${errorDetails}`,
-      };
-    }
-
-    const data: PortOneTokenResponse = await response.json();
-
-    // Update the token in a cookie for the session
-    const cookieStore = await cookies();
-    cookieStore.set("portone_token", data.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 10, // 10 minutes
-      path: "/",
-    });
-
-    return { success: true, token: data.accessToken };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      errorDetails: `Network or server error during token refresh: ${errorMessage}`,
     };
   }
 }

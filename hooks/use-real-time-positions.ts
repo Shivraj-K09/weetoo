@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { fetchWithCache } from "@/utils/data-optimization";
 
 // Define the Position type
 interface Position {
@@ -39,18 +40,41 @@ export function useRealTimePositions(roomId: string) {
   const positionsRef = useRef<Position[]>([]);
   const subscriptionRef = useRef<any>(null);
   const mountedRef = useRef(true);
+  const lastFetchTimeRef = useRef<number>(0);
+  const fetchThrottleTime = 2000; // Minimum time between fetches (2 seconds)
+
+  // Helper function to extract UUID from a string
+  const extractUUID = useCallback((str: string): string => {
+    if (!str) return str;
+
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    const uuidRegex =
+      /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+    const match = str.match(uuidRegex);
+    return match ? match[1] : str;
+  }, []);
+
+  // Clean roomId
+  const cleanRoomId = useRef<string>(extractUUID(roomId));
+
+  useEffect(() => {
+    cleanRoomId.current = extractUUID(roomId);
+  }, [roomId, extractUUID]);
 
   useEffect(() => {
     // Set mounted flag
     mountedRef.current = true;
 
-    if (!roomId) {
+    if (!cleanRoomId.current) {
       setPositions([]);
       setIsLoading(false);
       return;
     }
 
-    console.log("[useRealTimePositions] Setting up for roomId:", roomId);
+    console.log(
+      "[useRealTimePositions] Setting up for roomId:",
+      cleanRoomId.current
+    );
     setIsLoading(true);
     setError(null);
 
@@ -124,61 +148,47 @@ export function useRealTimePositions(roomId: string) {
       updateTimeout = setTimeout(processBatchUpdates, batchDelay);
     };
 
-    // Initial fetch of positions with retry logic
+    // Initial fetch of positions with retry logic and caching
     const fetchPositions = async (retryCount = 0) => {
       try {
-        console.log(
-          "[useRealTimePositions] Fetching initial positions for room:",
-          roomId
-        );
-        const { data, error } = await supabase
-          .from("trading_positions")
-          .select("*")
-          .eq("room_id", roomId)
-          .eq("status", "open")
-          .order("created_at", { ascending: false });
+        const now = Date.now();
 
-        if (error) {
-          console.error(
-            "[useRealTimePositions] Error fetching positions:",
-            error
-          );
-
-          // Retry logic for transient errors
-          if (retryCount < 3 && mountedRef.current) {
-            const delay = Math.pow(2, retryCount) * 1000;
-            console.log(`[useRealTimePositions] Retrying in ${delay}ms...`);
-            setTimeout(() => fetchPositions(retryCount + 1), delay);
-            return;
-          }
-
-          if (mountedRef.current) {
-            setError(error.message);
-            setIsLoading(false);
-          }
+        // Throttle fetches to prevent hammering the database
+        if (
+          now - lastFetchTimeRef.current < fetchThrottleTime &&
+          retryCount === 0
+        ) {
+          console.log("[useRealTimePositions] Throttling fetch request");
           return;
         }
 
+        lastFetchTimeRef.current = now;
         console.log(
-          "[useRealTimePositions] Initial positions loaded:",
+          "[useRealTimePositions] Fetching positions for room:",
+          cleanRoomId.current
+        );
+
+        // Use cache for faster loading
+        const data = await fetchWithCache(
+          `positions:${cleanRoomId.current}`,
+          async () => {
+            const { data, error } = await supabase
+              .from("trading_positions")
+              .select("*")
+              .eq("room_id", cleanRoomId.current)
+              .eq("status", "open")
+              .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+          },
+          5000 // 5 second TTL for positions
+        );
+
+        console.log(
+          "[useRealTimePositions] Positions loaded:",
           data?.length || 0
         );
-        if (data && data.length > 0) {
-          console.log(
-            "[useRealTimePositions] Position details:",
-            data.map((pos) => ({
-              id: pos.id,
-              entry_amount: pos.entry_amount,
-              position_size: pos.position_size,
-              order_type: (pos as any).order_type,
-              initial_margin: (pos as any).initial_margin,
-              calculated_margin:
-                pos.entry_amount +
-                pos.position_size *
-                  ((pos as any).order_type === "market" ? 0.0006 : 0.0002),
-            }))
-          );
-        }
         if (mountedRef.current) {
           setPositions(data || []);
           positionsRef.current = data || [];
@@ -187,6 +197,14 @@ export function useRealTimePositions(roomId: string) {
       } catch (err) {
         console.error("[useRealTimePositions] Unexpected error:", err);
         if (mountedRef.current) {
+          // Retry logic for transient errors
+          if (retryCount < 3) {
+            const delay = Math.pow(2, retryCount) * 1000;
+            console.log(`[useRealTimePositions] Retrying in ${delay}ms...`);
+            setTimeout(() => fetchPositions(retryCount + 1), delay);
+            return;
+          }
+
           setError("Failed to load positions");
           setIsLoading(false);
         }
@@ -198,14 +216,14 @@ export function useRealTimePositions(roomId: string) {
 
     // Set up real-time subscription with optimized handlers
     const subscription = supabase
-      .channel(`trading_positions_changes_${roomId}`)
+      .channel(`trading_positions_changes_${cleanRoomId.current}`)
       .on(
         "postgres_changes",
         {
           event: "*", // Listen for all events (insert, update, delete)
           schema: "public",
           table: "trading_positions",
-          filter: `room_id=eq.${roomId}`,
+          filter: `room_id=eq.${cleanRoomId.current}`,
         },
         (payload: PositionPayload) => {
           console.log(
@@ -321,7 +339,7 @@ export function useRealTimePositions(roomId: string) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("new-position-created", handleNewPosition);
     };
-  }, [roomId]);
+  }, [cleanRoomId.current]);
 
   // Return setPositions so we can manually update positions
   return { positions, isLoading, error, setPositions };

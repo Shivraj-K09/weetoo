@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
 import RoomPage from "@/components/room/room-page";
 import { RoomSkeleton } from "@/components/room/room-skeleton";
+import { fetchAllRoomData } from "@/lib/data-fetching";
 
 interface RoomPageProps {
   params: {
@@ -11,8 +11,8 @@ interface RoomPageProps {
 }
 
 export default async function Page({ params }: RoomPageProps) {
-  // Properly handle params by awaiting it
-  const { roomName } = await Promise.resolve(params);
+  // Properly handle params
+  const roomName = params.roomName;
 
   // The roomId is the entire part before the first hyphen that follows the UUID
   // This regex matches a UUID pattern
@@ -29,24 +29,17 @@ export default async function Page({ params }: RoomPageProps) {
   }
 
   try {
-    // Create a new Supabase client for each request
-    const supabase = await createServerClient();
-
-    // Fetch room data
-    const { data: roomData, error } = await supabase
-      .from("trading_rooms")
-      .select("*")
-      .eq("id", roomId)
-      .single();
-
-    if (error || !roomData) {
-      console.error("Error fetching room:", error);
-      notFound();
-    }
+    // Fetch all room data in parallel using our optimized function
+    const { roomData, participants, tradingRecords } =
+      await fetchAllRoomData(roomId);
 
     return (
       <Suspense fallback={<RoomSkeleton />}>
-        <RoomPage roomData={roomData} />
+        <RoomPage
+          roomData={roomData}
+          initialParticipants={participants}
+          initialTradingRecords={tradingRecords}
+        />
       </Suspense>
     );
   } catch (error) {

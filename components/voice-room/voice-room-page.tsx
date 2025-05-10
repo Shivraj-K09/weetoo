@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  Suspense,
+  lazy,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import {
+  resetSupabaseClient,
+  forceResetSupabaseClient,
+  clearAllToasts,
+} from "@/lib/supabase/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { TradingMarketPlace } from "@/components/room/trading-market-place";
-import { TradingTabs } from "@/components/room/trading-tabs";
-import { PriceInfoBar } from "@/components/room/price-info-bar";
-import { WarningDialog } from "../room/warning-dialog";
-import { CloseRoomDialog } from "../room/close-room-dialog";
+import { WarningDialog } from "@/components/room/warning-dialog";
+import { CloseRoomDialog } from "@/components/room/close-room-dialog";
 import { deleteRoom } from "@/app/actions/delete-room";
 import { formatLargeNumber, extractCurrencies } from "@/utils/format-utils";
 import { useRoomDetails } from "@/hooks/use-room-details";
@@ -18,21 +27,76 @@ import { usePriceData } from "@/hooks/use-price-data";
 import { RoomHeader } from "@/components/room/room-header";
 import { ParticipantsPanel } from "@/components/room/participants-panel";
 import { ChatPanel } from "@/components/room/chat-panel";
-import { TradingChart } from "@/components/room/trading-chart";
-import { TradingTabsBottom } from "@/components/room/trading-tabs-bottom";
-import { RoomSkeleton } from "../room/room-skeleton";
+import { RoomSkeleton } from "@/components/room/room-skeleton";
 import { usePersistentConnection } from "@/hooks/use-persistent-connection";
-import { VoiceChannel } from "./voice-room-channel";
-import { AutoJoinRoom } from "../room/auto-join-room";
+import { VoiceChannel } from "@/components/voice-room/voice-room-channel";
+import { AutoJoinRoom } from "@/components/room/auto-join-room";
+import {
+  fetchWithCache,
+  clearCache,
+  preloadAssets,
+} from "@/utils/data-optimization";
+
+// Define the props interface for VoiceRoomPage
+interface VoiceRoomPageProps {
+  roomData: any;
+  initialParticipants?: any[];
+  initialTradingRecords?: any;
+}
+
+// Lazy load non-critical components
+// Prioritize loading of TradingMarketPlace
+const TradingMarketPlace = lazy(() =>
+  import("@/components/room/trading-market-place").then((mod) => ({
+    default: mod.TradingMarketPlace,
+  }))
+);
+const TradingTabs = lazy(() =>
+  import("@/components/room/trading-tabs").then((mod) => ({
+    default: mod.TradingTabs,
+  }))
+);
+const PriceInfoBar = lazy(() =>
+  import("@/components/room/price-info-bar").then((mod) => ({
+    default: mod.PriceInfoBar,
+  }))
+);
+const TradingChart = lazy(() =>
+  import("@/components/room/trading-chart").then((mod) => ({
+    default: mod.TradingChart,
+  }))
+);
+// Prioritize loading of TradingTabsBottom with a lower priority threshold
+const TradingTabsBottom = lazy(() =>
+  import("@/components/room/trading-tabs-bottom").then((mod) => ({
+    default: mod.TradingTabsBottom,
+  }))
+);
 
 // Add error boundary and fallback UI
-export default function VoiceRoomPage({ roomData }: { roomData: any }) {
+export default function VoiceRoomPage({
+  roomData,
+  initialParticipants = [],
+  initialTradingRecords = null,
+}: VoiceRoomPageProps) {
   const params = useParams();
   const router = useRouter();
   const roomNameParam = params.roomName as string;
   const authCheckedRef = useRef(false);
   const connectionAttemptsRef = useRef(0);
   const maxConnectionAttempts = 3;
+  const cleanupDoneRef = useRef(false);
+  const roomInitializedRef = useRef(false);
+  const dataLoadedRef = useRef({
+    auth: false,
+    room: false,
+    price: false,
+  });
+
+  // Preload critical assets
+  useEffect(() => {
+    preloadAssets();
+  }, []);
 
   // Add state for warning dialog
   const [showWarning, setShowWarning] = useState(false);
@@ -40,6 +104,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [initialRender, setInitialRender] = useState(true);
 
   // Extract room ID from the URL - properly handle UUID format
   // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
@@ -63,6 +128,87 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
 
   const { priceData, priceDataLoaded, fundingData, handlePriceUpdate } =
     usePriceData(selectedSymbol);
+
+  // Effect to handle initial render state
+  useEffect(() => {
+    // After a short delay, set initialRender to false to allow lazy components to load
+    const timer = setTimeout(() => {
+      setInitialRender(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Function to clean up resources when component unmounts or when switching rooms
+  const cleanupResources = useCallback(() => {
+    if (cleanupDoneRef.current) return;
+
+    console.log("[VOICE ROOM] Cleaning up resources for room:", roomId);
+
+    try {
+      // Remove all Supabase channels
+      supabase.removeAllChannels();
+
+      // Clear any room-specific localStorage items
+      if (typeof window !== "undefined") {
+        // Clear room-specific items from localStorage
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            (key.includes(roomId) ||
+              key.includes("room-") ||
+              key.includes("trading-"))
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+
+        // Remove the collected keys
+        keysToRemove.forEach((key) => {
+          localStorage.removeItem(key);
+        });
+
+        // Clear all toast notifications
+        clearAllToasts();
+      }
+
+      // Reset Supabase client
+      resetSupabaseClient();
+
+      // Clear data cache
+      clearCache();
+
+      cleanupDoneRef.current = true;
+      console.log("[VOICE ROOM] Resources cleaned up successfully");
+    } catch (error) {
+      console.error("[VOICE ROOM] Error cleaning up resources:", error);
+    }
+  }, [roomId]);
+
+  // Initialize room on first load
+  useEffect(() => {
+    if (roomInitializedRef.current) return;
+
+    console.log("[VOICE ROOM] Initializing room:", roomId);
+
+    // Reset cleanup flag
+    cleanupDoneRef.current = false;
+
+    // Force reset Supabase client to ensure clean state
+    forceResetSupabaseClient().then(() => {
+      console.log("[VOICE ROOM] Supabase client reset for new room");
+    });
+
+    // Mark room as initialized
+    roomInitializedRef.current = true;
+
+    // Clean up when component unmounts
+    return () => {
+      cleanupResources();
+    };
+  }, [roomId, cleanupResources]);
 
   // Add timeout for loading
   useEffect(() => {
@@ -89,7 +235,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
       );
 
       // Force reset Supabase connections
-      supabase.removeAllChannels();
+      await forceResetSupabaseClient();
 
       // Force refresh the auth session
       await supabase.auth.refreshSession();
@@ -111,20 +257,26 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
         throw new Error("No session found after refresh");
       }
 
-      // Fetch user data
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id, first_name, last_name, email, avatar_url, kor_coins")
-        .eq("id", session.user.id)
-        .single();
+      // Fetch user data with caching
+      const userData = await fetchWithCache(
+        `user:${session.user.id}`,
+        async () => {
+          const { data, error } = await supabase
+            .from("users")
+            .select("id, first_name, last_name, email, avatar_url, kor_coins")
+            .eq("id", session.user.id)
+            .single();
 
-      if (userError) {
-        throw new Error(`User data error: ${userError.message}`);
-      }
+          if (error) throw error;
+          return data;
+        },
+        30000 // 30 second TTL for user data
+      );
 
       console.log("[VOICE ROOM] Auth retry successful, user:", userData.id);
       setUser(userData);
       setAuthLoading(false);
+      dataLoadedRef.current.auth = true;
 
       // Reload the page if we're on the third retry
       if (retryCount >= 2) {
@@ -163,26 +315,30 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
         if (session) {
           console.log("[VOICE ROOM] Session found, fetching user data...");
 
-          // Fetch user data
-          const { data: userData, error } = await supabase
-            .from("users")
-            .select("id, first_name, last_name, email, avatar_url, kor_coins")
-            .eq("id", session.user.id)
-            .single();
+          // Fetch user data with caching
+          const userData = await fetchWithCache(
+            `user:${session.user.id}`,
+            async () => {
+              const { data, error } = await supabase
+                .from("users")
+                .select(
+                  "id, first_name, last_name, email, avatar_url, kor_coins"
+                )
+                .eq("id", session.user.id)
+                .single();
 
-          if (error) {
-            console.error("[VOICE ROOM] Error fetching user data:", error);
-            setLoadError(
-              "Failed to load user data. Please try refreshing the page."
-            );
-            return;
-          }
+              if (error) throw error;
+              return data;
+            },
+            30000 // 30 second TTL for user data
+          );
 
           console.log(
             "[VOICE ROOM] User data fetched successfully:",
             userData.id
           );
           setUser(userData);
+          dataLoadedRef.current.auth = true;
 
           // If we're in a voice room and this user is the owner, ensure they're added as a participant
           if (roomData && userData.id === roomData.owner_id) {
@@ -240,15 +396,27 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
 
         if (event === "SIGNED_IN" && session) {
           // Fetch user data on sign in
-          const { data: userData, error } = await supabase
-            .from("users")
-            .select("id, first_name, last_name, email, avatar_url, kor_coins")
-            .eq("id", session.user.id)
-            .single();
+          const userData = await fetchWithCache(
+            `user:${session.user.id}`,
+            async () => {
+              const { data, error } = await supabase
+                .from("users")
+                .select(
+                  "id, first_name, last_name, email, avatar_url, kor_coins"
+                )
+                .eq("id", session.user.id)
+                .single();
 
-          if (!error && userData) {
+              if (error) throw error;
+              return data;
+            },
+            30000 // 30 second TTL for user data
+          );
+
+          if (userData) {
             console.log("[VOICE ROOM] User data updated after auth change");
             setUser(userData);
+            dataLoadedRef.current.auth = true;
           }
         } else if (event === "SIGNED_OUT") {
           setUser(null);
@@ -342,9 +510,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
     // Add window unload event listener for better cleanup
     const handleUnload = () => {
       console.log("[VOICE ROOM] Window unloading, cleaning up subscriptions");
-      supabase.removeChannel(roomSubscription);
-      // Remove any other active channels
-      supabase.removeAllChannels();
+      cleanupResources();
     };
 
     window.addEventListener("beforeunload", handleUnload);
@@ -354,7 +520,14 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
       window.removeEventListener("beforeunload", handleUnload);
       supabase.removeChannel(roomSubscription);
     };
-  }, [roomId, router, roomData, fetchParticipants, currentUserId]);
+  }, [
+    roomId,
+    router,
+    roomData,
+    fetchParticipants,
+    currentUserId,
+    cleanupResources,
+  ]);
 
   // Check if warning should be shown
   useEffect(() => {
@@ -401,6 +574,9 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
       const result = await deleteRoom(roomDetails.id);
 
       if (result.success) {
+        // Clean up resources before closing
+        cleanupResources();
+
         // Close the window
         window.close();
 
@@ -415,7 +591,7 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
       console.error("Error closing room:", error);
       toast.error("An error occurred while closing the room");
     }
-  }, [roomDetails, router]);
+  }, [roomDetails, router, cleanupResources]);
 
   // Handle symbol change
   const handleSymbolChange = useCallback(
@@ -590,43 +766,164 @@ export default function VoiceRoomPage({ roomData }: { roomData: any }) {
 
             {/* Price Info Bar */}
             <div className="bg-[#212631] rounded-md w-full">
-              <PriceInfoBar
-                tradingPairs={roomDetails.trading_pairs}
-                selectedSymbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                priceData={priceData}
-                priceDataLoaded={priceDataLoaded}
-                fundingData={fundingData}
-                onSymbolChange={handleSymbolChange}
-                formatLargeNumber={formatLargeNumber}
-                extractCurrencies={extractCurrencies}
-              />
+              <Suspense
+                fallback={
+                  <div className="h-16 bg-[#212631] animate-pulse rounded-md"></div>
+                }
+              >
+                {!initialRender && (
+                  <PriceInfoBar
+                    tradingPairs={roomDetails.trading_pairs}
+                    selectedSymbol={
+                      selectedSymbol || roomDetails.trading_pairs[0]
+                    }
+                    priceData={priceData}
+                    priceDataLoaded={priceDataLoaded}
+                    fundingData={fundingData}
+                    onSymbolChange={handleSymbolChange}
+                    formatLargeNumber={formatLargeNumber}
+                    extractCurrencies={extractCurrencies}
+                  />
+                )}
+              </Suspense>
             </div>
 
             <div className="flex gap-1.5 w-full">
               {/* Trading Chart */}
-              <TradingChart
-                symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex-1 h-[45rem] bg-[#212631] animate-pulse rounded-md"></div>
+                }
+              >
+                {!initialRender && (
+                  <TradingChart
+                    symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                  />
+                )}
+              </Suspense>
 
               {/* Tabs */}
               <div className="bg-[#212631] p-1 rounded max-w-[290px] w-full h-[45rem] border border-[#3f445c]">
-                <TradingTabs
-                  symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                  onPriceUpdate={handlePriceUpdate}
-                />
+                <Suspense
+                  fallback={
+                    <div className="h-full bg-[#212631] animate-pulse rounded-md"></div>
+                  }
+                >
+                  {!initialRender && (
+                    <TradingTabs
+                      symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                      onPriceUpdate={handlePriceUpdate}
+                    />
+                  )}
+                </Suspense>
               </div>
 
-              <TradingMarketPlace />
+              <Suspense
+                fallback={
+                  <div className="w-[19rem] h-[45rem] bg-[#212631] rounded-md p-4 border border-[#3f445c]">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="text-white font-medium">거래</div>
+                      <div className="flex space-x-2">
+                        <div className="w-20 h-6 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+
+                    {/* Price input skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">주문가격</div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Amount input skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">주문수량</div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Percentage buttons skeleton */}
+                    <div className="grid grid-cols-5 gap-1 mb-4">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-8 bg-[#1a1e27]/50 rounded animate-pulse"
+                        ></div>
+                      ))}
+                    </div>
+
+                    {/* Leverage selector skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">
+                        레버리지 설정
+                      </div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Position info skeleton */}
+                    <div className="space-y-2 mb-4">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="flex justify-between">
+                          <div className="w-24 h-5 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                          <div className="w-24 h-5 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Action buttons skeleton */}
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                      <div className="h-10 bg-[#00C879]/30 rounded animate-pulse"></div>
+                      <div className="h-10 bg-[#FF5252]/30 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                }
+              >
+                <TradingMarketPlace />
+              </Suspense>
             </div>
 
-            <div className="bg-[#212631] w-full h-[22rem] border border-[#3f445c]">
-              <TradingTabsBottom
-                roomId={roomDetails.id}
-                isHost={isHost}
-                symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                currentPrice={currentPriceNumber}
-                virtualCurrency="KOR"
-              />
+            {/* Increased height to 16rem for the tabs container */}
+            <div className="bg-[#212631] w-full h-[16rem] border border-[#3f445c]">
+              <Suspense
+                fallback={
+                  <div className="h-full bg-[#212631] rounded-md p-2 border border-[#3f445c]">
+                    <div className="flex space-x-1 border-b border-[#3f445c]">
+                      <div className="px-4 py-2 text-sm text-white/70 bg-[#1a1e27]/30 rounded-t-md">
+                        거래
+                      </div>
+                      <div className="px-4 py-2 text-sm text-white/70">
+                        포지션
+                      </div>
+                      <div className="px-4 py-2 text-sm text-white/70">
+                        거래내역
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <div className="bg-[#212631] rounded max-w-[290px] w-full border border-[#3f445c] overflow-y-auto no-scrollbar">
+                        <div className="flex gap-1.5 w-full p-2">
+                          <div className="h-10 w-full bg-[#1a1e27] rounded animate-pulse"></div>
+                          <div className="h-10 w-full bg-[#1a1e27] rounded animate-pulse"></div>
+                        </div>
+                        <div className="h-10 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="h-10 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="h-32 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="grid grid-cols-2 gap-2 p-2">
+                          <div className="h-10 w-full bg-[#00C879]/30 rounded animate-pulse"></div>
+                          <div className="h-10 w-full bg-[#FF5252]/30 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
+                {!initialRender && (
+                  <TradingTabsBottom
+                    roomId={roomDetails.id}
+                    isHost={isHost}
+                    symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                    currentPrice={currentPriceNumber}
+                    virtualCurrency="KOR"
+                  />
+                )}
+              </Suspense>
             </div>
           </div>
         </div>

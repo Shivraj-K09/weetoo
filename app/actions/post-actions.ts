@@ -41,69 +41,116 @@ async function verifyRecaptcha(token: string) {
 }
 
 // Fetch all posts for the free board
-export async function getPosts(): Promise<Post[]> {
+export async function getPosts(category = "free"): Promise<Post[]> {
   unstable_noStore();
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    // Add timeout to the query
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Query timeout")), 10000); // 10 second timeout
+    });
+
+    const queryPromise = supabase
       .from("posts")
       .select(
         `
         *,
         user:user_id (
-          first_name
+          first_name,
+          last_name,
+          avatar_url
         )
       `
       )
       .eq("status", "approved") // Only fetch approved posts
-      .eq("category", "free") // Only fetch posts with category "free"
+      .eq("category", category) // Filter by category
       .order("created_at", { ascending: false })
-      .limit(100) // Add a reasonable limit
+      .limit(50) // Reduced limit for better performance
       .throwOnError();
 
-    if (error) {
-      console.error("Error fetching posts:", error);
+    type QueryResult = {
+      data: Post[];
+      error: any;
+    };
+
+    const result = await Promise.race([queryPromise, timeoutPromise])
+      .then((result) => result as QueryResult)
+      .catch((error) => {
+        console.error(`Error fetching ${category} posts:`, error);
+        return { data: [], error } as QueryResult;
+      });
+
+    if ("error" in result && result.error) {
+      console.error(`Error fetching ${category} posts:`, result.error);
       return [];
     }
 
-    return data as Post[];
+    return result.data;
   } catch (error) {
-    console.error("Unexpected error fetching posts:", error);
+    console.error(`Unexpected error fetching ${category} posts:`, error);
     return [];
   }
 }
 
-// Fetch top viewed posts for the free board
-export async function getTopViewedPosts(count: number): Promise<Post[]> {
+// Fetch top viewed posts for a specific category
+export async function getTopViewedPosts(
+  count = 6,
+  category = "free"
+): Promise<Post[]> {
   unstable_noStore();
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    // Add timeout to the query
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Query timeout")), 10000); // 10 second timeout
+    });
+
+    const queryPromise = supabase
       .from("posts")
       .select(
         `
         *,
         user:user_id (
-          first_name
+          first_name,
+          last_name,
+          avatar_url
         )
       `
       )
       .eq("status", "approved") // Only fetch approved posts
-      .eq("category", "free") // Only fetch posts with category "free"
+      .eq("category", category) // Filter by category
       .order("view_count", { ascending: false })
       .limit(count)
       .throwOnError();
 
-    if (error) {
-      console.error("Error fetching top viewed posts:", error);
+    type QueryResult = {
+      data: Post[];
+      error: any;
+    };
+
+    const result = await Promise.race([queryPromise, timeoutPromise])
+      .then((result) => result as QueryResult)
+      .catch((error) => {
+        console.error(`Error fetching top viewed ${category} posts:`, error);
+        return { data: [], error } as QueryResult;
+      });
+
+    if ("error" in result && result.error) {
+      console.error(
+        `Error fetching top viewed ${category} posts:`,
+        result.error
+      );
       return [];
     }
 
-    return data as Post[];
+    return result.data;
   } catch (error) {
-    console.error("Unexpected error fetching top viewed posts:", error);
+    console.error(
+      `Unexpected error fetching top viewed ${category} posts:`,
+      error
+    );
     return [];
   }
 }
@@ -114,26 +161,44 @@ export async function getPost(id: string): Promise<Post | null> {
   try {
     const supabase = await createClient();
 
-    const { data: post, error } = await supabase
+    // Add timeout to the query
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Query timeout")), 10000); // 10 second timeout
+    });
+
+    const queryPromise = supabase
       .from("posts")
       .select(
         `
         *,
         user:user_id (
-          first_name
+          first_name,
+          last_name,
+          avatar_url
         )
       `
       )
       .eq("id", id)
-      .single()
-      .throwOnError();
+      .single();
 
-    if (error) {
-      console.error("Error fetching post:", error);
+    type QueryResult = {
+      data: Post | null;
+      error: any;
+    };
+
+    const result = await Promise.race([queryPromise, timeoutPromise])
+      .then((result) => result as QueryResult)
+      .catch((error) => {
+        console.error("Error fetching post:", error);
+        return { data: null, error } as QueryResult;
+      });
+
+    if ("error" in result && result.error) {
+      console.error("Error fetching post:", result.error);
       return null;
     }
 
-    return post as Post;
+    return result.data;
   } catch (error) {
     console.error("Unexpected error fetching post:", error);
     return null;
@@ -670,32 +735,47 @@ export async function getPostsByCategory(category: string): Promise<Post[]> {
   try {
     const supabase = await createClient();
 
-    // Add cache-busting timestamp to ensure fresh data
-    const cacheBuster = new Date().getTime();
+    // Add timeout to the query
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Query timeout")), 10000); // 10 second timeout
+    });
 
-    const { data, error } = await supabase
+    const queryPromise = supabase
       .from("posts")
       .select(
         `
         *,
         user:user_id (
-          first_name
+          first_name,
+          last_name,
+          avatar_url
         )
       `
       )
       .eq("status", "approved") // Only fetch approved posts
       .eq("category", category) // Filter by category
       .order("created_at", { ascending: false })
-      .limit(100) // Add a reasonable limit
+      .limit(50) // Reduced limit for better performance
       .throwOnError();
 
-    if (error) {
-      console.error(`Error fetching ${category} posts:`, error);
+    type QueryResult = {
+      data: Post[];
+      error: any;
+    };
+
+    const result = await Promise.race([queryPromise, timeoutPromise])
+      .then((result) => result as QueryResult)
+      .catch((error) => {
+        console.error(`Error fetching ${category} posts:`, error);
+        return { data: [], error } as QueryResult;
+      });
+
+    if ("error" in result && result.error) {
+      console.error(`Error fetching ${category} posts:`, result.error);
       return [];
     }
 
-    console.log(`Fetched ${data.length} ${category} posts at ${cacheBuster}`);
-    return data as Post[];
+    return result.data;
   } catch (error) {
     console.error(`Unexpected error fetching ${category} posts:`, error);
     return [];

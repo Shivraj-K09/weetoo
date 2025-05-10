@@ -1,20 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  Suspense,
+  lazy,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  supabase,
   ensureAuthSession,
   reconnectSupabase,
-  supabase,
 } from "@/lib/supabase/client";
+import { forceResetSupabaseClient } from "@/lib/supabase/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { TradingMarketPlace } from "@/components/room/trading-market-place";
-import { TradingTabs } from "@/components/room/trading-tabs";
-import { PriceInfoBar } from "@/components/room/price-info-bar";
-import { WarningDialog } from "./warning-dialog";
-import { CloseRoomDialog } from "./close-room-dialog";
+import { WarningDialog } from "@/components/room/warning-dialog";
+import { CloseRoomDialog } from "@/components/room/close-room-dialog";
 import { deleteRoom } from "@/app/actions/delete-room";
 import { formatLargeNumber, extractCurrencies } from "@/utils/format-utils";
 import { useRoomDetails } from "@/hooks/use-room-details";
@@ -22,11 +27,14 @@ import { usePriceData } from "@/hooks/use-price-data";
 import { RoomHeader } from "@/components/room/room-header";
 import { ParticipantsPanel } from "@/components/room/participants-panel";
 import { ChatPanel } from "@/components/room/chat-panel";
-import { TradingChart } from "@/components/room/trading-chart";
-import { TradingTabsBottom } from "@/components/room/trading-tabs-bottom";
 import { RoomSkeleton } from "@/components/room/room-skeleton";
-import { RoomAccessManager } from "./room-access-manager";
 import { usePersistentConnection } from "@/hooks/use-persistent-connection";
+import { AutoJoinRoom } from "@/components/room/auto-join-room";
+import {
+  fetchWithCache,
+  clearCache,
+  preloadAssets,
+} from "@/utils/data-optimization";
 import {
   saveRoomData,
   getCachedRoomData,
@@ -37,11 +45,51 @@ import {
   hasHandledRefresh,
   clearRefreshHandled,
 } from "@/utils/room-persistence";
-import { AutoJoinRoom } from "./auto-join-room";
-import { useRoomStore } from "@/lib/store/room-store";
+
+// Lazy load non-critical components
+const TradingTabs = lazy(() =>
+  import("@/components/room/trading-tabs").then((mod) => ({
+    default: mod.TradingTabs,
+  }))
+);
+const PriceInfoBar = lazy(() =>
+  import("@/components/room/price-info-bar").then((mod) => ({
+    default: mod.PriceInfoBar,
+  }))
+);
+const TradingChart = lazy(() =>
+  import("@/components/room/trading-chart").then((mod) => ({
+    default: mod.TradingChart,
+  }))
+);
+
+// Prioritize loading of TradingTabsBottom with a lower priority threshold
+const TradingTabsBottom = lazy(() =>
+  import("@/components/room/trading-tabs-bottom").then((mod) => ({
+    default: mod.TradingTabsBottom,
+  }))
+);
+
+// Prioritize loading of TradingMarketPlace
+const TradingMarketPlace = lazy(() =>
+  import("@/components/room/trading-market-place").then((mod) => ({
+    default: mod.TradingMarketPlace,
+  }))
+);
+
+// Define the props interface for RoomPage
+interface RoomPageProps {
+  roomData: any;
+  initialParticipants?: any[];
+  initialTradingRecords?: any;
+}
 
 // Add error boundary and fallback UI
-export default function RoomPage({ roomData }: { roomData: any }) {
+export default function RoomPage({
+  roomData,
+  initialParticipants = [],
+  initialTradingRecords = null,
+}: RoomPageProps) {
   const params = useParams();
   const router = useRouter();
   const roomNameParam = params.roomName as string;
@@ -54,6 +102,17 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const forceRenderRef = useRef(0);
   const isRefreshRef = useRef(false);
   const mountedRef = useRef(false);
+  const initialLoadCompleteRef = useRef(false);
+  const dataLoadedRef = useRef({
+    auth: false,
+    room: false,
+    price: false,
+  });
+
+  // Preload critical assets
+  useEffect(() => {
+    preloadAssets();
+  }, []);
 
   // Then add this effect to set it correctly on the client side
   useEffect(() => {
@@ -61,8 +120,31 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     isRefreshRef.current = wasPageRefreshed();
     mountedRef.current = true;
 
+    // Force reset Supabase client on mount to ensure clean state
+    forceResetSupabaseClient().then(() => {
+      console.log("[ROOM PAGE] Supabase client force reset on mount");
+    });
+
     return () => {
       mountedRef.current = false;
+
+      // Clean up on unmount
+      if (loadingTimeoutRef.current) {
+        if (Array.isArray(loadingTimeoutRef.current)) {
+          (loadingTimeoutRef.current as NodeJS.Timeout[]).forEach((id) =>
+            clearTimeout(id)
+          );
+        } else {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        loadingTimeoutRef.current = null;
+      }
+
+      // Remove all Supabase channels on unmount
+      supabase.removeAllChannels();
+
+      // Clear data cache
+      clearCache();
     };
   }, []);
 
@@ -73,6 +155,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [forceRender, setForceRender] = useState(0);
   const [isRecovering, setIsRecovering] = useState(isRefreshRef.current);
+  const [initialRender, setInitialRender] = useState(true);
 
   // Extract room ID from the URL - properly handle UUID format
   // A UUID is in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
@@ -89,7 +172,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Use custom hooks
+  // Use custom hooks with optimized loading
   const {
     roomDetails,
     isLoading,
@@ -180,7 +263,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     if (!mountedRef.current) return;
 
     try {
-      toast.loading("Refreshing room data...", { id: "refresh-room" });
+      console.log("[ROOM PAGE] Refreshing room data...");
 
       // Force reconnect
       await reconnectSupabase();
@@ -191,10 +274,9 @@ export default function RoomPage({ roomData }: { roomData: any }) {
       // Force a component update
       forceComponentUpdate();
 
-      toast.success("Room data refreshed", { id: "refresh-room" });
+      console.log("[ROOM PAGE] Room data refreshed successfully");
     } catch (error) {
       console.error("Error refreshing room:", error);
-      toast.error("Failed to refresh room data", { id: "refresh-room" });
     }
   }, [fetchParticipants, forceComponentUpdate]);
 
@@ -244,22 +326,27 @@ export default function RoomPage({ roomData }: { roomData: any }) {
         return false;
       }
 
-      // Fetch user data
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id, first_name, last_name, email, avatar_url, kor_coins")
-        .eq("id", sessionData.session.user.id)
-        .single();
+      // Fetch user data with caching
+      const userData = await fetchWithCache(
+        `user:${sessionData.session.user.id}`,
+        async () => {
+          const { data, error } = await supabase
+            .from("users")
+            .select("id, first_name, last_name, email, avatar_url, kor_coins")
+            .eq("id", sessionData.session!.user.id)
+            .single();
 
-      if (userError) {
-        console.error("[ROOM PAGE] Error fetching user data:", userError);
-        throw new Error("Failed to load user data");
-      }
+          if (error) throw error;
+          return data;
+        },
+        30000 // 30 second TTL for user data
+      );
 
       console.log("[ROOM PAGE] Authentication successful:", userData.id);
       if (mountedRef.current) {
         setUser(userData);
         setAuthLoading(false);
+        dataLoadedRef.current.auth = true;
       }
 
       // Save auth state for recovery
@@ -279,7 +366,7 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     }
   }, [forceComponentUpdate]);
 
-  // Add timeout for loading with better error recovery
+  // Add timeout for loading with better error recovery - but don't show any toasts
   useEffect(() => {
     if (!mountedRef.current) return;
 
@@ -290,12 +377,12 @@ export default function RoomPage({ roomData }: { roomData: any }) {
           clearTimeout(id)
         );
       } else {
-        clearTimeout(loadingTimeoutRef.current as NodeJS.Timeout);
+        clearTimeout(loadingTimeoutRef.current);
       }
       loadingTimeoutRef.current = null;
     }
 
-    // Set a new timeout - with progressive feedback
+    // Set a new timeout - but don't show any UI feedback
     loadingTimeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
 
@@ -304,19 +391,9 @@ export default function RoomPage({ roomData }: { roomData: any }) {
           "[ROOM PAGE] Initial loading period elapsed, attempting recovery..."
         );
 
-        // Show a toast but keep trying to recover
-        toast.loading("Connecting to trading room...", {
-          id: "room-page-loading",
-          duration: 8000,
-        });
-
-        // Try to recover automatically
+        // Try to recover automatically without showing toast
         retryAuth().then((success) => {
-          if (success && mountedRef.current) {
-            toast.success("Connection established!", {
-              id: "room-page-loading",
-            });
-          } else if (mountedRef.current) {
+          if (!success && mountedRef.current) {
             console.warn(
               "[ROOM PAGE] First recovery attempt failed, continuing..."
             );
@@ -330,31 +407,17 @@ export default function RoomPage({ roomData }: { roomData: any }) {
                   "[ROOM PAGE] Extended loading timeout reached, final recovery attempt"
                 );
 
-                toast.loading("Making final connection attempt...", {
-                  id: "room-page-loading",
-                  duration: 5000,
-                });
-
                 // Final retry with more aggressive approach
                 reconnectSupabase().then(async (reconnected) => {
                   if (reconnected && mountedRef.current) {
                     const authSuccess = await retryAuth();
                     if (authSuccess && mountedRef.current) {
-                      toast.success("Connected successfully!", {
-                        id: "room-page-loading",
-                      });
                       forceComponentUpdate();
                     } else if (mountedRef.current) {
                       setLoadTimeout(true);
-                      toast.error("Connection timed out. Please try again.", {
-                        id: "room-page-loading",
-                      });
                     }
                   } else if (mountedRef.current) {
                     setLoadTimeout(true);
-                    toast.error("Connection timed out. Please try again.", {
-                      id: "room-page-loading",
-                    });
                   }
                 });
               }
@@ -378,13 +441,10 @@ export default function RoomPage({ roomData }: { roomData: any }) {
             clearTimeout(id)
           );
         } else {
-          clearTimeout(loadingTimeoutRef.current as NodeJS.Timeout);
+          clearTimeout(loadingTimeoutRef.current);
         }
         loadingTimeoutRef.current = null;
       }
-
-      // Clear any loading toasts
-      toast.dismiss("room-page-loading");
     };
   }, [isLoading, authLoading, retryAuth, forceRender]);
 
@@ -482,36 +542,30 @@ export default function RoomPage({ roomData }: { roomData: any }) {
         if (session) {
           console.log("[AUTH] Session found, fetching user data...");
 
-          // Fetch user data
-          const { data: userData, error } = await supabase
-            .from("users")
-            .select("id, first_name, last_name, email, avatar_url, kor_coins")
-            .eq("id", session.user.id)
-            .single();
+          // Fetch user data with caching
+          const userData = await fetchWithCache(
+            `user:${session.user.id}`,
+            async () => {
+              const { data, error } = await supabase
+                .from("users")
+                .select(
+                  "id, first_name, last_name, email, avatar_url, kor_coins"
+                )
+                .eq("id", session.user.id)
+                .single();
 
-          if (error) {
-            console.error("[AUTH] Error fetching user data:", error);
-
-            // If we've tried too many times, show error
-            if (authRetryCountRef.current >= maxAuthRetries) {
-              if (mountedRef.current) {
-                setLoadError(
-                  "Failed to load user data. Please try refreshing the page."
-                );
-                setAuthLoading(false);
-              }
-            } else {
-              // Otherwise, try again
-              authRetryCountRef.current++;
-              setTimeout(checkAuth, 2000);
-            }
-            return;
-          }
+              if (error) throw error;
+              return data;
+            },
+            30000 // 30 second TTL for user data
+          );
 
           console.log("[AUTH] User data fetched successfully:", userData.id);
           if (mountedRef.current) {
             setUser(userData);
             setAuthLoading(false);
+            initialLoadCompleteRef.current = true;
+            dataLoadedRef.current.auth = true;
           }
           authRetryCountRef.current = 0; // Reset counter on success
 
@@ -565,16 +619,28 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
         if (event === "SIGNED_IN" && session) {
           // Fetch user data on sign in
-          const { data: userData, error } = await supabase
-            .from("users")
-            .select("id, first_name, last_name, email, avatar_url, kor_coins")
-            .eq("id", session.user.id)
-            .single();
+          const userData = await fetchWithCache(
+            `user:${session.user.id}`,
+            async () => {
+              const { data, error } = await supabase
+                .from("users")
+                .select(
+                  "id, first_name, last_name, email, avatar_url, kor_coins"
+                )
+                .eq("id", session.user.id)
+                .single();
 
-          if (!error && userData && mountedRef.current) {
+              if (error) throw error;
+              return data;
+            },
+            30000 // 30 second TTL for user data
+          );
+
+          if (userData && mountedRef.current) {
             console.log("[AUTH] User data updated after auth change");
             setUser(userData);
             setAuthLoading(false);
+            dataLoadedRef.current.auth = true;
 
             // Save auth state for recovery
             saveAuthState(userData.id, userData);
@@ -603,8 +669,26 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
     if (roomDetails) {
       saveRoomData(roomId, roomDetails);
+      dataLoadedRef.current.room = true;
     }
   }, [roomId, roomDetails]);
+
+  // Update data loaded status when price data is loaded
+  useEffect(() => {
+    if (priceDataLoaded) {
+      dataLoadedRef.current.price = true;
+    }
+  }, [priceDataLoaded]);
+
+  // Effect to handle initial render state
+  useEffect(() => {
+    // After a short delay, set initialRender to false to allow lazy components to load
+    const timer = setTimeout(() => {
+      setInitialRender(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!mountedRef.current) return;
@@ -845,7 +929,8 @@ export default function RoomPage({ roomData }: { roomData: any }) {
     );
   }
 
-  if (isLoading || authLoading) {
+  // Use RoomSkeleton only if we have no data at all
+  if ((isLoading || authLoading) && !roomDetails && !user) {
     return <RoomSkeleton />;
   }
 
@@ -936,43 +1021,164 @@ export default function RoomPage({ roomData }: { roomData: any }) {
 
             {/* Price Info Bar */}
             <div className="bg-[#212631] rounded-md w-full">
-              <PriceInfoBar
-                tradingPairs={roomDetails.trading_pairs}
-                selectedSymbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                priceData={priceData}
-                priceDataLoaded={priceDataLoaded}
-                fundingData={fundingData}
-                onSymbolChange={handleSymbolChange}
-                formatLargeNumber={formatLargeNumber}
-                extractCurrencies={extractCurrencies}
-              />
+              <Suspense
+                fallback={
+                  <div className="h-16 bg-[#212631] animate-pulse rounded-md"></div>
+                }
+              >
+                {!initialRender && (
+                  <PriceInfoBar
+                    tradingPairs={roomDetails.trading_pairs}
+                    selectedSymbol={
+                      selectedSymbol || roomDetails.trading_pairs[0]
+                    }
+                    priceData={priceData}
+                    priceDataLoaded={priceDataLoaded}
+                    fundingData={fundingData}
+                    onSymbolChange={handleSymbolChange}
+                    formatLargeNumber={formatLargeNumber}
+                    extractCurrencies={extractCurrencies}
+                  />
+                )}
+              </Suspense>
             </div>
 
             <div className="flex gap-1.5 w-full">
               {/* Trading Chart */}
-              <TradingChart
-                symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex-1 h-[45rem] bg-[#212631] animate-pulse rounded-md"></div>
+                }
+              >
+                {!initialRender && (
+                  <TradingChart
+                    symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                  />
+                )}
+              </Suspense>
 
               {/* Tabs */}
               <div className="bg-[#212631] p-1 rounded max-w-[290px] w-full h-[45rem] border border-[#3f445c]">
-                <TradingTabs
-                  symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                  onPriceUpdate={handlePriceUpdate}
-                />
+                <Suspense
+                  fallback={
+                    <div className="h-full bg-[#212631] animate-pulse rounded-md"></div>
+                  }
+                >
+                  {!initialRender && (
+                    <TradingTabs
+                      symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                      onPriceUpdate={handlePriceUpdate}
+                    />
+                  )}
+                </Suspense>
               </div>
 
-              <TradingMarketPlace />
+              <Suspense
+                fallback={
+                  <div className="w-[19rem] h-[45rem] bg-[#212631] rounded-md p-4 border border-[#3f445c]">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="text-white font-medium">거래</div>
+                      <div className="flex space-x-2">
+                        <div className="w-20 h-6 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+
+                    {/* Price input skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">주문가격</div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Amount input skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">주문수량</div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Percentage buttons skeleton */}
+                    <div className="grid grid-cols-5 gap-1 mb-4">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-8 bg-[#1a1e27]/50 rounded animate-pulse"
+                        ></div>
+                      ))}
+                    </div>
+
+                    {/* Leverage selector skeleton */}
+                    <div className="mb-4">
+                      <div className="text-xs text-white/70 mb-1">
+                        레버리지 설정
+                      </div>
+                      <div className="h-10 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                    </div>
+
+                    {/* Position info skeleton */}
+                    <div className="space-y-2 mb-4">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="flex justify-between">
+                          <div className="w-24 h-5 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                          <div className="w-24 h-5 bg-[#1a1e27]/50 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Action buttons skeleton */}
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                      <div className="h-10 bg-[#00C879]/30 rounded animate-pulse"></div>
+                      <div className="h-10 bg-[#FF5252]/30 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                }
+              >
+                <TradingMarketPlace />
+              </Suspense>
             </div>
 
-            <div className="bg-[#212631] w-full h-[22rem] border border-[#3f445c]">
-              <TradingTabsBottom
-                roomId={roomDetails.id}
-                isHost={isHost}
-                symbol={selectedSymbol || roomDetails.trading_pairs[0]}
-                currentPrice={currentPriceNumber}
-                virtualCurrency="KOR"
-              />
+            {/* Increased height to 16rem for the tabs container */}
+            <div className="bg-[#212631] w-full h-[16rem] border border-[#3f445c]">
+              <Suspense
+                fallback={
+                  <div className="h-full bg-[#212631] rounded-md p-2 border border-[#3f445c]">
+                    <div className="flex space-x-1 border-b border-[#3f445c]">
+                      <div className="px-4 py-2 text-sm text-white/70 bg-[#1a1e27]/30 rounded-t-md">
+                        거래
+                      </div>
+                      <div className="px-4 py-2 text-sm text-white/70">
+                        포지션
+                      </div>
+                      <div className="px-4 py-2 text-sm text-white/70">
+                        거래내역
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <div className="bg-[#212631] rounded max-w-[290px] w-full border border-[#3f445c] overflow-y-auto no-scrollbar">
+                        <div className="flex gap-1.5 w-full p-2">
+                          <div className="h-10 w-full bg-[#1a1e27] rounded animate-pulse"></div>
+                          <div className="h-10 w-full bg-[#1a1e27] rounded animate-pulse"></div>
+                        </div>
+                        <div className="h-10 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="h-10 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="h-32 w-full bg-[#1a1e27] rounded m-2 animate-pulse"></div>
+                        <div className="grid grid-cols-2 gap-2 p-2">
+                          <div className="h-10 w-full bg-[#00C879]/30 rounded animate-pulse"></div>
+                          <div className="h-10 w-full bg-[#FF5252]/30 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
+                {!initialRender && (
+                  <TradingTabsBottom
+                    roomId={roomDetails.id}
+                    isHost={isHost}
+                    symbol={selectedSymbol || roomDetails.trading_pairs[0]}
+                    currentPrice={currentPriceNumber}
+                    virtualCurrency="KOR"
+                  />
+                )}
+              </Suspense>
             </div>
           </div>
         </div>
